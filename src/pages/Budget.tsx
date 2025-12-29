@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,7 +12,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 interface Transaction {
   id: string;
@@ -50,6 +51,7 @@ interface FamilyMember {
 export default function Budget() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
@@ -78,6 +80,7 @@ export default function Budget() {
   useEffect(() => {
     if (user) {
       loadTransactions();
+      loadAllTransactions();
       loadCategories();
       loadFamilyMembers();
       loadBudgets();
@@ -92,6 +95,18 @@ export default function Budget() {
       .order('date', { ascending: false })
       .limit(100);
     setTransactions((data as Transaction[]) || []);
+  };
+
+  const loadAllTransactions = async () => {
+    // Load last 12 months of transactions for the chart
+    const sixMonthsAgo = format(subMonths(new Date(), 11), 'yyyy-MM-dd');
+    const { data } = await supabase
+      .from('transactions')
+      .select('id, amount, type, date')
+      .eq('user_id', user?.id)
+      .gte('date', sixMonthsAgo)
+      .order('date', { ascending: true });
+    setAllTransactions((data as Transaction[]) || []);
   };
 
   const loadCategories = async () => {
@@ -131,6 +146,40 @@ export default function Budget() {
     const date = new Date(t.date);
     return date.getMonth() + 1 === currentMonth && date.getFullYear() === currentYear;
   });
+
+  // Calculate monthly trend data for chart (last 12 months)
+  const monthlyTrendData = useMemo(() => {
+    const months: { month: string; income: number; expense: number; balance: number }[] = [];
+    
+    for (let i = 11; i >= 0; i--) {
+      const monthDate = subMonths(new Date(), i);
+      const monthStart = startOfMonth(monthDate);
+      const monthEnd = endOfMonth(monthDate);
+      const monthKey = format(monthDate, 'MMM yyyy');
+      
+      const monthTransactions = allTransactions.filter(t => {
+        const tDate = new Date(t.date);
+        return tDate >= monthStart && tDate <= monthEnd;
+      });
+      
+      const monthIncome = monthTransactions
+        .filter(t => t.type === 'income')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      
+      const monthExpense = monthTransactions
+        .filter(t => t.type === 'expense')
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+      
+      months.push({
+        month: format(monthDate, 'MMM'),
+        income: monthIncome,
+        expense: monthExpense,
+        balance: monthIncome - monthExpense,
+      });
+    }
+    
+    return months;
+  }, [allTransactions]);
 
   const income = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
   const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
@@ -501,6 +550,69 @@ export default function Budget() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Monthly Spending Trend Chart */}
+      {allTransactions.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Monthly Spending Trend
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthlyTrendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="month" 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                  />
+                  <YAxis 
+                    tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
+                    axisLine={{ stroke: 'hsl(var(--border))' }}
+                    tickFormatter={(value) => `৳${(value / 1000).toFixed(0)}k`}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: 'hsl(var(--card))', 
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                      color: 'hsl(var(--foreground))'
+                    }}
+                    formatter={(value: number) => [`৳${value.toLocaleString()}`, '']}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '20px' }}
+                    formatter={(value) => <span style={{ color: 'hsl(var(--muted-foreground))' }}>{value}</span>}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="income" 
+                    name="Income"
+                    stroke="#22c55e" 
+                    strokeWidth={2}
+                    dot={{ fill: '#22c55e', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: '#22c55e' }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="expense" 
+                    name="Expense"
+                    stroke="#ef4444" 
+                    strokeWidth={2}
+                    dot={{ fill: '#ef4444', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, fill: '#ef4444' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Budget Progress */}
       {spendingByCategory.length > 0 && (
