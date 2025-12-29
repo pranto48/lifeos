@@ -266,6 +266,51 @@ export type Database = {
           },
         ]
       }
+      family_member_connections: {
+        Row: {
+          connection_type: string
+          created_at: string
+          id: string
+          member_id_1: string
+          member_id_2: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          connection_type?: string
+          created_at?: string
+          id?: string
+          member_id_1: string
+          member_id_2: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          connection_type?: string
+          created_at?: string
+          id?: string
+          member_id_1?: string
+          member_id_2?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_member_connections_member_id_1_fkey"
+            columns: ["member_id_1"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_member_connections_member_id_2_fkey"
+            columns: ["member_id_2"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       family_members: {
         Row: {
           avatar_url: string | null

@@ -235,10 +235,11 @@ function DocumentCard({ doc, onDelete }: {
 
 export default function Family() {
   const { 
-    members, events, documents, isLoading,
+    members, events, documents, connections, isLoading,
     createMember, updateMember, deleteMember,
     createEvent, updateEvent, deleteEvent,
-    uploadDocument, deleteDocument
+    uploadDocument, deleteDocument,
+    createConnection, deleteConnection
   } = useFamily();
 
   const [memberDialog, setMemberDialog] = useState(false);
@@ -523,7 +524,13 @@ export default function Family() {
 
         {/* Tree Tab */}
         <TabsContent value="tree" className="space-y-4">
-          <FamilyTree members={members} />
+          <FamilyTree 
+            members={members} 
+            connections={connections}
+            onCreateConnection={(conn) => createConnection.mutate(conn)}
+            onDeleteConnection={(id) => deleteConnection.mutate(id)}
+            isCreating={createConnection.isPending}
+          />
         </TabsContent>
 
         {/* Events Tab */}

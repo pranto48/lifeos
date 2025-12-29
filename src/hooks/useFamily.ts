@@ -45,6 +45,18 @@ export interface FamilyDocument {
   family_member?: FamilyMember;
 }
 
+export interface FamilyConnection {
+  id: string;
+  user_id: string;
+  member_id_1: string;
+  member_id_2: string;
+  connection_type: 'spouse' | 'parent_child' | 'sibling';
+  created_at: string;
+  updated_at: string;
+  member_1?: FamilyMember;
+  member_2?: FamilyMember;
+}
+
 export function useFamily() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -90,6 +102,21 @@ export function useFamily() {
 
       if (error) throw error;
       return data as FamilyDocument[];
+    },
+    enabled: !!user?.id,
+  });
+
+  // Family Connections
+  const connectionsQuery = useQuery({
+    queryKey: ['family_connections', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('family_member_connections')
+        .select('*, member_1:family_members!member_id_1(*), member_2:family_members!member_id_2(*)')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as FamilyConnection[];
     },
     enabled: !!user?.id,
   });
@@ -309,11 +336,58 @@ export function useFamily() {
     },
   });
 
+  // Connection mutations
+  const createConnection = useMutation({
+    mutationFn: async (connection: { member_id_1: string; member_id_2: string; connection_type: string }) => {
+      const { data, error } = await supabase
+        .from('family_member_connections')
+        .insert({
+          user_id: user!.id,
+          member_id_1: connection.member_id_1,
+          member_id_2: connection.member_id_2,
+          connection_type: connection.connection_type,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['family_connections'] });
+      toast.success('Connection added!');
+    },
+    onError: (error) => {
+      toast.error('Failed to add connection');
+      console.error(error);
+    },
+  });
+
+  const deleteConnection = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('family_member_connections')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['family_connections'] });
+      toast.success('Connection removed');
+    },
+    onError: (error) => {
+      toast.error('Failed to remove connection');
+      console.error(error);
+    },
+  });
+
   return {
     members: membersQuery.data || [],
     events: eventsQuery.data || [],
     documents: documentsQuery.data || [],
-    isLoading: membersQuery.isLoading || eventsQuery.isLoading || documentsQuery.isLoading,
+    connections: connectionsQuery.data || [],
+    isLoading: membersQuery.isLoading || eventsQuery.isLoading || documentsQuery.isLoading || connectionsQuery.isLoading,
     createMember,
     updateMember,
     deleteMember,
@@ -322,5 +396,7 @@ export function useFamily() {
     deleteEvent,
     uploadDocument,
     deleteDocument,
+    createConnection,
+    deleteConnection,
   };
 }
