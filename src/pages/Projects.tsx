@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Lightbulb, Plus, MoreVertical, Pencil, Trash2, Calendar, Target } from 'lucide-react';
+import { Lightbulb, Plus, MoreVertical, Pencil, Trash2, Calendar, Target, CheckCircle2, Circle, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -12,8 +12,19 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Progress } from '@/components/ui/progress';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+
+interface Milestone {
+  id: string;
+  project_id: string;
+  title: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  sort_order: number;
+}
 
 interface Project {
   id: string;
@@ -45,6 +56,9 @@ export default function Projects() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [projects, setProjects] = useState<Project[]>([]);
+  const [milestones, setMilestones] = useState<Record<string, Milestone[]>>({});
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [newMilestone, setNewMilestone] = useState<Record<string, string>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [formData, setFormData] = useState({
@@ -61,12 +75,26 @@ export default function Projects() {
   }, [user]);
 
   const loadProjects = async () => {
-    const { data } = await supabase
+    const { data: projectsData } = await supabase
       .from('projects')
       .select('*')
       .eq('user_id', user?.id)
       .order('created_at', { ascending: false });
-    setProjects(data || []);
+    setProjects(projectsData || []);
+
+    // Load all milestones
+    const { data: milestonesData } = await supabase
+      .from('project_milestones')
+      .select('*')
+      .eq('user_id', user?.id)
+      .order('sort_order', { ascending: true });
+    
+    const grouped: Record<string, Milestone[]> = {};
+    (milestonesData || []).forEach((m: Milestone) => {
+      if (!grouped[m.project_id]) grouped[m.project_id] = [];
+      grouped[m.project_id].push(m);
+    });
+    setMilestones(grouped);
   };
 
   const resetForm = () => {
@@ -140,6 +168,63 @@ export default function Projects() {
       toast.success(t('projects.projectDeleted'));
       loadProjects();
     }
+  };
+
+  const toggleExpanded = (projectId: string) => {
+    setExpandedProjects(prev => {
+      const next = new Set(prev);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const handleAddMilestone = async (projectId: string) => {
+    const title = newMilestone[projectId]?.trim();
+    if (!title || !user) return;
+
+    const currentMilestones = milestones[projectId] || [];
+    const { error } = await supabase.from('project_milestones').insert({
+      project_id: projectId,
+      user_id: user.id,
+      title,
+      sort_order: currentMilestones.length,
+    });
+
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success(t('projects.milestoneAdded'));
+      setNewMilestone(prev => ({ ...prev, [projectId]: '' }));
+      loadProjects();
+    }
+  };
+
+  const toggleMilestone = async (milestone: Milestone) => {
+    const { error } = await supabase
+      .from('project_milestones')
+      .update({
+        is_completed: !milestone.is_completed,
+        completed_at: !milestone.is_completed ? new Date().toISOString() : null,
+      })
+      .eq('id', milestone.id);
+
+    if (!error) loadProjects();
+  };
+
+  const deleteMilestone = async (id: string) => {
+    const { error } = await supabase.from('project_milestones').delete().eq('id', id);
+    if (!error) {
+      toast.success(t('projects.milestoneDeleted'));
+      loadProjects();
+    }
+  };
+
+  const getProgress = (projectId: string) => {
+    const projectMilestones = milestones[projectId] || [];
+    if (projectMilestones.length === 0) return 0;
+    const completed = projectMilestones.filter(m => m.is_completed).length;
+    return Math.round((completed / projectMilestones.length) * 100);
   };
 
   return (
@@ -256,60 +341,145 @@ export default function Projects() {
             </CardContent>
           </Card>
         ) : (
-          projects.map(project => (
-            <Card key={project.id} className="bg-card border-border hover:bg-muted/30 transition-colors group">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <h3 className="font-medium text-foreground">{project.title}</h3>
-                  <div className="flex items-center gap-1">
-                    <Badge className={statusColors[project.status]}>{t(`projects.${project.status}` as any)}</Badge>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openEditDialog(project)}>
-                          <Pencil className="h-4 w-4 mr-2" />
-                          {t('common.edit')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDelete(project.id)} className="text-destructive">
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          {t('common.delete')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+          projects.map(project => {
+            const projectMilestones = milestones[project.id] || [];
+            const progress = getProgress(project.id);
+            const isExpanded = expandedProjects.has(project.id);
+
+            return (
+              <Card key={project.id} className="bg-card border-border hover:bg-muted/30 transition-colors group">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <h3 className="font-medium text-foreground">{project.title}</h3>
+                    <div className="flex items-center gap-1">
+                      <Badge className={statusColors[project.status]}>{t(`projects.${project.status}` as any)}</Badge>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => openEditDialog(project)}>
+                            <Pencil className="h-4 w-4 mr-2" />
+                            {t('common.edit')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(project.id)} className="text-destructive">
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {t('common.delete')}
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
                   </div>
-                </div>
-                
-                {project.description && (
-                  <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
-                )}
-                
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className={priorityColors[project.priority]} variant="outline">
-                    <Target className="h-3 w-3 mr-1" />
-                    {t(`projects.${project.priority}` as any)}
-                  </Badge>
-                  {project.target_date && (
-                    <Badge variant="outline" className="text-xs">
-                      <Calendar className="h-3 w-3 mr-1" />
-                      {format(new Date(project.target_date), 'MMM d, yyyy')}
-                    </Badge>
+                  
+                  {project.description && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">{project.description}</p>
                   )}
-                </div>
-                
-                {project.tags && project.tags.length > 0 && (
-                  <div className="flex gap-1 flex-wrap">
-                    {project.tags.map((tag: string) => (
-                      <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
-                    ))}
+
+                  {/* Progress bar */}
+                  {projectMilestones.length > 0 && (
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-muted-foreground">{t('projects.progress')}</span>
+                        <span className="font-mono text-foreground">{progress}%</span>
+                      </div>
+                      <Progress value={progress} className="h-1.5" />
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge className={priorityColors[project.priority]} variant="outline">
+                      <Target className="h-3 w-3 mr-1" />
+                      {t(`projects.${project.priority}` as any)}
+                    </Badge>
+                    {project.target_date && (
+                      <Badge variant="outline" className="text-xs">
+                        <Calendar className="h-3 w-3 mr-1" />
+                        {format(new Date(project.target_date), 'MMM d, yyyy')}
+                      </Badge>
+                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
+                  
+                  {project.tags && project.tags.length > 0 && (
+                    <div className="flex gap-1 flex-wrap">
+                      {project.tags.map((tag: string) => (
+                        <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Milestones section */}
+                  <Collapsible open={isExpanded} onOpenChange={() => toggleExpanded(project.id)}>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground hover:text-foreground p-0 h-8">
+                        <span className="text-xs">{t('projects.milestones')} ({projectMilestones.filter(m => m.is_completed).length}/{projectMilestones.length})</span>
+                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-2 pt-2">
+                      {projectMilestones.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">{t('projects.noMilestones')}</p>
+                      ) : (
+                        <div className="space-y-1">
+                          {projectMilestones.map(milestone => (
+                            <div
+                              key={milestone.id}
+                              className="flex items-center gap-2 group/milestone"
+                            >
+                              <button
+                                onClick={() => toggleMilestone(milestone)}
+                                className="flex-shrink-0"
+                              >
+                                {milestone.is_completed ? (
+                                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                                ) : (
+                                  <Circle className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                                )}
+                              </button>
+                              <span className={`text-sm flex-1 ${milestone.is_completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                {milestone.title}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0 opacity-0 group-hover/milestone:opacity-100"
+                                onClick={() => deleteMilestone(milestone.id)}
+                              >
+                                <Trash2 className="h-3 w-3 text-destructive" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        <Input
+                          value={newMilestone[project.id] || ''}
+                          onChange={(e) => setNewMilestone(prev => ({ ...prev, [project.id]: e.target.value }))}
+                          placeholder={t('projects.milestonePlaceholder')}
+                          className="h-8 text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleAddMilestone(project.id);
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          onClick={() => handleAddMilestone(project.id)}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+                </CardContent>
+              </Card>
+            );
+          })
         )}
       </div>
     </div>
