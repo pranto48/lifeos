@@ -4,11 +4,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBiometricAuth } from '@/hooks/useBiometricAuth';
+import { useRateLimit } from '@/hooks/useRateLimit';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone } from 'lucide-react';
+import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone, AlertTriangle } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -37,6 +38,13 @@ export default function Auth() {
 
   const { signIn, signUp, user, session } = useAuth();
   const navigate = useNavigate();
+  const {
+    isLocked,
+    remainingAttempts,
+    formatRemainingTime,
+    recordAttempt,
+    reset: resetRateLimit,
+  } = useRateLimit('auth', { maxAttempts: 5, windowMs: 60000, lockoutMs: 300000 });
   const {
     capabilities,
     isLoading: biometricLoading,
@@ -72,6 +80,17 @@ export default function Auth() {
 
     try {
       if (isLogin) {
+        // Check rate limit before attempting login
+        if (isLocked) {
+          toast({
+            title: 'Too many attempts',
+            description: `Please wait ${formatRemainingTime()} before trying again.`,
+            variant: 'destructive',
+          });
+          setLoading(false);
+          return;
+        }
+
         const result = loginSchema.safeParse({ email, password });
         if (!result.success) {
           const fieldErrors: Record<string, string> = {};
@@ -83,14 +102,21 @@ export default function Auth() {
           return;
         }
 
+        // Record the attempt before making the request
+        recordAttempt();
+
         const { error } = await signIn(email, password);
         if (error) {
           toast({
             title: 'Authentication Failed',
-            description: error.message,
+            description: remainingAttempts > 1 
+              ? `${error.message}. ${remainingAttempts - 1} attempts remaining.`
+              : error.message,
             variant: 'destructive',
           });
         } else {
+          // Reset rate limit on successful login
+          resetRateLimit();
           // Check if we should offer biometric setup
           if (capabilities?.canUseBiometrics && !hasBiometricSetup) {
             // We'll handle biometric prompt after successful login
@@ -264,6 +290,25 @@ export default function Auth() {
                 <p className="text-xs text-muted-foreground">
                   <strong>Tip:</strong> Save your password to Safari for quick Face ID login on future visits.
                 </p>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Rate Limit Warning */}
+          {isLocked && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mb-4 p-4 rounded-lg bg-destructive/10 border border-destructive/30"
+            >
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-5 h-5 text-destructive flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-destructive">Too many failed attempts</p>
+                  <p className="text-xs text-destructive/80">
+                    Please wait {formatRemainingTime()} before trying again.
+                  </p>
+                </div>
               </div>
             </motion.div>
           )}
