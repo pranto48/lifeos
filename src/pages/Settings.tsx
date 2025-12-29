@@ -10,6 +10,7 @@ import { toast } from '@/hooks/use-toast';
 import { SessionManagement } from '@/components/settings/SessionManagement';
 import { PasswordChange } from '@/components/settings/PasswordChange';
 import { TwoFactorAuth } from '@/components/settings/TwoFactorAuth';
+import { BiometricManagement } from '@/components/settings/BiometricManagement';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -126,6 +127,8 @@ export default function Settings() {
       <PasswordChange />
       
       <TwoFactorAuth />
+
+      <BiometricManagement />
 
       <Card className="bg-card border-border">
         <CardHeader>
