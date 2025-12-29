@@ -455,11 +455,11 @@ export default function Family() {
               }
             }}>
               <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-2" /> Add Member</Button>
+                <Button><Plus className="h-4 w-4 mr-2" /> {t('family.addMember')}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingMember ? 'Edit Member' : 'Add Family Member'}</DialogTitle>
+                  <DialogTitle>{editingMember ? t('family.editMember') : t('family.addFamilyMember')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleMemberSubmit} className="space-y-4">
                   {/* Avatar Upload */}
@@ -472,7 +472,7 @@ export default function Family() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Name</Label>
+                    <Label>{t('family.name')}</Label>
                     <Input
                       value={memberForm.name}
                       onChange={(e) => setMemberForm(f => ({ ...f, name: e.target.value }))}
@@ -480,9 +480,9 @@ export default function Family() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Relationship</Label>
+                    <Label>{t('family.relationship')}</Label>
                     <Select value={memberForm.relationship} onValueChange={(v) => setMemberForm(f => ({ ...f, relationship: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('family.selectRelationship')} /></SelectTrigger>
                       <SelectContent>
                         {RELATIONSHIPS.map(r => (
                           <SelectItem key={r} value={r}>{r}</SelectItem>
@@ -491,7 +491,7 @@ export default function Family() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Date of Birth</Label>
+                    <Label>{t('family.dateOfBirth')}</Label>
                     <Input
                       type="date"
                       value={memberForm.date_of_birth}
@@ -499,7 +499,7 @@ export default function Family() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Notes</Label>
+                    <Label>{t('family.notes')}</Label>
                     <Textarea
                       value={memberForm.notes}
                       onChange={(e) => setMemberForm(f => ({ ...f, notes: e.target.value }))}
@@ -507,9 +507,9 @@ export default function Family() {
                     />
                   </div>
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setMemberDialog(false)}>Cancel</Button>
+                    <Button type="button" variant="outline" onClick={() => setMemberDialog(false)}>{t('common.cancel')}</Button>
                     <Button type="submit" disabled={createMember.isPending || updateMember.isPending}>
-                      {editingMember ? 'Save' : 'Add'}
+                      {editingMember ? t('common.save') : t('common.add')}
                     </Button>
                   </div>
                 </form>
@@ -529,10 +529,10 @@ export default function Family() {
             <Card className="border-dashed">
               <CardContent className="p-12 text-center">
                 <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-semibold text-foreground mb-2">No family members yet</h3>
-                <p className="text-muted-foreground mb-4">Add your family members to track birthdays and events</p>
+                <h3 className="font-semibold text-foreground mb-2">{t('family.noMembersYet')}</h3>
+                <p className="text-muted-foreground mb-4">{t('family.addMembersHint')}</p>
                 <Button onClick={() => setMemberDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" /> Add First Member
+                  <Plus className="h-4 w-4 mr-2" /> {t('family.addFirstMember')}
                 </Button>
               </CardContent>
             </Card>
@@ -545,7 +545,7 @@ export default function Family() {
                     member={member}
                     onView={() => setViewingMember(member)}
                     onEdit={() => openEditMember(member)}
-                    onDelete={() => confirm('Delete this family member?') && deleteMember.mutate(member.id)}
+                    onDelete={() => confirm(t('family.deleteMemberConfirm')) && deleteMember.mutate(member.id)}
                   />
                 ))}
               </AnimatePresence>
@@ -575,36 +575,36 @@ export default function Family() {
               }
             }}>
               <DialogTrigger asChild>
-                <Button><Plus className="h-4 w-4 mr-2" /> Add Event</Button>
+                <Button><Plus className="h-4 w-4 mr-2" /> {t('family.addEvent')}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>{editingEvent ? 'Edit Event' : 'Add Event'}</DialogTitle>
+                  <DialogTitle>{editingEvent ? t('family.editEvent') : t('family.addEvent')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleEventSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Title</Label>
+                    <Label>{t('family.eventTitle')}</Label>
                     <Input
                       value={eventForm.title}
                       onChange={(e) => setEventForm(f => ({ ...f, title: e.target.value }))}
-                      placeholder="e.g., Mom's Birthday"
+                      placeholder={t('family.eventTitlePlaceholder')}
                       required
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Type</Label>
+                      <Label>{t('family.eventType')}</Label>
                       <Select value={eventForm.event_type} onValueChange={(v) => setEventForm(f => ({ ...f, event_type: v }))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {EVENT_TYPES.map(t => (
-                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                          {EVENT_TYPES.map(et => (
+                            <SelectItem key={et.value} value={et.value}>{et.label}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Date</Label>
+                      <Label>{t('budget.date')}</Label>
                       <Input
                         type="date"
                         value={eventForm.event_date}
@@ -614,11 +614,11 @@ export default function Family() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Family Member (optional)</Label>
+                    <Label>{t('family.familyMember')} ({t('common.optional')})</Label>
                     <Select value={eventForm.family_member_id || "none"} onValueChange={(v) => setEventForm(f => ({ ...f, family_member_id: v === "none" ? "" : v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('family.selectMember')} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="none">{t('common.none')}</SelectItem>
                         {members.map(m => (
                           <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                         ))}
@@ -626,7 +626,7 @@ export default function Family() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Notes</Label>
+                    <Label>{t('family.notes')}</Label>
                     <Textarea
                       value={eventForm.notes}
                       onChange={(e) => setEventForm(f => ({ ...f, notes: e.target.value }))}
@@ -634,9 +634,9 @@ export default function Family() {
                     />
                   </div>
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setEventDialog(false)}>Cancel</Button>
+                    <Button type="button" variant="outline" onClick={() => setEventDialog(false)}>{t('common.cancel')}</Button>
                     <Button type="submit" disabled={createEvent.isPending || updateEvent.isPending}>
-                      {editingEvent ? 'Save' : 'Add'}
+                      {editingEvent ? t('common.save') : t('common.add')}
                     </Button>
                   </div>
                 </form>
@@ -648,10 +648,10 @@ export default function Family() {
             <Card className="border-dashed">
               <CardContent className="p-12 text-center">
                 <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-semibold text-foreground mb-2">No events yet</h3>
-                <p className="text-muted-foreground mb-4">Add birthdays, anniversaries, and other important dates</p>
+                <h3 className="font-semibold text-foreground mb-2">{t('family.noEventsYet')}</h3>
+                <p className="text-muted-foreground mb-4">{t('family.addEventsHint')}</p>
                 <Button onClick={() => setEventDialog(true)}>
-                  <Plus className="h-4 w-4 mr-2" /> Add First Event
+                  <Plus className="h-4 w-4 mr-2" /> {t('family.addFirstEvent')}
                 </Button>
               </CardContent>
             </Card>
@@ -664,7 +664,7 @@ export default function Family() {
                       key={event.id}
                       event={event}
                       onEdit={() => openEditEvent(event)}
-                      onDelete={() => confirm('Delete this event?') && deleteEvent.mutate(event.id)}
+                      onDelete={() => confirm(t('family.deleteEventConfirm')) && deleteEvent.mutate(event.id)}
                     />
                   ))}
                 </AnimatePresence>
@@ -684,15 +684,15 @@ export default function Family() {
               }
             }}>
               <DialogTrigger asChild>
-                <Button><Upload className="h-4 w-4 mr-2" /> Upload Document</Button>
+                <Button><Upload className="h-4 w-4 mr-2" /> {t('family.uploadDocument')}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>Upload Document</DialogTitle>
+                  <DialogTitle>{t('family.uploadDocument')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleDocSubmit} className="space-y-4">
                   <div className="space-y-2">
-                    <Label>File</Label>
+                    <Label>{t('family.file')}</Label>
                     <input
                       ref={fileInputRef}
                       type="file"
@@ -714,23 +714,23 @@ export default function Family() {
                       ) : (
                         <>
                           <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                          <p className="text-sm text-muted-foreground">Click to select a file</p>
+                          <p className="text-sm text-muted-foreground">{t('family.clickToSelect')}</p>
                         </>
                       )}
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Title</Label>
+                    <Label>{t('family.eventTitle')}</Label>
                     <Input
                       value={docForm.title}
                       onChange={(e) => setDocForm(f => ({ ...f, title: e.target.value }))}
-                      placeholder="Document title"
+                      placeholder={t('family.documentTitle')}
                       required
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>Category</Label>
+                      <Label>{t('budget.category')}</Label>
                       <Select value={docForm.category} onValueChange={(v) => setDocForm(f => ({ ...f, category: v }))}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
@@ -741,11 +741,11 @@ export default function Family() {
                       </Select>
                     </div>
                     <div className="space-y-2">
-                      <Label>Family Member</Label>
+                      <Label>{t('family.familyMember')}</Label>
                       <Select value={docForm.family_member_id || "none"} onValueChange={(v) => setDocForm(f => ({ ...f, family_member_id: v === "none" ? "" : v }))}>
-                        <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('common.optional')} /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="none">{t('common.none')}</SelectItem>
                           {members.map(m => (
                             <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                           ))}
@@ -754,7 +754,7 @@ export default function Family() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label>Notes</Label>
+                    <Label>{t('family.notes')}</Label>
                     <Textarea
                       value={docForm.notes}
                       onChange={(e) => setDocForm(f => ({ ...f, notes: e.target.value }))}
@@ -762,9 +762,9 @@ export default function Family() {
                     />
                   </div>
                   <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setDocDialog(false)}>Cancel</Button>
+                    <Button type="button" variant="outline" onClick={() => setDocDialog(false)}>{t('common.cancel')}</Button>
                     <Button type="submit" disabled={!selectedFile || uploadDocument.isPending}>
-                      {uploadDocument.isPending ? 'Uploading...' : 'Upload'}
+                      {uploadDocument.isPending ? t('family.uploading') : t('family.upload')}
                     </Button>
                   </div>
                 </form>
@@ -776,10 +776,10 @@ export default function Family() {
             <Card className="border-dashed">
               <CardContent className="p-12 text-center">
                 <FolderOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="font-semibold text-foreground mb-2">No documents yet</h3>
-                <p className="text-muted-foreground mb-4">Store important family documents securely</p>
+                <h3 className="font-semibold text-foreground mb-2">{t('family.noDocsYet')}</h3>
+                <p className="text-muted-foreground mb-4">{t('family.storeDocsHint')}</p>
                 <Button onClick={() => setDocDialog(true)}>
-                  <Upload className="h-4 w-4 mr-2" /> Upload First Document
+                  <Upload className="h-4 w-4 mr-2" /> {t('family.uploadFirstDoc')}
                 </Button>
               </CardContent>
             </Card>
@@ -791,7 +791,7 @@ export default function Family() {
                     <DocumentCard
                       key={doc.id}
                       doc={doc}
-                      onDelete={() => confirm('Delete this document?') && deleteDocument.mutate(doc)}
+                      onDelete={() => confirm(t('family.deleteDocConfirm')) && deleteDocument.mutate(doc)}
                     />
                   ))}
                 </AnimatePresence>
