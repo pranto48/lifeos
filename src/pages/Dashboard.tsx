@@ -1,15 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
-  CheckSquare, FileText, Wallet, TrendingUp, Target, 
-  Calendar, Clock, ArrowUpRight, ArrowDownRight, Plus
+  CheckSquare, FileText, Wallet, Target, 
+  Calendar, Clock, ArrowUpRight, ArrowDownRight
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { format } from 'date-fns';
+import { UpcomingFamilyEvents } from '@/components/dashboard/UpcomingFamilyEvents';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -162,37 +161,41 @@ export default function Dashboard() {
         </Card>
       </div>
 
-      {/* Upcoming Tasks */}
-      <Card className="bg-card border-border">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-            <Calendar className="h-4 w-4" /> Upcoming Tasks
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {stats.upcomingTasks.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No tasks yet. Press 't' to add one!</p>
-          ) : (
-            <div className="space-y-2">
-              {stats.upcomingTasks.map(task => (
-                <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${
-                      task.priority === 'urgent' ? 'bg-red-500' :
-                      task.priority === 'high' ? 'bg-orange-500' :
-                      task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                    }`} />
-                    <span className="text-sm text-foreground">{task.title}</span>
+      {/* Bottom Grid: Upcoming Tasks + Family Events */}
+      <div className="grid md:grid-cols-2 gap-6">
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+              <Calendar className="h-4 w-4" /> Upcoming Tasks
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {stats.upcomingTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">No tasks yet. Press 't' to add one!</p>
+            ) : (
+              <div className="space-y-2">
+                {stats.upcomingTasks.map(task => (
+                  <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-2 h-2 rounded-full ${
+                        task.priority === 'urgent' ? 'bg-red-500' :
+                        task.priority === 'high' ? 'bg-orange-500' :
+                        task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                      }`} />
+                      <span className="text-sm text-foreground">{task.title}</span>
+                    </div>
+                    {task.due_date && (
+                      <span className="text-xs text-muted-foreground">{format(new Date(task.due_date), 'MMM d')}</span>
+                    )}
                   </div>
-                  {task.due_date && (
-                    <span className="text-xs text-muted-foreground">{format(new Date(task.due_date), 'MMM d')}</span>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <UpcomingFamilyEvents />
+      </div>
     </div>
   );
 }

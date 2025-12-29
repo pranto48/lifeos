@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Shield, Download, LogOut, Mail, Bell, Monitor } from 'lucide-react';
+import { Settings as SettingsIcon, User, Shield, Download, LogOut, Mail, Bell } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { SessionManagement } from '@/components/settings/SessionManagement';
+import { PasswordChange } from '@/components/settings/PasswordChange';
+import { TwoFactorAuth } from '@/components/settings/TwoFactorAuth';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -120,6 +122,10 @@ export default function Settings() {
       </Card>
 
       <SessionManagement />
+      
+      <PasswordChange />
+      
+      <TwoFactorAuth />
 
       <Card className="bg-card border-border">
         <CardHeader>
