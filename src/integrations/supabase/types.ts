@@ -166,6 +166,142 @@ export type Database = {
           },
         ]
       }
+      family_documents: {
+        Row: {
+          category: string | null
+          created_at: string
+          family_member_id: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string
+          id: string
+          notes: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
+          family_member_id?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url: string
+          id?: string
+          notes?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          family_member_id?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string
+          id?: string
+          notes?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_documents_family_member_id_fkey"
+            columns: ["family_member_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_events: {
+        Row: {
+          created_at: string
+          event_date: string
+          event_type: string
+          family_member_id: string | null
+          id: string
+          notes: string | null
+          reminder_days: number | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          event_date: string
+          event_type?: string
+          family_member_id?: string | null
+          id?: string
+          notes?: string | null
+          reminder_days?: number | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_date?: string
+          event_type?: string
+          family_member_id?: string | null
+          id?: string
+          notes?: string | null
+          reminder_days?: number | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_events_family_member_id_fkey"
+            columns: ["family_member_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_members: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          date_of_birth: string | null
+          id: string
+          name: string
+          notes: string | null
+          relationship: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          id?: string
+          name: string
+          notes?: string | null
+          relationship: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          id?: string
+          name?: string
+          notes?: string | null
+          relationship?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       goal_milestones: {
         Row: {
           completed_at: string | null
@@ -679,6 +815,7 @@ export type Database = {
           category_id: string | null
           created_at: string
           date: string
+          family_member_id: string | null
           id: string
           is_recurring: boolean | null
           merchant: string | null
@@ -695,6 +832,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           date?: string
+          family_member_id?: string | null
           id?: string
           is_recurring?: boolean | null
           merchant?: string | null
@@ -711,6 +849,7 @@ export type Database = {
           category_id?: string | null
           created_at?: string
           date?: string
+          family_member_id?: string | null
           id?: string
           is_recurring?: boolean | null
           merchant?: string | null
@@ -726,6 +865,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "budget_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_family_member_id_fkey"
+            columns: ["family_member_id"]
+            isOneToOne: false
+            referencedRelation: "family_members"
             referencedColumns: ["id"]
           },
         ]
