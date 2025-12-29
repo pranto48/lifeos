@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle, Settings, Tag } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -72,7 +72,9 @@ export default function Budget() {
   const [filterMember, setFilterMember] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+  const [newCategory, setNewCategory] = useState({ name: '', is_income: false, color: '#6b7280' });
   
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -394,6 +396,39 @@ export default function Budget() {
   // Categories with budget alerts
   const alertCategories = spendingByCategory.filter(c => c.overBudget || c.nearLimit);
 
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCategory.name.trim() || !user) return;
+
+    try {
+      const { error } = await supabase.from('budget_categories').insert({
+        user_id: user.id,
+        name: newCategory.name.trim(),
+        is_income: newCategory.is_income,
+        color: newCategory.color,
+      });
+      if (error) throw error;
+
+      toast.success(t('budget.categoryAdded'));
+      setNewCategory({ name: '', is_income: false, color: '#6b7280' });
+      loadCategories();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleDeleteCategory = async (categoryId: string) => {
+    if (!confirm(t('budget.deleteCategoryConfirm'))) return;
+
+    const { error } = await supabase.from('budget_categories').delete().eq('id', categoryId);
+    if (error) {
+      toast.error('Failed to delete category');
+    } else {
+      toast.success(t('budget.categoryDeleted'));
+      loadCategories();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -455,6 +490,91 @@ export default function Budget() {
                   <Button type="submit">{t('budget.saveLimit')}</Button>
                 </div>
               </form>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Tag className="h-4 w-4 mr-2" />
+                {t('budget.manageCategories')}
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>{t('budget.addCategory')}</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleAddCategory} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>{t('budget.categoryName')}</Label>
+                  <Input
+                    value={newCategory.name}
+                    onChange={(e) => setNewCategory(c => ({ ...c, name: e.target.value }))}
+                    placeholder={t('budget.categoryName')}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t('budget.categoryType')}</Label>
+                    <Select 
+                      value={newCategory.is_income ? 'income' : 'expense'} 
+                      onValueChange={(v) => setNewCategory(c => ({ ...c, is_income: v === 'income' }))}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="expense">{t('budget.expenseCategory')}</SelectItem>
+                        <SelectItem value="income">{t('budget.incomeCategory')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t('budget.categoryColor')}</Label>
+                    <Input
+                      type="color"
+                      value={newCategory.color}
+                      onChange={(e) => setNewCategory(c => ({ ...c, color: e.target.value }))}
+                      className="h-10 p-1 cursor-pointer"
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button type="submit">{t('common.add')}</Button>
+                </div>
+              </form>
+
+              {/* Existing Categories List */}
+              <div className="mt-4 border-t pt-4">
+                <Label className="text-sm font-medium">{t('budget.existingCategories')}</Label>
+                <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
+                  {categories.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">{t('budget.noCategories')}</p>
+                  ) : (
+                    categories.map(cat => (
+                      <div key={cat.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50 group">
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-3 h-3 rounded-full" 
+                            style={{ backgroundColor: cat.color || '#6b7280' }}
+                          />
+                          <span className="text-sm">{cat.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {cat.is_income ? t('budget.income') : t('budget.expense')}
+                          </Badge>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="opacity-0 group-hover:opacity-100 h-7 w-7 p-0 text-destructive"
+                          onClick={() => handleDeleteCategory(cat.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
 
