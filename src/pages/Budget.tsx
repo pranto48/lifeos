@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle, Settings, Tag } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle, Settings, Tag, CreditCard, Banknote, PiggyBank, Receipt, ShoppingCart, ShoppingBag, Utensils, Coffee, Car, Fuel, Home, Lightbulb, Wifi, Phone, Laptop, Gamepad2, Music, Film, Book, GraduationCap, Briefcase, Heart, Activity, Pill, Plane, Train, Bus, Gift, Baby, Dog, Shirt, Scissors, Wrench, Building, DollarSign, HandCoins, Coins, MoreHorizontal } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -45,7 +45,29 @@ interface Category {
   name: string;
   is_income: boolean;
   color: string | null;
+  icon: string | null;
 }
+
+const CATEGORY_ICONS = [
+  'Wallet', 'CreditCard', 'Banknote', 'PiggyBank', 'Receipt', 'ShoppingCart', 'ShoppingBag',
+  'Utensils', 'Coffee', 'Car', 'Fuel', 'Home', 'Lightbulb', 'Wifi', 'Phone', 'Laptop',
+  'Gamepad2', 'Music', 'Film', 'Book', 'GraduationCap', 'Briefcase', 'Heart', 'Activity',
+  'Pill', 'Plane', 'Train', 'Bus', 'Gift', 'Baby', 'Dog', 'Shirt', 'Scissors', 'Wrench',
+  'Building', 'TrendingUp', 'DollarSign', 'HandCoins', 'Coins', 'MoreHorizontal'
+] as const;
+
+const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  Wallet, CreditCard, Banknote, PiggyBank, Receipt, ShoppingCart, ShoppingBag,
+  Utensils, Coffee, Car, Fuel, Home, Lightbulb, Wifi, Phone, Laptop,
+  Gamepad2, Music, Film, Book, GraduationCap, Briefcase, Heart, Activity,
+  Pill, Plane, Train, Bus, Gift, Baby, Dog, Shirt, Scissors, Wrench,
+  Building, TrendingUp, DollarSign, HandCoins, Coins, MoreHorizontal
+};
+
+const CategoryIcon = ({ name, className }: { name: string; className?: string }) => {
+  const Icon = iconMap[name] || Wallet;
+  return <Icon className={className} />;
+};
 
 interface Budget {
   id: string;
@@ -74,7 +96,7 @@ export default function Budget() {
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [newCategory, setNewCategory] = useState({ name: '', is_income: false, color: '#6b7280' });
+  const [newCategory, setNewCategory] = useState({ name: '', is_income: false, color: '#6b7280', icon: 'Wallet' });
   
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -406,11 +428,12 @@ export default function Budget() {
         name: newCategory.name.trim(),
         is_income: newCategory.is_income,
         color: newCategory.color,
+        icon: newCategory.icon,
       });
       if (error) throw error;
 
       toast.success(t('budget.categoryAdded'));
-      setNewCategory({ name: '', is_income: false, color: '#6b7280' });
+      setNewCategory({ name: '', is_income: false, color: '#6b7280', icon: 'Wallet' });
       loadCategories();
     } catch (error: any) {
       toast.error(error.message);
@@ -538,6 +561,26 @@ export default function Budget() {
                     />
                   </div>
                 </div>
+                
+                {/* Icon Picker */}
+                <div className="space-y-2">
+                  <Label>{t('budget.categoryIcon')}</Label>
+                  <div className="grid grid-cols-8 gap-1.5 p-2 border rounded-md max-h-32 overflow-y-auto">
+                    {CATEGORY_ICONS.map(iconName => (
+                      <button
+                        key={iconName}
+                        type="button"
+                        onClick={() => setNewCategory(c => ({ ...c, icon: iconName }))}
+                        className={`p-2 rounded-md hover:bg-muted transition-colors ${
+                          newCategory.icon === iconName ? 'bg-primary/20 ring-2 ring-primary' : ''
+                        }`}
+                      >
+                        <CategoryIcon name={iconName} className="h-4 w-4" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
                 <div className="flex justify-end gap-2">
                   <Button type="submit">{t('common.add')}</Button>
                 </div>
@@ -554,9 +597,11 @@ export default function Budget() {
                       <div key={cat.id} className="flex items-center justify-between p-2 rounded-md bg-muted/50 group">
                         <div className="flex items-center gap-2">
                           <div 
-                            className="w-3 h-3 rounded-full" 
+                            className="w-6 h-6 rounded-md flex items-center justify-center" 
                             style={{ backgroundColor: cat.color || '#6b7280' }}
-                          />
+                          >
+                            <CategoryIcon name={cat.icon || 'Wallet'} className="h-3.5 w-3.5 text-white" />
+                          </div>
                           <span className="text-sm">{cat.name}</span>
                           <Badge variant="outline" className="text-xs">
                             {cat.is_income ? t('budget.income') : t('budget.expense')}

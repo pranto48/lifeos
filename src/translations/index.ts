@@ -214,6 +214,8 @@ export const translations = {
   'budget.deleteCategoryConfirm': { bn: 'এই বিভাগ মুছে ফেলবেন?', en: 'Delete this category?' },
   'budget.existingCategories': { bn: 'বিদ্যমান বিভাগসমূহ', en: 'Existing Categories' },
   'budget.noCategories': { bn: 'কোন বিভাগ নেই', en: 'No categories yet' },
+  'budget.categoryIcon': { bn: 'আইকন', en: 'Icon' },
+  'budget.selectIcon': { bn: 'আইকন নির্বাচন করুন', en: 'Select Icon' },
 
   // Family Additional
   'family.manageDescription': { bn: 'পরিবারের সদস্য, ইভেন্ট এবং ডকুমেন্ট পরিচালনা করুন', en: 'Manage family members, events, and documents' },
@@ -384,6 +386,29 @@ export const translations = {
   'salary.salaryTimeline': { bn: 'বেতন টাইমলাইন', en: 'Salary Timeline' },
   'salary.noEntriesYet': { bn: 'এখনো কোন বেতন এন্ট্রি নেই।', en: 'No salary entries yet.' },
   'salary.gross': { bn: 'মোট', en: 'Gross' },
+
+  // Projects Additional
+  'projects.addProject': { bn: 'প্রকল্প যোগ করুন', en: 'Add Project' },
+  'projects.editProject': { bn: 'প্রকল্প সম্পাদনা', en: 'Edit Project' },
+  'projects.projectTitle': { bn: 'প্রকল্পের শিরোনাম', en: 'Project Title' },
+  'projects.description': { bn: 'বিবরণ', en: 'Description' },
+  'projects.status': { bn: 'স্থিতি', en: 'Status' },
+  'projects.priority': { bn: 'অগ্রাধিকার', en: 'Priority' },
+  'projects.targetDate': { bn: 'লক্ষ্য তারিখ', en: 'Target Date' },
+  'projects.tags': { bn: 'ট্যাগ (কমা দিয়ে আলাদা)', en: 'Tags (comma separated)' },
+  'projects.idea': { bn: 'আইডিয়া', en: 'Idea' },
+  'projects.researching': { bn: 'গবেষণা', en: 'Researching' },
+  'projects.building': { bn: 'নির্মাণ', en: 'Building' },
+  'projects.paused': { bn: 'বিরতি', en: 'Paused' },
+  'projects.done': { bn: 'সম্পন্ন', en: 'Done' },
+  'projects.archived': { bn: 'সংরক্ষিত', en: 'Archived' },
+  'projects.high': { bn: 'উচ্চ', en: 'High' },
+  'projects.medium': { bn: 'মাঝারি', en: 'Medium' },
+  'projects.low': { bn: 'নিম্ন', en: 'Low' },
+  'projects.projectAdded': { bn: 'প্রকল্প যোগ হয়েছে!', en: 'Project added!' },
+  'projects.projectUpdated': { bn: 'প্রকল্প আপডেট হয়েছে!', en: 'Project updated!' },
+  'projects.projectDeleted': { bn: 'প্রকল্প মুছে ফেলা হয়েছে', en: 'Project deleted' },
+  'projects.deleteConfirm': { bn: 'এই প্রকল্প মুছে ফেলবেন?', en: 'Delete this project?' },
   'salary.net': { bn: 'নিট', en: 'Net' },
 
   // Projects Additional
