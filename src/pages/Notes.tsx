@@ -1,35 +1,177 @@
-import { useState, useEffect } from 'react';
-import { FileText, Pin, Star, Search } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { FileText, Pin, Star, Search, Lock, LockOpen, Plus, X, Eye, EyeOff } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { toast } from '@/hooks/use-toast';
+import { encryptContent, decryptContent, validatePassphrase } from '@/lib/encryption';
 import { format } from 'date-fns';
 
 export default function Notes() {
   const { user } = useAuth();
   const [notes, setNotes] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [selectedNote, setSelectedNote] = useState<any>(null);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [decryptedContent, setDecryptedContent] = useState<string | null>(null);
+  const [passphrase, setPassphrase] = useState('');
+  const [showPassphrase, setShowPassphrase] = useState(false);
+  const [isDecrypting, setIsDecrypting] = useState(false);
+  
+  // Create note state
+  const [newTitle, setNewTitle] = useState('');
+  const [newContent, setNewContent] = useState('');
+  const [newTags, setNewTags] = useState('');
+  const [isVault, setIsVault] = useState(false);
+  const [vaultPassphrase, setVaultPassphrase] = useState('');
+  const [confirmPassphrase, setConfirmPassphrase] = useState('');
+  const [isCreating, setIsCreating] = useState(false);
 
   useEffect(() => {
     if (user) loadNotes();
   }, [user]);
 
   const loadNotes = async () => {
-    const { data } = await supabase.from('notes').select('*').eq('user_id', user?.id).order('is_pinned', { ascending: false }).order('created_at', { ascending: false });
+    const { data } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('user_id', user?.id)
+      .order('is_pinned', { ascending: false })
+      .order('created_at', { ascending: false });
     setNotes(data || []);
   };
 
-  const filtered = notes.filter(n => n.title.toLowerCase().includes(search.toLowerCase()) || n.content?.toLowerCase().includes(search.toLowerCase()));
+  const filtered = notes.filter(n => 
+    n.title.toLowerCase().includes(search.toLowerCase()) || 
+    (!n.is_vault && n.content?.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const handleViewNote = (note: any) => {
+    setSelectedNote(note);
+    setDecryptedContent(null);
+    setPassphrase('');
+    setIsViewDialogOpen(true);
+  };
+
+  const handleDecrypt = async () => {
+    if (!selectedNote || !passphrase) return;
+    
+    setIsDecrypting(true);
+    try {
+      const decrypted = await decryptContent(selectedNote.encrypted_content, passphrase);
+      setDecryptedContent(decrypted);
+      toast({ title: 'Unlocked', description: 'Note decrypted successfully.' });
+    } catch (error) {
+      toast({ 
+        title: 'Decryption failed', 
+        description: 'Incorrect passphrase. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsDecrypting(false);
+    }
+  };
+
+  const handleCreateNote = async () => {
+    if (!newTitle.trim() || !user) return;
+
+    // Validate vault passphrase if creating vault note
+    if (isVault) {
+      if (!vaultPassphrase) {
+        toast({ title: 'Error', description: 'Passphrase is required for vault notes', variant: 'destructive' });
+        return;
+      }
+      if (vaultPassphrase !== confirmPassphrase) {
+        toast({ title: 'Error', description: 'Passphrases do not match', variant: 'destructive' });
+        return;
+      }
+      const validation = validatePassphrase(vaultPassphrase);
+      if (!validation.valid) {
+        toast({ title: 'Weak passphrase', description: validation.message, variant: 'destructive' });
+        return;
+      }
+    }
+
+    setIsCreating(true);
+    try {
+      let encrypted_content = null;
+      let content = newContent;
+
+      if (isVault && newContent) {
+        encrypted_content = await encryptContent(newContent, vaultPassphrase);
+        content = null; // Don't store plaintext for vault notes
+      }
+
+      const tagsArray = newTags.split(',').map(t => t.trim()).filter(Boolean);
+
+      const { error } = await supabase.from('notes').insert({
+        user_id: user.id,
+        title: newTitle.trim(),
+        content: isVault ? null : content,
+        encrypted_content,
+        tags: tagsArray,
+        is_vault: isVault,
+      });
+
+      if (error) throw error;
+
+      toast({ 
+        title: isVault ? '🔒 Vault note created' : 'Note created', 
+        description: isVault ? 'Your note is securely encrypted.' : 'Your note has been saved.'
+      });
+      
+      // Reset form
+      setNewTitle('');
+      setNewContent('');
+      setNewTags('');
+      setIsVault(false);
+      setVaultPassphrase('');
+      setConfirmPassphrase('');
+      setIsCreateDialogOpen(false);
+      loadNotes();
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const togglePin = async (noteId: string, currentPinned: boolean) => {
+    await supabase.from('notes').update({ is_pinned: !currentPinned }).eq('id', noteId);
+    loadNotes();
+  };
+
+  const toggleFavorite = async (noteId: string, currentFav: boolean) => {
+    await supabase.from('notes').update({ is_favorite: !currentFav }).eq('id', noteId);
+    loadNotes();
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <h1 className="text-2xl font-bold text-foreground">Notes</h1>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search notes..." className="pl-9 bg-muted/50" />
+        <div className="flex items-center gap-4">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input 
+              value={search} 
+              onChange={e => setSearch(e.target.value)} 
+              placeholder="Search notes..." 
+              className="pl-9 bg-muted/50" 
+            />
+          </div>
+          <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" /> New Note
+          </Button>
         </div>
       </div>
 
@@ -43,19 +185,43 @@ export default function Notes() {
           </Card>
         ) : (
           filtered.map(note => (
-            <Card key={note.id} className="bg-card border-border hover:bg-muted/30 transition-colors cursor-pointer">
+            <Card 
+              key={note.id} 
+              className="bg-card border-border hover:bg-muted/30 transition-colors cursor-pointer group"
+              onClick={() => handleViewNote(note)}
+            >
               <CardContent className="p-4 space-y-2">
                 <div className="flex items-start justify-between">
-                  <h3 className="font-medium text-foreground">{note.title}</h3>
+                  <div className="flex items-center gap-2">
+                    {note.is_vault && <Lock className="h-4 w-4 text-primary" />}
+                    <h3 className="font-medium text-foreground">{note.title}</h3>
+                  </div>
                   <div className="flex gap-1">
-                    {note.is_pinned && <Pin className="h-4 w-4 text-primary" />}
-                    {note.is_favorite && <Star className="h-4 w-4 text-yellow-400" />}
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); togglePin(note.id, note.is_pinned); }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Pin className={`h-4 w-4 ${note.is_pinned ? 'text-primary fill-primary' : 'text-muted-foreground'}`} />
+                    </button>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); toggleFavorite(note.id, note.is_favorite); }}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Star className={`h-4 w-4 ${note.is_favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'}`} />
+                    </button>
                   </div>
                 </div>
-                {note.content && <p className="text-sm text-muted-foreground line-clamp-3">{note.content}</p>}
+                {note.is_vault ? (
+                  <p className="text-sm text-muted-foreground italic">🔒 Encrypted content - click to unlock</p>
+                ) : note.content ? (
+                  <p className="text-sm text-muted-foreground line-clamp-3">{note.content}</p>
+                ) : null}
                 <div className="flex items-center justify-between pt-2">
                   <div className="flex gap-1">
-                    {note.tags?.slice(0, 2).map((tag: string) => <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>)}
+                    {note.tags?.slice(0, 2).map((tag: string) => (
+                      <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+                    ))}
+                    {note.is_vault && <Badge className="bg-primary/20 text-primary text-xs">Vault</Badge>}
                   </div>
                   <span className="text-xs text-muted-foreground">{format(new Date(note.created_at), 'MMM d')}</span>
                 </div>
@@ -64,6 +230,166 @@ export default function Notes() {
           ))
         )}
       </div>
+
+      {/* View Note Dialog */}
+      <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-foreground">
+              {selectedNote?.is_vault && <Lock className="h-5 w-5 text-primary" />}
+              {selectedNote?.title}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedNote?.is_vault && !decryptedContent ? (
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                This note is encrypted. Enter your passphrase to unlock it.
+              </p>
+              <div className="space-y-2">
+                <Label>Passphrase</Label>
+                <div className="relative">
+                  <Input
+                    type={showPassphrase ? 'text' : 'password'}
+                    value={passphrase}
+                    onChange={e => setPassphrase(e.target.value)}
+                    placeholder="Enter your passphrase"
+                    className="bg-muted/50 pr-10"
+                    onKeyDown={e => e.key === 'Enter' && handleDecrypt()}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassphrase(!showPassphrase)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showPassphrase ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+              <Button onClick={handleDecrypt} disabled={!passphrase || isDecrypting} className="w-full">
+                <LockOpen className="h-4 w-4 mr-2" />
+                {isDecrypting ? 'Decrypting...' : 'Unlock Note'}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-4 py-4">
+              <div className="bg-muted/30 rounded-lg p-4 min-h-[200px] whitespace-pre-wrap text-foreground">
+                {selectedNote?.is_vault ? decryptedContent : selectedNote?.content || 'No content'}
+              </div>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <div className="flex gap-1">
+                  {selectedNote?.tags?.map((tag: string) => (
+                    <Badge key={tag} variant="secondary">{tag}</Badge>
+                  ))}
+                </div>
+                <span>Created {selectedNote && format(new Date(selectedNote.created_at), 'MMM d, yyyy')}</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Note Dialog */}
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+        <DialogContent className="sm:max-w-[600px] bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Create New Note</DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Title</Label>
+              <Input
+                value={newTitle}
+                onChange={e => setNewTitle(e.target.value)}
+                placeholder="Note title"
+                className="bg-muted/50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Content</Label>
+              <Textarea
+                value={newContent}
+                onChange={e => setNewContent(e.target.value)}
+                placeholder="Write your note..."
+                className="bg-muted/50 min-h-[150px]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tags (comma separated)</Label>
+              <Input
+                value={newTags}
+                onChange={e => setNewTags(e.target.value)}
+                placeholder="work, ideas, important"
+                className="bg-muted/50"
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-muted/30 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Lock className="h-4 w-4 text-primary" />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Vault Note</p>
+                  <p className="text-xs text-muted-foreground">Encrypt with a passphrase</p>
+                </div>
+              </div>
+              <Switch checked={isVault} onCheckedChange={setIsVault} />
+            </div>
+
+            <AnimatePresence>
+              {isVault && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-4 overflow-hidden"
+                >
+                  <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+                    <p className="text-sm text-foreground mb-3">
+                      ⚠️ <strong>Important:</strong> Your passphrase is NOT stored anywhere. 
+                      If you forget it, your note cannot be recovered.
+                    </p>
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label>Passphrase</Label>
+                        <Input
+                          type="password"
+                          value={vaultPassphrase}
+                          onChange={e => setVaultPassphrase(e.target.value)}
+                          placeholder="Enter a strong passphrase"
+                          className="bg-background"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Min 8 characters, with uppercase, lowercase, and number
+                        </p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Confirm Passphrase</Label>
+                        <Input
+                          type="password"
+                          value={confirmPassphrase}
+                          onChange={e => setConfirmPassphrase(e.target.value)}
+                          placeholder="Confirm your passphrase"
+                          className="bg-background"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="ghost" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button onClick={handleCreateNote} disabled={!newTitle.trim() || isCreating}>
+                {isCreating ? 'Creating...' : isVault ? '🔒 Create Vault Note' : 'Create Note'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
