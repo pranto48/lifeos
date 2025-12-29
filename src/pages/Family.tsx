@@ -3,7 +3,7 @@ import { format, differenceInDays, differenceInYears, parseISO, isBefore, addYea
 import { 
   Plus, Users, Calendar, FileText, Gift, Heart, Cake, 
   MoreVertical, Pencil, Trash2, Upload, Download, User,
-  Baby, PartyPopper, AlertCircle, Clock, FolderOpen
+  Baby, PartyPopper, AlertCircle, Clock, FolderOpen, GitBranch
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useFamily, FamilyMember, FamilyEvent, FamilyDocument } from '@/hooks/useFamily';
+import { FamilyTree } from '@/components/family/FamilyTree';
 import { cn } from '@/lib/utils';
 
 const RELATIONSHIPS = [
@@ -410,6 +411,9 @@ export default function Family() {
           <TabsTrigger value="members" className="gap-2">
             <Users className="h-4 w-4" /> Members
           </TabsTrigger>
+          <TabsTrigger value="tree" className="gap-2">
+            <GitBranch className="h-4 w-4" /> Tree
+          </TabsTrigger>
           <TabsTrigger value="events" className="gap-2">
             <Calendar className="h-4 w-4" /> Events
           </TabsTrigger>
@@ -515,6 +519,11 @@ export default function Family() {
               </AnimatePresence>
             </div>
           )}
+        </TabsContent>
+
+        {/* Tree Tab */}
+        <TabsContent value="tree" className="space-y-4">
+          <FamilyTree members={members} />
         </TabsContent>
 
         {/* Events Tab */}
