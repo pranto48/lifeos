@@ -11,6 +11,7 @@ import { SessionManagement } from '@/components/settings/SessionManagement';
 import { PasswordChange } from '@/components/settings/PasswordChange';
 import { TwoFactorAuth } from '@/components/settings/TwoFactorAuth';
 import { BiometricManagement } from '@/components/settings/BiometricManagement';
+import { PushNotificationSettings } from '@/components/settings/PushNotificationSettings';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -129,6 +130,8 @@ export default function Settings() {
       <TwoFactorAuth />
 
       <BiometricManagement />
+
+      <PushNotificationSettings />
 
       <Card className="bg-card border-border">
         <CardHeader>
