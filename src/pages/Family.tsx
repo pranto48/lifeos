@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useFamily, FamilyMember, FamilyEvent, FamilyDocument } from '@/hooks/useFamily';
 import { FamilyTree } from '@/components/family/FamilyTree';
 import { AvatarUpload } from '@/components/family/AvatarUpload';
+import { FamilyMemberDetail } from '@/components/family/FamilyMemberDetail';
 import { cn } from '@/lib/utils';
 
 const RELATIONSHIPS = [
@@ -58,10 +59,11 @@ function getUpcomingEvents(events: FamilyEvent[], days: number = 30) {
     .sort((a, b) => a.daysUntil - b.daysUntil);
 }
 
-function MemberCard({ member, onEdit, onDelete }: {
+function MemberCard({ member, onEdit, onDelete, onView }: {
   member: FamilyMember;
   onEdit: () => void;
   onDelete: () => void;
+  onView: () => void;
 }) {
   const age = member.date_of_birth 
     ? differenceInYears(new Date(), parseISO(member.date_of_birth))
@@ -73,7 +75,10 @@ function MemberCard({ member, onEdit, onDelete }: {
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
     >
-      <Card className="group hover:shadow-lg transition-all border-border/50 bg-card/50 backdrop-blur-sm">
+      <Card 
+        className="group hover:shadow-lg transition-all border-border/50 bg-card/50 backdrop-blur-sm cursor-pointer"
+        onClick={onView}
+      >
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <Avatar className="h-12 w-12 border-2 border-primary/20">
@@ -94,15 +99,23 @@ function MemberCard({ member, onEdit, onDelete }: {
                 </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <MoreVertical className="h-4 w-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={onEdit}>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onView(); }}>
+                      <User className="h-4 w-4 mr-2" /> View Details
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
                       <Pencil className="h-4 w-4 mr-2" /> Edit
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={onDelete} className="text-destructive">
+                    <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDelete(); }} className="text-destructive">
                       <Trash2 className="h-4 w-4 mr-2" /> Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
@@ -251,6 +264,7 @@ export default function Family() {
   const [docDialog, setDocDialog] = useState(false);
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
   const [editingEvent, setEditingEvent] = useState<FamilyEvent | null>(null);
+  const [viewingMember, setViewingMember] = useState<FamilyMember | null>(null);
   
   const [memberForm, setMemberForm] = useState({ name: '', relationship: '', date_of_birth: '', notes: '', avatar_url: '' });
   const [eventForm, setEventForm] = useState({ title: '', event_type: 'birthday', event_date: '', family_member_id: '', notes: '' });
@@ -527,6 +541,7 @@ export default function Family() {
                   <MemberCard
                     key={member.id}
                     member={member}
+                    onView={() => setViewingMember(member)}
                     onEdit={() => openEditMember(member)}
                     onDelete={() => confirm('Delete this family member?') && deleteMember.mutate(member.id)}
                   />
@@ -783,6 +798,30 @@ export default function Family() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Member Detail View */}
+      <AnimatePresence>
+        {viewingMember && (
+          <FamilyMemberDetail
+            member={viewingMember}
+            events={events}
+            documents={documents}
+            connections={connections}
+            allMembers={members}
+            onClose={() => setViewingMember(null)}
+            onEdit={() => {
+              setViewingMember(null);
+              openEditMember(viewingMember);
+            }}
+            onDelete={() => {
+              if (confirm('Delete this family member?')) {
+                deleteMember.mutate(viewingMember.id);
+                setViewingMember(null);
+              }
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
