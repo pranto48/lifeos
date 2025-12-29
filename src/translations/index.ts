@@ -414,6 +414,13 @@ export const translations = {
   // Projects Additional
   'projects.projectIdeas': { bn: 'প্রকল্প আইডিয়া', en: 'Project Ideas' },
   'projects.noProjectsYet': { bn: 'এখনো কোন প্রকল্প আইডিয়া নেই।', en: 'No project ideas yet.' },
+  'projects.milestones': { bn: 'মাইলস্টোন', en: 'Milestones' },
+  'projects.addMilestone': { bn: 'মাইলস্টোন যোগ করুন', en: 'Add Milestone' },
+  'projects.milestonePlaceholder': { bn: 'মাইলস্টোন শিরোনাম লিখুন', en: 'Enter milestone title' },
+  'projects.noMilestones': { bn: 'কোন মাইলস্টোন নেই', en: 'No milestones yet' },
+  'projects.progress': { bn: 'অগ্রগতি', en: 'Progress' },
+  'projects.milestoneAdded': { bn: 'মাইলস্টোন যোগ হয়েছে!', en: 'Milestone added!' },
+  'projects.milestoneDeleted': { bn: 'মাইলস্টোন মুছে ফেলা হয়েছে', en: 'Milestone deleted' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
