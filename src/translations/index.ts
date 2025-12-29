@@ -1,0 +1,203 @@
+export type Language = 'bn' | 'en';
+
+export const translations = {
+  // Navigation
+  'nav.dashboard': { bn: 'ড্যাশবোর্ড', en: 'Dashboard' },
+  'nav.tasks': { bn: 'কাজ', en: 'Tasks' },
+  'nav.notes': { bn: 'নোট', en: 'Notes' },
+  'nav.projects': { bn: 'প্রকল্প', en: 'Projects' },
+  'nav.goals': { bn: 'লক্ষ্য', en: 'Goals' },
+  'nav.habits': { bn: 'অভ্যাস', en: 'Habits' },
+  'nav.budget': { bn: 'বাজেট', en: 'Budget' },
+  'nav.salary': { bn: 'বেতন', en: 'Salary' },
+  'nav.investments': { bn: 'বিনিয়োগ', en: 'Investments' },
+  'nav.family': { bn: 'পরিবার', en: 'Family' },
+  'nav.settings': { bn: 'সেটিংস', en: 'Settings' },
+
+  // Common
+  'common.save': { bn: 'সংরক্ষণ করুন', en: 'Save' },
+  'common.cancel': { bn: 'বাতিল', en: 'Cancel' },
+  'common.delete': { bn: 'মুছুন', en: 'Delete' },
+  'common.edit': { bn: 'সম্পাদনা', en: 'Edit' },
+  'common.add': { bn: 'যোগ করুন', en: 'Add' },
+  'common.search': { bn: 'অনুসন্ধান', en: 'Search' },
+  'common.loading': { bn: 'লোড হচ্ছে...', en: 'Loading...' },
+  'common.noData': { bn: 'কোন তথ্য নেই', en: 'No data' },
+  'common.all': { bn: 'সব', en: 'All' },
+  'common.none': { bn: 'কিছুই না', en: 'None' },
+  'common.yes': { bn: 'হ্যাঁ', en: 'Yes' },
+  'common.no': { bn: 'না', en: 'No' },
+  'common.close': { bn: 'বন্ধ করুন', en: 'Close' },
+  'common.back': { bn: 'পেছনে', en: 'Back' },
+  'common.next': { bn: 'পরবর্তী', en: 'Next' },
+  'common.submit': { bn: 'জমা দিন', en: 'Submit' },
+  'common.update': { bn: 'আপডেট করুন', en: 'Update' },
+  'common.view': { bn: 'দেখুন', en: 'View' },
+  'common.optional': { bn: 'ঐচ্ছিক', en: 'Optional' },
+
+  // Dashboard
+  'dashboard.title': { bn: 'ড্যাশবোর্ড', en: 'Dashboard' },
+  'dashboard.welcome': { bn: 'স্বাগতম', en: 'Welcome' },
+  'dashboard.todayTasks': { bn: 'আজকের কাজ', en: "Today's Tasks" },
+  'dashboard.upcomingEvents': { bn: 'আসন্ন ইভেন্ট', en: 'Upcoming Events' },
+  'dashboard.quickStats': { bn: 'দ্রুত পরিসংখ্যান', en: 'Quick Stats' },
+
+  // Tasks
+  'tasks.title': { bn: 'কাজ', en: 'Tasks' },
+  'tasks.addTask': { bn: 'কাজ যোগ করুন', en: 'Add Task' },
+  'tasks.editTask': { bn: 'কাজ সম্পাদনা', en: 'Edit Task' },
+  'tasks.taskTitle': { bn: 'কাজের শিরোনাম', en: 'Task Title' },
+  'tasks.description': { bn: 'বিবরণ', en: 'Description' },
+  'tasks.dueDate': { bn: 'শেষ তারিখ', en: 'Due Date' },
+  'tasks.priority': { bn: 'অগ্রাধিকার', en: 'Priority' },
+  'tasks.status': { bn: 'স্থিতি', en: 'Status' },
+  'tasks.high': { bn: 'উচ্চ', en: 'High' },
+  'tasks.medium': { bn: 'মাঝারি', en: 'Medium' },
+  'tasks.low': { bn: 'নিম্ন', en: 'Low' },
+  'tasks.todo': { bn: 'করতে হবে', en: 'To Do' },
+  'tasks.inProgress': { bn: 'চলমান', en: 'In Progress' },
+  'tasks.completed': { bn: 'সম্পন্ন', en: 'Completed' },
+
+  // Notes
+  'notes.title': { bn: 'নোট', en: 'Notes' },
+  'notes.addNote': { bn: 'নোট যোগ করুন', en: 'Add Note' },
+  'notes.editNote': { bn: 'নোট সম্পাদনা', en: 'Edit Note' },
+  'notes.noteTitle': { bn: 'নোটের শিরোনাম', en: 'Note Title' },
+  'notes.content': { bn: 'বিষয়বস্তু', en: 'Content' },
+
+  // Budget
+  'budget.title': { bn: 'বাজেট ও খরচ', en: 'Budget & Spending' },
+  'budget.income': { bn: 'আয়', en: 'Income' },
+  'budget.expense': { bn: 'ব্যয়', en: 'Expense' },
+  'budget.expenses': { bn: 'ব্যয়সমূহ', en: 'Expenses' },
+  'budget.balance': { bn: 'ব্যালেন্স', en: 'Balance' },
+  'budget.addTransaction': { bn: 'লেনদেন যোগ করুন', en: 'Add Transaction' },
+  'budget.editTransaction': { bn: 'লেনদেন সম্পাদনা', en: 'Edit Transaction' },
+  'budget.category': { bn: 'বিভাগ', en: 'Category' },
+  'budget.amount': { bn: 'পরিমাণ', en: 'Amount' },
+  'budget.date': { bn: 'তারিখ', en: 'Date' },
+  'budget.type': { bn: 'ধরন', en: 'Type' },
+  'budget.setBudget': { bn: 'বাজেট নির্ধারণ', en: 'Set Budget' },
+  'budget.monthlyLimit': { bn: 'মাসিক সীমা', en: 'Monthly Limit' },
+  'budget.budgetProgress': { bn: 'বাজেট অগ্রগতি', en: 'Budget Progress' },
+  'budget.budgetAlerts': { bn: 'বাজেট সতর্কতা', en: 'Budget Alerts' },
+  'budget.overBudget': { bn: 'বাজেট অতিক্রম', en: 'Over budget' },
+  'budget.recentTransactions': { bn: 'সাম্প্রতিক লেনদেন', en: 'Recent Transactions' },
+  'budget.spendingTrend': { bn: 'খরচের প্রবণতা', en: 'Monthly Spending Trend' },
+  'budget.expenseBreakdown': { bn: 'ব্যয় বিশ্লেষণ', en: 'Expense Breakdown' },
+  'budget.incomeSource': { bn: 'আয়ের উৎস', en: 'Source of Income' },
+  'budget.description': { bn: 'বিবরণ', en: 'Description' },
+  'budget.allTransactions': { bn: 'সব লেনদেন', en: 'All Transactions' },
+
+  // Income Sources
+  'income.salary': { bn: 'বেতন', en: 'Salary' },
+  'income.freelance': { bn: 'ফ্রিল্যান্স', en: 'Freelance' },
+  'income.business': { bn: 'ব্যবসা', en: 'Business' },
+  'income.investment': { bn: 'বিনিয়োগ রিটার্ন', en: 'Investment Returns' },
+  'income.rental': { bn: 'ভাড়া আয়', en: 'Rental Income' },
+  'income.gift': { bn: 'উপহার/বোনাস', en: 'Gift/Bonus' },
+  'income.other': { bn: 'অন্যান্য', en: 'Other' },
+
+  // Family
+  'family.title': { bn: 'পরিবার', en: 'Family' },
+  'family.members': { bn: 'সদস্য', en: 'Members' },
+  'family.addMember': { bn: 'সদস্য যোগ করুন', en: 'Add Member' },
+  'family.editMember': { bn: 'সদস্য সম্পাদনা', en: 'Edit Member' },
+  'family.name': { bn: 'নাম', en: 'Name' },
+  'family.relationship': { bn: 'সম্পর্ক', en: 'Relationship' },
+  'family.dateOfBirth': { bn: 'জন্ম তারিখ', en: 'Date of Birth' },
+  'family.events': { bn: 'ইভেন্ট', en: 'Events' },
+  'family.documents': { bn: 'ডকুমেন্ট', en: 'Documents' },
+  'family.connections': { bn: 'সংযোগ', en: 'Connections' },
+  'family.treeView': { bn: 'ট্রি ভিউ', en: 'Tree View' },
+  'family.listView': { bn: 'তালিকা ভিউ', en: 'List View' },
+  'family.spouse': { bn: 'স্বামী/স্ত্রী', en: 'Spouse' },
+  'family.parent': { bn: 'পিতা/মাতা', en: 'Parent' },
+  'family.child': { bn: 'সন্তান', en: 'Child' },
+  'family.sibling': { bn: 'ভাই/বোন', en: 'Sibling' },
+
+  // Goals
+  'goals.title': { bn: 'লক্ষ্য', en: 'Goals' },
+  'goals.addGoal': { bn: 'লক্ষ্য যোগ করুন', en: 'Add Goal' },
+  'goals.editGoal': { bn: 'লক্ষ্য সম্পাদনা', en: 'Edit Goal' },
+  'goals.targetDate': { bn: 'লক্ষ্য তারিখ', en: 'Target Date' },
+  'goals.targetAmount': { bn: 'লক্ষ্য পরিমাণ', en: 'Target Amount' },
+  'goals.currentAmount': { bn: 'বর্তমান পরিমাণ', en: 'Current Amount' },
+  'goals.progress': { bn: 'অগ্রগতি', en: 'Progress' },
+  'goals.active': { bn: 'সক্রিয়', en: 'Active' },
+  'goals.achieved': { bn: 'অর্জিত', en: 'Achieved' },
+
+  // Habits
+  'habits.title': { bn: 'অভ্যাস', en: 'Habits' },
+  'habits.addHabit': { bn: 'অভ্যাস যোগ করুন', en: 'Add Habit' },
+  'habits.editHabit': { bn: 'অভ্যাস সম্পাদনা', en: 'Edit Habit' },
+  'habits.streak': { bn: 'ধারাবাহিকতা', en: 'Streak' },
+  'habits.daily': { bn: 'দৈনিক', en: 'Daily' },
+  'habits.weekly': { bn: 'সাপ্তাহিক', en: 'Weekly' },
+  'habits.markComplete': { bn: 'সম্পন্ন চিহ্নিত করুন', en: 'Mark Complete' },
+
+  // Salary
+  'salary.title': { bn: 'বেতন', en: 'Salary' },
+  'salary.grossAmount': { bn: 'মোট পরিমাণ', en: 'Gross Amount' },
+  'salary.netAmount': { bn: 'নিট পরিমাণ', en: 'Net Amount' },
+  'salary.deductions': { bn: 'কর্তন', en: 'Deductions' },
+  'salary.allowances': { bn: 'ভাতা', en: 'Allowances' },
+  'salary.month': { bn: 'মাস', en: 'Month' },
+  'salary.year': { bn: 'বছর', en: 'Year' },
+
+  // Investments
+  'investments.title': { bn: 'বিনিয়োগ', en: 'Investments' },
+  'investments.addInvestment': { bn: 'বিনিয়োগ যোগ করুন', en: 'Add Investment' },
+  'investments.principal': { bn: 'মূলধন', en: 'Principal' },
+  'investments.currentValue': { bn: 'বর্তমান মূল্য', en: 'Current Value' },
+  'investments.returns': { bn: 'রিটার্ন', en: 'Returns' },
+
+  // Settings
+  'settings.title': { bn: 'সেটিংস', en: 'Settings' },
+  'settings.profile': { bn: 'প্রোফাইল', en: 'Profile' },
+  'settings.preferences': { bn: 'পছন্দসমূহ', en: 'Preferences' },
+  'settings.security': { bn: 'নিরাপত্তা', en: 'Security' },
+  'settings.language': { bn: 'ভাষা', en: 'Language' },
+  'settings.theme': { bn: 'থিম', en: 'Theme' },
+  'settings.notifications': { bn: 'বিজ্ঞপ্তি', en: 'Notifications' },
+  'settings.logout': { bn: 'লগআউট', en: 'Logout' },
+  'settings.fullName': { bn: 'পুরো নাম', en: 'Full Name' },
+  'settings.email': { bn: 'ইমেইল', en: 'Email' },
+  'settings.timezone': { bn: 'সময় অঞ্চল', en: 'Timezone' },
+  'settings.currency': { bn: 'মুদ্রা', en: 'Currency' },
+  'settings.dateFormat': { bn: 'তারিখের ফরম্যাট', en: 'Date Format' },
+  'settings.changePassword': { bn: 'পাসওয়ার্ড পরিবর্তন', en: 'Change Password' },
+  'settings.bangla': { bn: 'বাংলা', en: 'Bangla' },
+  'settings.english': { bn: 'ইংরেজি', en: 'English' },
+
+  // Auth
+  'auth.login': { bn: 'লগইন', en: 'Login' },
+  'auth.signup': { bn: 'সাইন আপ', en: 'Sign Up' },
+  'auth.password': { bn: 'পাসওয়ার্ড', en: 'Password' },
+  'auth.forgotPassword': { bn: 'পাসওয়ার্ড ভুলে গেছেন?', en: 'Forgot Password?' },
+  'auth.noAccount': { bn: 'অ্যাকাউন্ট নেই?', en: "Don't have an account?" },
+  'auth.hasAccount': { bn: 'ইতিমধ্যে অ্যাকাউন্ট আছে?', en: 'Already have an account?' },
+
+  // Family Member
+  'familyMember.familyMember': { bn: 'পরিবারের সদস্য', en: 'Family Member' },
+
+  // Months
+  'month.january': { bn: 'জানুয়ারি', en: 'January' },
+  'month.february': { bn: 'ফেব্রুয়ারি', en: 'February' },
+  'month.march': { bn: 'মার্চ', en: 'March' },
+  'month.april': { bn: 'এপ্রিল', en: 'April' },
+  'month.may': { bn: 'মে', en: 'May' },
+  'month.june': { bn: 'জুন', en: 'June' },
+  'month.july': { bn: 'জুলাই', en: 'July' },
+  'month.august': { bn: 'আগস্ট', en: 'August' },
+  'month.september': { bn: 'সেপ্টেম্বর', en: 'September' },
+  'month.october': { bn: 'অক্টোবর', en: 'October' },
+  'month.november': { bn: 'নভেম্বর', en: 'November' },
+  'month.december': { bn: 'ডিসেম্বর', en: 'December' },
+} as const;
+
+export type TranslationKey = keyof typeof translations;
+
+export const getTranslation = (key: TranslationKey, lang: Language): string => {
+  return translations[key]?.[lang] || key;
+};

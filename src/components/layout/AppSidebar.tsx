@@ -16,30 +16,33 @@ import {
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { TranslationKey } from '@/translations';
 
-const navItems = [
-  { title: 'Dashboard', url: '/', icon: LayoutDashboard },
-  { title: 'Tasks', url: '/tasks', icon: CheckSquare },
-  { title: 'Notes', url: '/notes', icon: FileText },
-  { title: 'Habits', url: '/habits', icon: Repeat },
-  { title: 'Family', url: '/family', icon: Users },
-  { title: 'Budget', url: '/budget', icon: Wallet },
-  { title: 'Salary', url: '/salary', icon: DollarSign },
-  { title: 'Investments', url: '/investments', icon: TrendingUp },
-  { title: 'Goals', url: '/goals', icon: Target },
-  { title: 'Projects', url: '/projects', icon: Lightbulb },
+const navItems: { titleKey: TranslationKey; url: string; icon: any }[] = [
+  { titleKey: 'nav.dashboard', url: '/', icon: LayoutDashboard },
+  { titleKey: 'nav.tasks', url: '/tasks', icon: CheckSquare },
+  { titleKey: 'nav.notes', url: '/notes', icon: FileText },
+  { titleKey: 'nav.habits', url: '/habits', icon: Repeat },
+  { titleKey: 'nav.family', url: '/family', icon: Users },
+  { titleKey: 'nav.budget', url: '/budget', icon: Wallet },
+  { titleKey: 'nav.salary', url: '/salary', icon: DollarSign },
+  { titleKey: 'nav.investments', url: '/investments', icon: TrendingUp },
+  { titleKey: 'nav.goals', url: '/goals', icon: Target },
+  { titleKey: 'nav.projects', url: '/projects', icon: Lightbulb },
 ];
 
-const bottomNavItems = [
-  { title: 'Settings', url: '/settings', icon: Settings },
+const bottomNavItems: { titleKey: TranslationKey; url: string; icon: any }[] = [
+  { titleKey: 'nav.settings', url: '/settings', icon: Settings },
 ];
 
 export function AppSidebar() {
   const { signOut, user } = useAuth();
+  const { t } = useLanguage();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -107,7 +110,7 @@ export function AppSidebar() {
                   exit={{ opacity: 0, width: 0 }}
                   className="whitespace-nowrap overflow-hidden"
                 >
-                  {item.title}
+                  {t(item.titleKey)}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -143,7 +146,7 @@ export function AppSidebar() {
                   exit={{ opacity: 0 }}
                   className="whitespace-nowrap"
                 >
-                  {item.title}
+                  {t(item.titleKey)}
                 </motion.span>
               )}
             </AnimatePresence>
@@ -163,7 +166,7 @@ export function AppSidebar() {
                 exit={{ opacity: 0 }}
                 className="whitespace-nowrap"
               >
-                Sign Out
+                {t('settings.logout')}
               </motion.span>
             )}
           </AnimatePresence>
