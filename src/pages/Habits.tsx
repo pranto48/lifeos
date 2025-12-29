@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { Plus, Flame, Trophy, CheckCircle2, Circle, MoreVertical, Pencil, Trash2, Calendar } from 'lucide-react';
+import { Plus, Flame, Trophy, CheckCircle2, Circle, MoreVertical, Pencil, Trash2, Calendar, LayoutGrid, Bell, BellOff, Clock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, subDays } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useHabits, HabitWithStats } from '@/hooks/useHabits';
+import { HabitCalendar } from '@/components/habits/HabitCalendar';
 import { cn } from '@/lib/utils';
 
 const HABIT_COLORS = [
@@ -61,12 +64,17 @@ function HabitCard({ habit, onToggle, onEdit, onDelete }: {
                 </motion.div>
               </button>
               <div>
-                <h3 className={cn(
-                  'font-semibold text-foreground transition-all',
-                  habit.completedToday && 'line-through opacity-60'
-                )}>
-                  {habit.title}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className={cn(
+                    'font-semibold text-foreground transition-all',
+                    habit.completedToday && 'line-through opacity-60'
+                  )}>
+                    {habit.title}
+                  </h3>
+                  {habit.reminder_enabled && (
+                    <Bell className="w-3.5 h-3.5 text-muted-foreground" />
+                  )}
+                </div>
                 {habit.description && (
                   <p className="text-sm text-muted-foreground line-clamp-1">
                     {habit.description}
@@ -150,10 +158,12 @@ export default function Habits() {
     title: '',
     description: '',
     color: HABIT_COLORS[0],
+    reminder_enabled: false,
+    reminder_time: '08:00',
   });
 
   const resetForm = () => {
-    setFormData({ title: '', description: '', color: HABIT_COLORS[0] });
+    setFormData({ title: '', description: '', color: HABIT_COLORS[0], reminder_enabled: false, reminder_time: '08:00' });
     setEditingHabit(null);
   };
 
@@ -164,6 +174,8 @@ export default function Habits() {
         title: habit.title,
         description: habit.description || '',
         color: habit.color,
+        reminder_enabled: habit.reminder_enabled || false,
+        reminder_time: habit.reminder_time?.slice(0, 5) || '08:00',
       });
     } else {
       resetForm();
@@ -180,12 +192,16 @@ export default function Habits() {
         title: formData.title,
         description: formData.description || null,
         color: formData.color,
+        reminder_enabled: formData.reminder_enabled,
+        reminder_time: formData.reminder_time + ':00',
       });
     } else {
       await createHabit.mutateAsync({
         title: formData.title,
         description: formData.description || null,
         color: formData.color,
+        reminder_enabled: formData.reminder_enabled,
+        reminder_time: formData.reminder_time + ':00',
       });
     }
     
@@ -197,6 +213,10 @@ export default function Habits() {
     if (confirm('Are you sure you want to delete this habit?')) {
       await deleteHabit.mutateAsync(id);
     }
+  };
+
+  const handleCalendarToggle = (habitId: string, date: string) => {
+    toggleCompletion.mutate({ habitId, date });
   };
 
   const completedToday = habits.filter(h => h.completedToday).length;
@@ -267,6 +287,43 @@ export default function Habits() {
                 </div>
               </div>
 
+              {/* Reminder Settings */}
+              <div className="space-y-4 pt-2 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {formData.reminder_enabled ? (
+                      <Bell className="h-4 w-4 text-primary" />
+                    ) : (
+                      <BellOff className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <Label htmlFor="reminder" className="cursor-pointer">Email Reminder</Label>
+                  </div>
+                  <Switch
+                    id="reminder"
+                    checked={formData.reminder_enabled}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, reminder_enabled: checked }))}
+                  />
+                </div>
+                
+                {formData.reminder_enabled && (
+                  <div className="space-y-2">
+                    <Label htmlFor="reminder_time" className="flex items-center gap-2">
+                      <Clock className="h-4 w-4" />
+                      Reminder Time
+                    </Label>
+                    <Input
+                      id="reminder_time"
+                      type="time"
+                      value={formData.reminder_time}
+                      onChange={(e) => setFormData(prev => ({ ...prev, reminder_time: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      You'll receive an email reminder at this time (in your timezone)
+                    </p>
+                  </div>
+                )}
+              </div>
+
               <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                   Cancel
@@ -327,46 +384,88 @@ export default function Habits() {
         </Card>
       </div>
 
-      {/* Habits Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <Card key={i} className="animate-pulse">
-              <CardContent className="p-4">
-                <div className="h-20 bg-muted rounded" />
+      {/* Tabs for Grid/Calendar View */}
+      <Tabs defaultValue="grid" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="grid" className="gap-2">
+            <LayoutGrid className="h-4 w-4" />
+            Grid
+          </TabsTrigger>
+          <TabsTrigger value="calendar" className="gap-2">
+            <Calendar className="h-4 w-4" />
+            Calendar
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="grid">
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2, 3].map(i => (
+                <Card key={i} className="animate-pulse">
+                  <CardContent className="p-4">
+                    <div className="h-20 bg-muted rounded" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : habits.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="p-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+                  <Calendar className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">No habits yet</h3>
+                <p className="text-muted-foreground mb-4">Start building better habits today!</p>
+                <Button onClick={() => handleOpenDialog()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Habit
+                </Button>
               </CardContent>
             </Card>
-          ))}
-        </div>
-      ) : habits.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="p-12 text-center">
-            <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
-              <Calendar className="w-8 h-8 text-muted-foreground" />
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <AnimatePresence mode="popLayout">
+                {habits.map((habit) => (
+                  <HabitCard
+                    key={habit.id}
+                    habit={habit}
+                    onToggle={() => toggleCompletion.mutate({ habitId: habit.id })}
+                    onEdit={() => handleOpenDialog(habit)}
+                    onDelete={() => handleDelete(habit.id)}
+                  />
+                ))}
+              </AnimatePresence>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">No habits yet</h3>
-            <p className="text-muted-foreground mb-4">Start building better habits today!</p>
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              Create Your First Habit
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <AnimatePresence mode="popLayout">
-            {habits.map((habit) => (
-              <HabitCard
-                key={habit.id}
-                habit={habit}
-                onToggle={() => toggleCompletion.mutate({ habitId: habit.id })}
-                onEdit={() => handleOpenDialog(habit)}
-                onDelete={() => handleDelete(habit.id)}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
-      )}
+          )}
+        </TabsContent>
+
+        <TabsContent value="calendar">
+          {habits.length === 0 ? (
+            <Card className="border-dashed">
+              <CardContent className="p-12 text-center">
+                <div className="w-16 h-16 rounded-full bg-muted mx-auto mb-4 flex items-center justify-center">
+                  <Calendar className="w-8 h-8 text-muted-foreground" />
+                </div>
+                <h3 className="text-lg font-semibold text-foreground mb-2">No habits to display</h3>
+                <p className="text-muted-foreground mb-4">Create a habit first to see the calendar view</p>
+                <Button onClick={() => handleOpenDialog()}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Your First Habit
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="p-6">
+                <HabitCalendar 
+                  habits={habits} 
+                  onToggleCompletion={handleCalendarToggle}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

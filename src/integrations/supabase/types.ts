@@ -299,6 +299,8 @@ export type Database = {
           icon: string | null
           id: string
           is_archived: boolean | null
+          reminder_enabled: boolean | null
+          reminder_time: string | null
           target_per_day: number | null
           title: string
           updated_at: string
@@ -312,6 +314,8 @@ export type Database = {
           icon?: string | null
           id?: string
           is_archived?: boolean | null
+          reminder_enabled?: boolean | null
+          reminder_time?: string | null
           target_per_day?: number | null
           title: string
           updated_at?: string
@@ -325,6 +329,8 @@ export type Database = {
           icon?: string | null
           id?: string
           is_archived?: boolean | null
+          reminder_enabled?: boolean | null
+          reminder_time?: string | null
           target_per_day?: number | null
           title?: string
           updated_at?: string
@@ -445,6 +451,7 @@ export type Database = {
           created_at: string
           currency: string | null
           date_format: string | null
+          email: string | null
           full_name: string | null
           id: string
           timezone: string | null
@@ -456,6 +463,7 @@ export type Database = {
           created_at?: string
           currency?: string | null
           date_format?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
           timezone?: string | null
@@ -467,6 +475,7 @@ export type Database = {
           created_at?: string
           currency?: string | null
           date_format?: string | null
+          email?: string | null
           full_name?: string | null
           id?: string
           timezone?: string | null

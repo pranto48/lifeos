@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
-import { format, subDays, differenceInDays, parseISO, isToday, startOfDay } from 'date-fns';
+import { format, subDays, parseISO } from 'date-fns';
 
 export interface Habit {
   id: string;
@@ -14,6 +14,8 @@ export interface Habit {
   frequency: string;
   target_per_day: number;
   is_archived: boolean;
+  reminder_enabled: boolean;
+  reminder_time: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -128,6 +130,8 @@ export function useHabits() {
           color: habit.color || '#22c55e',
           frequency: habit.frequency || 'daily',
           target_per_day: habit.target_per_day || 1,
+          reminder_enabled: habit.reminder_enabled || false,
+          reminder_time: habit.reminder_time || '08:00:00',
         })
         .select()
         .single();
