@@ -399,10 +399,10 @@ export default function Budget() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Category</Label>
-                    <Select value={formData.category_id} onValueChange={(v) => setFormData(f => ({ ...f, category_id: v }))}>
+                    <Select value={formData.category_id || "none"} onValueChange={(v) => setFormData(f => ({ ...f, category_id: v === "none" ? "" : v }))}>
                       <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {filteredCategories.map(cat => (
                           <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                         ))}
@@ -433,10 +433,10 @@ export default function Budget() {
                       <Users className="h-3.5 w-3.5" />
                       Family Member
                     </Label>
-                    <Select value={formData.family_member_id} onValueChange={(v) => setFormData(f => ({ ...f, family_member_id: v }))}>
+                    <Select value={formData.family_member_id || "none"} onValueChange={(v) => setFormData(f => ({ ...f, family_member_id: v === "none" ? "" : v }))}>
                       <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {familyMembers.map(member => (
                           <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
                         ))}
