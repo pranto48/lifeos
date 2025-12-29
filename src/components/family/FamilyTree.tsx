@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Users, Heart, Baby, Link2, Plus, Trash2, X } from 'lucide-react';
 import { FamilyMember, FamilyConnection } from '@/hooks/useFamily';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -60,6 +60,9 @@ function MemberNode({
     >
       <div className="relative">
         <Avatar className="h-16 w-16 border-2 border-primary/30 shadow-lg">
+          {member.avatar_url && (
+            <AvatarImage src={member.avatar_url} alt={member.name} className="object-cover" />
+          )}
           <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
             {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
           </AvatarFallback>

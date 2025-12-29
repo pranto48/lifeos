@@ -16,9 +16,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useFamily, FamilyMember, FamilyEvent, FamilyDocument } from '@/hooks/useFamily';
 import { FamilyTree } from '@/components/family/FamilyTree';
+import { AvatarUpload } from '@/components/family/AvatarUpload';
 import { cn } from '@/lib/utils';
 
 const RELATIONSHIPS = [
@@ -75,7 +76,10 @@ function MemberCard({ member, onEdit, onDelete }: {
       <Card className="group hover:shadow-lg transition-all border-border/50 bg-card/50 backdrop-blur-sm">
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
-            <Avatar className="h-12 w-12 bg-primary/10">
+            <Avatar className="h-12 w-12 border-2 border-primary/20">
+              {member.avatar_url && (
+                <AvatarImage src={member.avatar_url} alt={member.name} className="object-cover" />
+              )}
               <AvatarFallback className="bg-primary/10 text-primary font-semibold">
                 {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
               </AvatarFallback>
@@ -248,7 +252,7 @@ export default function Family() {
   const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
   const [editingEvent, setEditingEvent] = useState<FamilyEvent | null>(null);
   
-  const [memberForm, setMemberForm] = useState({ name: '', relationship: '', date_of_birth: '', notes: '' });
+  const [memberForm, setMemberForm] = useState({ name: '', relationship: '', date_of_birth: '', notes: '', avatar_url: '' });
   const [eventForm, setEventForm] = useState({ title: '', event_type: 'birthday', event_date: '', family_member_id: '', notes: '' });
   const [docForm, setDocForm] = useState({ title: '', category: 'general', family_member_id: '', notes: '' });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -259,13 +263,13 @@ export default function Family() {
   const handleMemberSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingMember) {
-      await updateMember.mutateAsync({ id: editingMember.id, ...memberForm });
+      await updateMember.mutateAsync({ id: editingMember.id, ...memberForm, avatar_url: memberForm.avatar_url || null });
     } else {
-      await createMember.mutateAsync(memberForm);
+      await createMember.mutateAsync({ ...memberForm, avatar_url: memberForm.avatar_url || null });
     }
     setMemberDialog(false);
     setEditingMember(null);
-    setMemberForm({ name: '', relationship: '', date_of_birth: '', notes: '' });
+    setMemberForm({ name: '', relationship: '', date_of_birth: '', notes: '', avatar_url: '' });
   };
 
   const handleEventSubmit = async (e: React.FormEvent) => {
@@ -301,6 +305,7 @@ export default function Family() {
       relationship: member.relationship,
       date_of_birth: member.date_of_birth || '',
       notes: member.notes || '',
+      avatar_url: member.avatar_url || '',
     });
     setMemberDialog(true);
   };
@@ -430,7 +435,7 @@ export default function Family() {
               setMemberDialog(open);
               if (!open) {
                 setEditingMember(null);
-                setMemberForm({ name: '', relationship: '', date_of_birth: '', notes: '' });
+                setMemberForm({ name: '', relationship: '', date_of_birth: '', notes: '', avatar_url: '' });
               }
             }}>
               <DialogTrigger asChild>
@@ -441,6 +446,15 @@ export default function Family() {
                   <DialogTitle>{editingMember ? 'Edit Member' : 'Add Family Member'}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleMemberSubmit} className="space-y-4">
+                  {/* Avatar Upload */}
+                  <div className="flex justify-center">
+                    <AvatarUpload
+                      currentUrl={memberForm.avatar_url || null}
+                      name={memberForm.name}
+                      onUpload={(url) => setMemberForm(f => ({ ...f, avatar_url: url }))}
+                      size="lg"
+                    />
+                  </div>
                   <div className="space-y-2">
                     <Label>Name</Label>
                     <Input
