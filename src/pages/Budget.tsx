@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,14 @@ interface Category {
   color: string | null;
 }
 
+interface Budget {
+  id: string;
+  category_id: string;
+  amount: number;
+  month: number;
+  year: number;
+}
+
 interface FamilyMember {
   id: string;
   name: string;
@@ -42,11 +51,16 @@ export default function Budget() {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [filterMember, setFilterMember] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   
+  const currentMonth = new Date().getMonth() + 1;
+  const currentYear = new Date().getFullYear();
+
   const [formData, setFormData] = useState({
     amount: '',
     type: 'expense' as 'expense' | 'income',
@@ -56,11 +70,17 @@ export default function Budget() {
     date: new Date().toISOString().split('T')[0],
   });
 
+  const [budgetForm, setBudgetForm] = useState({
+    category_id: '',
+    amount: '',
+  });
+
   useEffect(() => {
     if (user) {
       loadTransactions();
       loadCategories();
       loadFamilyMembers();
+      loadBudgets();
     }
   }, [user]);
 
@@ -83,6 +103,16 @@ export default function Budget() {
     setCategories(data || []);
   };
 
+  const loadBudgets = async () => {
+    const { data } = await supabase
+      .from('budgets')
+      .select('*')
+      .eq('user_id', user?.id)
+      .eq('month', currentMonth)
+      .eq('year', currentYear);
+    setBudgets(data || []);
+  };
+
   const loadFamilyMembers = async () => {
     const { data } = await supabase
       .from('family_members')
@@ -96,10 +126,36 @@ export default function Budget() {
     ? transactions 
     : transactions.filter(t => t.family_member_id === filterMember);
 
+  // Filter to current month for budget tracking
+  const currentMonthTransactions = transactions.filter(t => {
+    const date = new Date(t.date);
+    return date.getMonth() + 1 === currentMonth && date.getFullYear() === currentYear;
+  });
+
   const income = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
   const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
 
   const filteredCategories = categories.filter(c => c.is_income === (formData.type === 'income'));
+  const expenseCategories = categories.filter(c => !c.is_income);
+
+  // Calculate spending per category for current month
+  const spendingByCategory = expenseCategories.map(cat => {
+    const spent = currentMonthTransactions
+      .filter(t => t.category_id === cat.id && t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    const budget = budgets.find(b => b.category_id === cat.id);
+    const limit = budget ? Number(budget.amount) : 0;
+    const percentage = limit > 0 ? (spent / limit) * 100 : 0;
+    
+    return {
+      ...cat,
+      spent,
+      limit,
+      percentage: Math.min(percentage, 100),
+      overBudget: spent > limit && limit > 0,
+      nearLimit: percentage >= 80 && percentage < 100,
+    };
+  }).filter(c => c.limit > 0 || c.spent > 0);
 
   const resetForm = () => {
     setFormData({
@@ -151,12 +207,64 @@ export default function Budget() {
       } else {
         const { error } = await supabase.from('transactions').insert(payload);
         if (error) throw error;
+        
+        // Check if this transaction exceeds budget
+        if (formData.category_id && formData.type === 'expense') {
+          const budget = budgets.find(b => b.category_id === formData.category_id);
+          if (budget) {
+            const currentSpent = currentMonthTransactions
+              .filter(t => t.category_id === formData.category_id && t.type === 'expense')
+              .reduce((sum, t) => sum + Number(t.amount), 0);
+            const newTotal = currentSpent + parseFloat(formData.amount);
+            
+            if (newTotal > Number(budget.amount)) {
+              toast.warning(`Budget exceeded for this category! Spent: ৳${newTotal.toLocaleString()} / ৳${Number(budget.amount).toLocaleString()}`);
+            } else if ((newTotal / Number(budget.amount)) >= 0.8) {
+              toast.info(`Approaching budget limit! ${Math.round((newTotal / Number(budget.amount)) * 100)}% used`);
+            }
+          }
+        }
+        
         toast.success('Transaction added!');
       }
 
       setDialogOpen(false);
       resetForm();
       loadTransactions();
+    } catch (error: any) {
+      toast.error(error.message);
+    }
+  };
+
+  const handleBudgetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!budgetForm.category_id || !budgetForm.amount || !user) return;
+
+    try {
+      // Check if budget exists for this category/month/year
+      const existingBudget = budgets.find(b => b.category_id === budgetForm.category_id);
+
+      if (existingBudget) {
+        const { error } = await supabase
+          .from('budgets')
+          .update({ amount: parseFloat(budgetForm.amount) })
+          .eq('id', existingBudget.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from('budgets').insert({
+          user_id: user.id,
+          category_id: budgetForm.category_id,
+          amount: parseFloat(budgetForm.amount),
+          month: currentMonth,
+          year: currentYear,
+        });
+        if (error) throw error;
+      }
+
+      toast.success('Budget limit saved!');
+      setBudgetDialogOpen(false);
+      setBudgetForm({ category_id: '', amount: '' });
+      loadBudgets();
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -181,37 +289,79 @@ export default function Budget() {
     return { ...member, total, count: memberTransactions.length };
   }).filter(m => m.total > 0).sort((a, b) => b.total - a.total);
 
+  // Categories with budget alerts
+  const alertCategories = spendingByCategory.filter(c => c.overBudget || c.nearLimit);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl font-bold text-foreground">Budget & Spending</h1>
         
-        <div className="flex items-center gap-2">
-          {/* Family Filter */}
+        <div className="flex items-center gap-2 flex-wrap">
           <Select value={filterMember} onValueChange={setFilterMember}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[160px]">
               <Filter className="h-4 w-4 mr-2" />
               <SelectValue placeholder="All Members" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Transactions</SelectItem>
               {familyMembers.map(member => (
-                <SelectItem key={member.id} value={member.id}>
-                  {member.name}
-                </SelectItem>
+                <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
+
+          <Dialog open={budgetDialogOpen} onOpenChange={setBudgetDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline">
+                <Target className="h-4 w-4 mr-2" />
+                Set Budget
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Set Monthly Budget Limit</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleBudgetSubmit} className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select value={budgetForm.category_id} onValueChange={(v) => setBudgetForm(f => ({ ...f, category_id: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      {expenseCategories.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Monthly Limit (৳)</Label>
+                  <Input
+                    type="number"
+                    value={budgetForm.amount}
+                    onChange={(e) => setBudgetForm(f => ({ ...f, amount: e.target.value }))}
+                    placeholder="0"
+                    className="font-mono"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This limit applies to {format(new Date(currentYear, currentMonth - 1), 'MMMM yyyy')}
+                </p>
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button type="button" variant="outline" onClick={() => setBudgetDialogOpen(false)}>Cancel</Button>
+                  <Button type="submit">Save Limit</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
 
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);
             if (!open) resetForm();
           }}>
             <DialogTrigger asChild>
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Transaction
-              </Button>
+              <Button><Plus className="h-4 w-4 mr-2" />Add Transaction</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
@@ -288,9 +438,7 @@ export default function Budget() {
                       <SelectContent>
                         <SelectItem value="">None</SelectItem>
                         {familyMembers.map(member => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.name}
-                          </SelectItem>
+                          <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -299,15 +447,39 @@ export default function Budget() {
 
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit">
-                    {editingTransaction ? 'Save' : 'Add'}
-                  </Button>
+                  <Button type="submit">{editingTransaction ? 'Save' : 'Add'}</Button>
                 </div>
               </form>
             </DialogContent>
           </Dialog>
         </div>
       </div>
+
+      {/* Budget Alerts */}
+      {alertCategories.length > 0 && (
+        <Card className="border-orange-500/30 bg-orange-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-500 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-foreground">Budget Alerts</p>
+                <div className="mt-1 space-y-1">
+                  {alertCategories.map(cat => (
+                    <p key={cat.id} className="text-sm text-muted-foreground">
+                      <span className="font-medium">{cat.name}:</span>{' '}
+                      {cat.overBudget ? (
+                        <span className="text-red-500">Over budget by ৳{(cat.spent - cat.limit).toLocaleString()}</span>
+                      ) : (
+                        <span className="text-orange-500">{Math.round(cat.percentage)}% used</span>
+                      )}
+                    </p>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid md:grid-cols-3 gap-4">
         <Card className="bg-card border-border">
@@ -329,6 +501,48 @@ export default function Budget() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Budget Progress */}
+      {spendingByCategory.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Budget Progress - {format(new Date(currentYear, currentMonth - 1), 'MMMM yyyy')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {spendingByCategory.map(cat => (
+              <div key={cat.id} className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full" 
+                      style={{ backgroundColor: cat.color || '#6b7280' }}
+                    />
+                    <span className="font-medium text-foreground">{cat.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`font-mono ${cat.overBudget ? 'text-red-500' : 'text-muted-foreground'}`}>
+                      ৳{cat.spent.toLocaleString()}
+                    </span>
+                    {cat.limit > 0 && (
+                      <span className="text-muted-foreground">/ ৳{cat.limit.toLocaleString()}</span>
+                    )}
+                    {cat.overBudget && <AlertTriangle className="h-4 w-4 text-red-500" />}
+                  </div>
+                </div>
+                {cat.limit > 0 && (
+                  <Progress 
+                    value={cat.percentage} 
+                    className={`h-2 ${cat.overBudget ? '[&>div]:bg-red-500' : cat.nearLimit ? '[&>div]:bg-orange-500' : ''}`}
+                  />
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Family Spending Summary */}
       {spendingByMember.length > 0 && (
