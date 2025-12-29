@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface Transaction {
   id: string;
@@ -23,9 +23,20 @@ interface Transaction {
   date: string;
   category_id: string | null;
   family_member_id: string | null;
+  account: string | null;
   budget_categories: { name: string; color: string } | null;
   family_members: { name: string; relationship: string } | null;
 }
+
+const INCOME_SOURCES = [
+  { value: 'salary', label: 'Salary' },
+  { value: 'freelance', label: 'Freelance' },
+  { value: 'business', label: 'Business' },
+  { value: 'investment', label: 'Investment Returns' },
+  { value: 'rental', label: 'Rental Income' },
+  { value: 'gift', label: 'Gift/Bonus' },
+  { value: 'other', label: 'Other' },
+];
 
 interface Category {
   id: string;
@@ -69,6 +80,7 @@ export default function Budget() {
     category_id: '',
     family_member_id: '',
     merchant: '',
+    account: 'cash',
     date: new Date().toISOString().split('T')[0],
   });
 
@@ -206,6 +218,41 @@ export default function Budget() {
     };
   }).filter(c => c.limit > 0 || c.spent > 0);
 
+  // Pie chart data for expense breakdown
+  const pieChartData = useMemo(() => {
+    const categorySpending = categories
+      .filter(c => !c.is_income)
+      .map(cat => {
+        const spent = currentMonthTransactions
+          .filter(t => t.category_id === cat.id && t.type === 'expense')
+          .reduce((sum, t) => sum + Number(t.amount), 0);
+        return {
+          name: cat.name,
+          value: spent,
+          color: cat.color || '#6b7280',
+        };
+      })
+      .filter(c => c.value > 0)
+      .sort((a, b) => b.value - a.value);
+    
+    // Add "Uncategorized" if there are expenses without category
+    const uncategorized = currentMonthTransactions
+      .filter(t => !t.category_id && t.type === 'expense')
+      .reduce((sum, t) => sum + Number(t.amount), 0);
+    
+    if (uncategorized > 0) {
+      categorySpending.push({
+        name: 'Uncategorized',
+        value: uncategorized,
+        color: '#9ca3af',
+      });
+    }
+    
+    return categorySpending;
+  }, [currentMonthTransactions, categories]);
+
+  const totalPieValue = pieChartData.reduce((sum, d) => sum + d.value, 0);
+
   const resetForm = () => {
     setFormData({
       amount: '',
@@ -213,6 +260,7 @@ export default function Budget() {
       category_id: '',
       family_member_id: '',
       merchant: '',
+      account: 'cash',
       date: new Date().toISOString().split('T')[0],
     });
     setEditingTransaction(null);
@@ -226,6 +274,7 @@ export default function Budget() {
       category_id: transaction.category_id || '',
       family_member_id: transaction.family_member_id || '',
       merchant: transaction.merchant || '',
+      account: transaction.account || 'cash',
       date: transaction.date,
     });
     setDialogOpen(true);
@@ -243,6 +292,7 @@ export default function Budget() {
         category_id: formData.category_id || null,
         family_member_id: formData.family_member_id || null,
         merchant: formData.merchant.trim() || null,
+        account: formData.type === 'income' ? formData.account : 'cash',
         date: formData.date,
       };
 
@@ -468,6 +518,21 @@ export default function Budget() {
                   </div>
                 </div>
 
+                {/* Income Source - Only show for income type */}
+                {formData.type === 'income' && (
+                  <div className="space-y-2">
+                    <Label>Source of Income</Label>
+                    <Select value={formData.account} onValueChange={(v) => setFormData(f => ({ ...f, account: v }))}>
+                      <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                      <SelectContent>
+                        {INCOME_SOURCES.map(source => (
+                          <SelectItem key={source.value} value={source.value}>{source.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Description</Label>
@@ -609,6 +674,66 @@ export default function Budget() {
                   />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Expense Breakdown Pie Chart */}
+      {pieChartData.length > 0 && (
+        <Card className="bg-card border-border">
+          <CardHeader>
+            <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              Expense Breakdown - {format(new Date(currentYear, currentMonth - 1), 'MMMM yyyy')}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col lg:flex-row items-center gap-6">
+              <div className="h-[250px] w-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieChartData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {pieChartData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px',
+                        color: 'hsl(var(--foreground))'
+                      }}
+                      formatter={(value: number) => [`৳${value.toLocaleString()}`, '']}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="flex-1 grid grid-cols-2 gap-3">
+                {pieChartData.map((entry, index) => (
+                  <div key={index} className="flex items-center gap-2">
+                    <div 
+                      className="w-3 h-3 rounded-full shrink-0" 
+                      style={{ backgroundColor: entry.color }}
+                    />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">{entry.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        ৳{entry.value.toLocaleString()} ({totalPieValue > 0 ? Math.round((entry.value / totalPieValue) * 100) : 0}%)
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </CardContent>
         </Card>
