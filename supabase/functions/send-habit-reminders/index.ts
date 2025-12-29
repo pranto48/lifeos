@@ -31,8 +31,45 @@ async function sendEmail(to: string, subject: string, html: string) {
   return res.json();
 }
 
+async function sendPushToUser(supabase: any, userId: string, title: string, body: string, url: string) {
+  try {
+    const { data: subscriptions } = await supabase
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth')
+      .eq('user_id', userId);
+
+    if (!subscriptions || subscriptions.length === 0) return 0;
+
+    const payload = JSON.stringify({
+      title,
+      body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      url,
+      tag: 'habit-reminder'
+    });
+
+    let sent = 0;
+    for (const sub of subscriptions) {
+      try {
+        await fetch(sub.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'TTL': '86400' },
+          body: payload,
+        });
+        sent++;
+      } catch (e) {
+        console.error('Push failed:', e);
+      }
+    }
+    return sent;
+  } catch (error) {
+    console.error('Error sending push:', error);
+    return 0;
+  }
+}
+
 serve(async (req: Request) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -44,21 +81,12 @@ serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get current time
     const now = new Date();
     console.log(`Current UTC time: ${now.toISOString()}`);
 
-    // Get all habits with reminders enabled
     const { data: habits, error: habitsError } = await supabase
       .from("habits")
-      .select(`
-        id,
-        title,
-        description,
-        reminder_time,
-        user_id,
-        color
-      `)
+      .select(`id, title, description, reminder_time, user_id, color`)
       .eq("reminder_enabled", true)
       .eq("is_archived", false);
 
@@ -76,10 +104,8 @@ serve(async (req: Request) => {
       );
     }
 
-    // Get unique user IDs
     const userIds = [...new Set(habits.map(h => h.user_id))];
     
-    // Get user profiles with timezone info
     const { data: profiles, error: profilesError } = await supabase
       .from("profiles")
       .select("user_id, full_name, timezone, email")
@@ -90,7 +116,6 @@ serve(async (req: Request) => {
       throw profilesError;
     }
 
-    // Get auth users for emails
     const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
     
     if (authError) {
@@ -98,10 +123,8 @@ serve(async (req: Request) => {
       throw authError;
     }
 
-    // Create email map from auth users
     const emailMap = new Map(authUsers.users.map(u => [u.id, u.email]));
 
-    // Get today's completions to avoid reminding for already completed habits
     const today = new Date().toISOString().split("T")[0];
     const { data: completions, error: completionsError } = await supabase
       .from("habit_completions")
@@ -115,19 +138,13 @@ serve(async (req: Request) => {
     const completedHabitIds = new Set((completions || []).map(c => c.habit_id));
 
     let emailsSent = 0;
+    let pushSent = 0;
     const errors: string[] = [];
 
-    // Process each user's habits
     for (const profile of profiles || []) {
       const userTimezone = profile.timezone || "Asia/Dhaka";
       const userEmail = emailMap.get(profile.user_id) || profile.email;
-      
-      if (!userEmail) {
-        console.log(`No email found for user ${profile.user_id}`);
-        continue;
-      }
 
-      // Get user's habits that haven't been completed today
       const userHabits = habits.filter(h => 
         h.user_id === profile.user_id && !completedHabitIds.has(h.id)
       );
@@ -137,12 +154,10 @@ serve(async (req: Request) => {
         continue;
       }
 
-      // Check if it's the right time for this user's timezone
       const userNow = new Date(now.toLocaleString("en-US", { timeZone: userTimezone }));
       const userHour = userNow.getHours();
       const userMinute = userNow.getMinutes();
 
-      // Find habits whose reminder time matches current time (within 30 min window)
       const habitsToRemind = userHabits.filter(h => {
         if (!h.reminder_time) return false;
         const [reminderHour, reminderMinute] = h.reminder_time.split(":").map(Number);
@@ -159,9 +174,19 @@ serve(async (req: Request) => {
         continue;
       }
 
-      console.log(`Sending reminder for ${habitsToRemind.length} habits to ${userEmail}`);
+      console.log(`Sending reminder for ${habitsToRemind.length} habits to user ${profile.user_id}`);
 
-      // Build email content
+      // Send push notification
+      const pushTitle = `⏰ ${habitsToRemind.length} habit${habitsToRemind.length > 1 ? 's' : ''} waiting`;
+      const pushBody = habitsToRemind.map(h => h.title).join(', ');
+      const sentPush = await sendPushToUser(supabase, profile.user_id, pushTitle, pushBody, '/habits');
+      pushSent += sentPush;
+
+      if (!userEmail) {
+        console.log(`No email found for user ${profile.user_id}`);
+        continue;
+      }
+
       const habitsList = habitsToRemind.map(h => 
         `<li style="margin-bottom: 12px;">
           <span style="display: inline-block; width: 12px; height: 12px; border-radius: 50%; background-color: ${h.color}; margin-right: 8px;"></span>
@@ -215,12 +240,13 @@ serve(async (req: Request) => {
       }
     }
 
-    console.log(`Habit reminders job completed. Sent ${emailsSent} emails.`);
+    console.log(`Habit reminders job completed. Sent ${emailsSent} emails and ${pushSent} push notifications.`);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         emailsSent,
+        pushSent,
         errors: errors.length > 0 ? errors : undefined
       }),
       { 

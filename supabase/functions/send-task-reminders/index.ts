@@ -8,8 +8,42 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function sendPushToUser(supabase: any, userId: string, title: string, body: string, url: string) {
+  try {
+    const { data: subscriptions } = await supabase
+      .from('push_subscriptions')
+      .select('endpoint, p256dh, auth')
+      .eq('user_id', userId);
+
+    if (!subscriptions || subscriptions.length === 0) return;
+
+    const payload = JSON.stringify({
+      title,
+      body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      url,
+      tag: 'task-reminder'
+    });
+
+    for (const sub of subscriptions) {
+      try {
+        await fetch(sub.endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'TTL': '86400' },
+          body: payload,
+        });
+        console.log(`Push sent to user ${userId}`);
+      } catch (e) {
+        console.error('Push failed:', e);
+      }
+    }
+  } catch (error) {
+    console.error('Error sending push:', error);
+  }
+}
+
 const handler = async (req: Request): Promise<Response> => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -19,17 +53,10 @@ const handler = async (req: Request): Promise<Response> => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get tasks due today or overdue
     const today = new Date().toISOString().split('T')[0];
     const { data: tasks, error: tasksError } = await supabase
       .from('tasks')
-      .select(`
-        id,
-        title,
-        due_date,
-        priority,
-        user_id
-      `)
+      .select(`id, title, due_date, priority, user_id`)
       .lte('due_date', today)
       .neq('status', 'completed')
       .neq('status', 'cancelled');
@@ -47,10 +74,8 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Get unique user IDs
     const userIds = [...new Set(tasks.map(t => t.user_id))];
     
-    // Get user profiles
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('user_id, full_name')
@@ -61,18 +86,28 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const emailsSent: string[] = [];
+    const pushSent: string[] = [];
     
     for (const userId of userIds) {
       const { data: userData } = await supabase.auth.admin.getUserById(userId);
+      const userTasks = tasks.filter(t => t.user_id === userId);
+      const overdueCounts = userTasks.filter(t => t.due_date < today).length;
+      
+      // Send push notification
+      const pushTitle = `📋 ${userTasks.length} task${userTasks.length > 1 ? 's' : ''} need attention`;
+      const pushBody = overdueCounts > 0 
+        ? `${overdueCounts} overdue, ${userTasks.length - overdueCounts} due today`
+        : `${userTasks.length} task${userTasks.length > 1 ? 's' : ''} due today`;
+      
+      await sendPushToUser(supabase, userId, pushTitle, pushBody, '/tasks');
+      pushSent.push(userId);
+
       if (!userData?.user?.email) continue;
 
       const userEmail = userData.user.email;
       const profile = profiles?.find(p => p.user_id === userId);
       const userName = profile?.full_name || 'there';
       
-      const userTasks = tasks.filter(t => t.user_id === userId);
-      
-      // Format tasks for email
       const tasksList = userTasks.map(task => {
         const isOverdue = task.due_date < today;
         const priorityEmoji = task.priority === 'urgent' ? '🔴' : 
@@ -81,7 +116,6 @@ const handler = async (req: Request): Promise<Response> => {
         return `${priorityEmoji} ${task.title} ${isOverdue ? '(OVERDUE)' : '(Due Today)'}`;
       }).join('<br/>');
 
-      const overdueCounts = userTasks.filter(t => t.due_date < today).length;
       const todayCount = userTasks.length - overdueCounts;
 
       const html = `
@@ -116,7 +150,6 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       try {
-        // Send email via Resend API directly
         const emailResponse = await fetch("https://api.resend.com/emails", {
           method: "POST",
           headers: {
@@ -148,7 +181,8 @@ const handler = async (req: Request): Promise<Response> => {
       JSON.stringify({ 
         success: true, 
         emailsSent: emailsSent.length,
-        message: `Sent reminders to ${emailsSent.length} users`
+        pushSent: pushSent.length,
+        message: `Sent ${emailsSent.length} emails and ${pushSent.length} push notifications`
       }),
       {
         status: 200,

@@ -32,10 +32,8 @@ self.addEventListener('activate', (event) => {
 
 // Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
-  // Skip non-GET requests
   if (event.request.method !== 'GET') return;
 
-  // Skip API calls and Supabase requests
   const url = new URL(event.request.url);
   if (url.pathname.startsWith('/api') || 
       url.hostname.includes('supabase') ||
@@ -46,10 +44,8 @@ self.addEventListener('fetch', (event) => {
   event.respondWith(
     fetch(event.request)
       .then((response) => {
-        // Clone response for caching
         const responseClone = response.clone();
         
-        // Only cache successful responses
         if (response.status === 200) {
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(event.request, responseClone);
@@ -59,13 +55,11 @@ self.addEventListener('fetch', (event) => {
         return response;
       })
       .catch(() => {
-        // Network failed, try cache
         return caches.match(event.request).then((response) => {
           if (response) {
             return response;
           }
           
-          // If it's a navigation request, return the cached index page
           if (event.request.mode === 'navigate') {
             return caches.match('/');
           }
@@ -76,16 +70,77 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
-// Handle push notifications (for future use)
+// Handle push notifications
 self.addEventListener('push', (event) => {
+  console.log('Push event received:', event);
+  
+  let data = {
+    title: 'LifeOS',
+    body: 'You have a new notification',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    url: '/'
+  };
+
   if (event.data) {
-    const data = event.data.json();
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      data: data.url
-    });
+    try {
+      data = { ...data, ...event.data.json() };
+    } catch (e) {
+      console.error('Error parsing push data:', e);
+    }
+  }
+
+  const options = {
+    body: data.body,
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/icon-192.png',
+    tag: data.tag || 'default',
+    data: { url: data.url || '/' },
+    vibrate: [100, 50, 100],
+    requireInteraction: true,
+    actions: [
+      { action: 'open', title: 'Open' },
+      { action: 'dismiss', title: 'Dismiss' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  console.log('Notification clicked:', event);
+  
+  event.notification.close();
+
+  if (event.action === 'dismiss') {
+    return;
+  }
+
+  const urlToOpen = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        // If there's already a window open, focus it
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && 'focus' in client) {
+            client.focus();
+            if (urlToOpen !== '/') {
+              client.navigate(urlToOpen);
+            }
+            return;
+          }
+        }
+        // Otherwise, open a new window
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
+  );
+});
   }
 });
 
