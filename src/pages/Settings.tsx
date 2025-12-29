@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Shield, Download, LogOut, Mail, Bell } from 'lucide-react';
+import { Settings as SettingsIcon, User, Shield, Download, LogOut, Mail, Bell, Monitor } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
+import { SessionManagement } from '@/components/settings/SessionManagement';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -60,7 +60,7 @@ export default function Settings() {
 
   const exportData = async () => {
     toast({ title: 'Exporting...', description: 'Preparing your data export.' });
-    const [tasks, notes, transactions, goals, investments, projects, salaries] = await Promise.all([
+    const [tasks, notes, transactions, goals, investments, projects, salaries, habits, family] = await Promise.all([
       supabase.from('tasks').select('*').eq('user_id', user?.id),
       supabase.from('notes').select('id, title, content, tags, is_pinned, is_favorite, is_vault, created_at, updated_at').eq('user_id', user?.id),
       supabase.from('transactions').select('*').eq('user_id', user?.id),
@@ -68,6 +68,8 @@ export default function Settings() {
       supabase.from('investments').select('*').eq('user_id', user?.id),
       supabase.from('projects').select('*').eq('user_id', user?.id),
       supabase.from('salary_entries').select('*').eq('user_id', user?.id),
+      supabase.from('habits').select('*').eq('user_id', user?.id),
+      supabase.from('family_members').select('*').eq('user_id', user?.id),
     ]);
     
     const data = { 
@@ -78,6 +80,8 @@ export default function Settings() {
       investments: investments.data, 
       projects: projects.data,
       salaries: salaries.data,
+      habits: habits.data,
+      family: family.data,
       exportedAt: new Date().toISOString() 
     };
     
@@ -115,6 +119,8 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      <SessionManagement />
+
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
@@ -137,7 +143,7 @@ export default function Settings() {
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
-            💡 Tip: For automated daily reminders, you can set up a cron job to call this function.
+            💡 Automated daily reminders are enabled for tasks (8 AM), habits (hourly), and family events (7 AM).
           </p>
         </CardContent>
       </Card>
