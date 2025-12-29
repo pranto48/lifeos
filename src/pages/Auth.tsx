@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Shield, Lock, Mail, User } from 'lucide-react';
+import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -30,15 +31,39 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [pendingUserData, setPendingUserData] = useState<{ email: string; fullName: string } | null>(null);
 
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, session } = useAuth();
   const navigate = useNavigate();
+  const {
+    capabilities,
+    isLoading: biometricLoading,
+    hasBiometricSetup,
+    biometricEmail,
+    registerBiometric,
+    authenticateWithBiometric,
+  } = useBiometricAuth();
 
   useEffect(() => {
     if (user) {
       navigate('/');
     }
   }, [user, navigate]);
+
+  // Handle biometric login
+  const handleBiometricLogin = async () => {
+    const result = await authenticateWithBiometric();
+    if (result) {
+      // Show password field pre-filled with email for quick login
+      setEmail(result.email);
+      toast({
+        title: 'Identity verified',
+        description: 'Please enter your password to complete sign in.',
+      });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,10 +91,19 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
-          toast({
-            title: 'Welcome back!',
-            description: 'Successfully signed in.',
-          });
+          // Check if we should offer biometric setup
+          if (capabilities?.canUseBiometrics && !hasBiometricSetup) {
+            // We'll handle biometric prompt after successful login
+            toast({
+              title: 'Welcome back!',
+              description: 'Successfully signed in.',
+            });
+          } else {
+            toast({
+              title: 'Welcome back!',
+              description: 'Successfully signed in.',
+            });
+          }
           navigate('/');
         }
       } else {
@@ -112,6 +146,39 @@ export default function Auth() {
     }
   };
 
+  // Offer biometric setup after login (shown once per session)
+  useEffect(() => {
+    if (session?.user && capabilities?.canUseBiometrics && !hasBiometricSetup) {
+      const hasPrompted = sessionStorage.getItem('biometric_prompted');
+      if (!hasPrompted) {
+        setShowBiometricPrompt(true);
+        setPendingUserId(session.user.id);
+        setPendingUserData({ 
+          email: session.user.email || '', 
+          fullName: session.user.user_metadata?.full_name || '' 
+        });
+        sessionStorage.setItem('biometric_prompted', 'true');
+      }
+    }
+  }, [session, capabilities, hasBiometricSetup]);
+
+  const handleSetupBiometric = async () => {
+    if (pendingUserId && pendingUserData) {
+      const success = await registerBiometric(
+        pendingUserId,
+        pendingUserData.email,
+        pendingUserData.fullName
+      );
+      if (success) {
+        setShowBiometricPrompt(false);
+      }
+    }
+  };
+
+  const handleSkipBiometric = () => {
+    setShowBiometricPrompt(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       {/* Background glow effect */}
@@ -146,6 +213,61 @@ export default function Auth() {
 
         {/* Auth Card */}
         <div className="glass-card rounded-2xl p-8">
+          {/* Biometric Login Option (Android only) */}
+          <AnimatePresence mode="wait">
+            {isLogin && hasBiometricSetup && capabilities?.canUseBiometrics && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-6"
+              >
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-14 border-primary/30 hover:bg-primary/10 hover:border-primary"
+                  onClick={handleBiometricLogin}
+                  disabled={biometricLoading}
+                >
+                  {biometricLoading ? (
+                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  ) : (
+                    <Fingerprint className="mr-2 h-5 w-5 text-primary" />
+                  )}
+                  <span className="flex flex-col items-start">
+                    <span className="font-medium">Sign in with Fingerprint</span>
+                    <span className="text-xs text-muted-foreground">{biometricEmail}</span>
+                  </span>
+                </Button>
+                
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-muted-foreground">or continue with email</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Platform Notice for iOS */}
+          {isLogin && capabilities?.isIOS && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mb-4 p-3 rounded-lg bg-muted/50 border border-border"
+            >
+              <div className="flex items-start gap-2">
+                <Smartphone className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                <p className="text-xs text-muted-foreground">
+                  <strong>Tip:</strong> Save your password to Safari for quick Face ID login on future visits.
+                </p>
+              </div>
+            </motion.div>
+          )}
+
           {/* Tab Switcher */}
           <div className="flex gap-2 p-1 bg-muted/50 rounded-lg mb-6">
             <button
@@ -184,6 +306,7 @@ export default function Auth() {
                     placeholder="Arif Mahmud Pranto"
                     className="pl-10 bg-muted/50 border-border focus:border-primary"
                     disabled={loading}
+                    autoComplete="name"
                   />
                 </div>
                 {errors.fullName && (
@@ -204,6 +327,7 @@ export default function Auth() {
                   placeholder="you@example.com"
                   className="pl-10 bg-muted/50 border-border focus:border-primary"
                   disabled={loading}
+                  autoComplete="email"
                 />
               </div>
               {errors.email && (
@@ -223,6 +347,7 @@ export default function Auth() {
                   placeholder="••••••••"
                   className="pl-10 bg-muted/50 border-border focus:border-primary"
                   disabled={loading}
+                  autoComplete={isLogin ? "current-password" : "new-password"}
                 />
               </div>
               {errors.password && (
@@ -243,6 +368,7 @@ export default function Auth() {
                     placeholder="••••••••"
                     className="pl-10 bg-muted/50 border-border focus:border-primary"
                     disabled={loading}
+                    autoComplete="new-password"
                   />
                 </div>
                 {errors.confirmPassword && (
@@ -266,6 +392,14 @@ export default function Auth() {
               )}
             </Button>
           </form>
+
+          {/* Biometric Setup Option after login for Android users */}
+          {capabilities?.canUseBiometrics && !hasBiometricSetup && isLogin && (
+            <p className="text-xs text-center text-muted-foreground mt-4">
+              <Fingerprint className="inline-block w-3 h-3 mr-1" />
+              Fingerprint login available after signing in
+            </p>
+          )}
         </div>
 
         {/* Security Note */}
@@ -273,6 +407,65 @@ export default function Auth() {
           🔒 Your data is encrypted and secured with enterprise-grade protection
         </p>
       </motion.div>
+
+      {/* Biometric Setup Modal */}
+      <AnimatePresence>
+        {showBiometricPrompt && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card rounded-2xl p-6 max-w-sm w-full"
+            >
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                  <Fingerprint className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">
+                  Enable Fingerprint Login?
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Sign in faster with your fingerprint on this device.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <Button
+                  onClick={handleSetupBiometric}
+                  className="w-full"
+                  disabled={biometricLoading}
+                >
+                  {biometricLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Setting up...
+                    </>
+                  ) : (
+                    <>
+                      <Fingerprint className="mr-2 h-4 w-4" />
+                      Enable Fingerprint
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleSkipBiometric}
+                  className="w-full text-muted-foreground"
+                  disabled={biometricLoading}
+                >
+                  Maybe Later
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
