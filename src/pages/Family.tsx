@@ -568,10 +568,10 @@ export default function Family() {
                   </div>
                   <div className="space-y-2">
                     <Label>Family Member (optional)</Label>
-                    <Select value={eventForm.family_member_id} onValueChange={(v) => setEventForm(f => ({ ...f, family_member_id: v }))}>
+                    <Select value={eventForm.family_member_id || "none"} onValueChange={(v) => setEventForm(f => ({ ...f, family_member_id: v === "none" ? "" : v }))}>
                       <SelectTrigger><SelectValue placeholder="Select member" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">None</SelectItem>
+                        <SelectItem value="none">None</SelectItem>
                         {members.map(m => (
                           <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                         ))}
@@ -695,10 +695,10 @@ export default function Family() {
                     </div>
                     <div className="space-y-2">
                       <Label>Family Member</Label>
-                      <Select value={docForm.family_member_id} onValueChange={(v) => setDocForm(f => ({ ...f, family_member_id: v }))}>
+                      <Select value={docForm.family_member_id || "none"} onValueChange={(v) => setDocForm(f => ({ ...f, family_member_id: v === "none" ? "" : v }))}>
                         <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">None</SelectItem>
+                          <SelectItem value="none">None</SelectItem>
                           {members.map(m => (
                             <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>
                           ))}
