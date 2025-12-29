@@ -1,1 +1,7 @@
 project_id = "fewysenbjhxhqwocttvv"
+
+[functions.send-task-reminders]
+verify_jwt = false
+
+[functions.send-habit-reminders]
+verify_jwt = false
