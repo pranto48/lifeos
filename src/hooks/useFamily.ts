@@ -123,7 +123,7 @@ export function useFamily() {
 
   // Member mutations
   const createMember = useMutation({
-    mutationFn: async (member: Partial<FamilyMember>) => {
+    mutationFn: async (member: Partial<FamilyMember> & { createBirthdayEvent?: boolean }) => {
       const { data, error } = await supabase
         .from('family_members')
         .insert({
@@ -138,10 +138,26 @@ export function useFamily() {
         .single();
 
       if (error) throw error;
+
+      // Auto-create birthday event if date_of_birth is provided
+      if (member.date_of_birth && data) {
+        await supabase
+          .from('family_events')
+          .insert({
+            user_id: user!.id,
+            family_member_id: data.id,
+            title: `${member.name}'s Birthday`,
+            event_type: 'birthday',
+            event_date: member.date_of_birth,
+            reminder_days: 7,
+          });
+      }
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['family_members'] });
+      queryClient.invalidateQueries({ queryKey: ['family_events'] });
       toast.success('Family member added!');
     },
     onError: (error) => {
