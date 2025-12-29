@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Users } from 'lucide-react';
 
 interface QuickAddExpenseProps {
   onClose: () => void;
@@ -18,19 +18,28 @@ interface Category {
   is_income: boolean;
 }
 
+interface FamilyMember {
+  id: string;
+  name: string;
+  relationship: string;
+}
+
 export function QuickAddExpense({ onClose }: QuickAddExpenseProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [amount, setAmount] = useState('');
   const [type, setType] = useState<'expense' | 'income'>('expense');
   const [categoryId, setCategoryId] = useState('');
+  const [familyMemberId, setFamilyMemberId] = useState('');
   const [merchant, setMerchant] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
 
   useEffect(() => {
     if (user) {
       loadCategories();
+      loadFamilyMembers();
     }
   }, [user]);
 
@@ -43,6 +52,18 @@ export function QuickAddExpense({ onClose }: QuickAddExpenseProps) {
     
     if (data) {
       setCategories(data);
+    }
+  };
+
+  const loadFamilyMembers = async () => {
+    const { data } = await supabase
+      .from('family_members')
+      .select('id, name, relationship')
+      .eq('user_id', user?.id)
+      .order('name');
+    
+    if (data) {
+      setFamilyMembers(data);
     }
   };
 
@@ -59,6 +80,7 @@ export function QuickAddExpense({ onClose }: QuickAddExpenseProps) {
         amount: parseFloat(amount),
         type,
         category_id: categoryId || null,
+        family_member_id: familyMemberId || null,
         merchant: merchant.trim() || null,
         date,
       });
@@ -142,15 +164,37 @@ export function QuickAddExpense({ onClose }: QuickAddExpenseProps) {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="expense-merchant">Merchant / Description</Label>
-        <Input
-          id="expense-merchant"
-          value={merchant}
-          onChange={(e) => setMerchant(e.target.value)}
-          placeholder="Where did you spend?"
-          className="bg-muted/50 border-border"
-        />
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="expense-merchant">Merchant / Description</Label>
+          <Input
+            id="expense-merchant"
+            value={merchant}
+            onChange={(e) => setMerchant(e.target.value)}
+            placeholder="Where did you spend?"
+            className="bg-muted/50 border-border"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-1.5">
+            <Users className="h-3.5 w-3.5" />
+            Family Member
+          </Label>
+          <Select value={familyMemberId} onValueChange={setFamilyMemberId}>
+            <SelectTrigger className="bg-muted/50 border-border">
+              <SelectValue placeholder="Optional" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">None</SelectItem>
+              {familyMembers.map(member => (
+                <SelectItem key={member.id} value={member.id}>
+                  {member.name} ({member.relationship})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
