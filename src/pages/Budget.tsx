@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -28,15 +29,16 @@ interface Transaction {
   family_members: { name: string; relationship: string } | null;
 }
 
-const INCOME_SOURCES = [
-  { value: 'salary', label: 'Salary' },
-  { value: 'freelance', label: 'Freelance' },
-  { value: 'business', label: 'Business' },
-  { value: 'investment', label: 'Investment Returns' },
-  { value: 'rental', label: 'Rental Income' },
-  { value: 'gift', label: 'Gift/Bonus' },
-  { value: 'other', label: 'Other' },
-];
+// Income sources will be translated in component
+const INCOME_SOURCE_KEYS = [
+  { value: 'salary', key: 'income.salary' },
+  { value: 'freelance', key: 'income.freelance' },
+  { value: 'business', key: 'income.business' },
+  { value: 'investment', key: 'income.investment' },
+  { value: 'rental', key: 'income.rental' },
+  { value: 'gift', key: 'income.gift' },
+  { value: 'other', key: 'income.other' },
+] as const;
 
 interface Category {
   id: string;
@@ -61,6 +63,7 @@ interface FamilyMember {
 
 export default function Budget() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [allTransactions, setAllTransactions] = useState<Transaction[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -242,7 +245,7 @@ export default function Budget() {
     
     if (uncategorized > 0) {
       categorySpending.push({
-        name: 'Uncategorized',
+        name: t('budget.uncategorized'),
         value: uncategorized,
         color: '#9ca3af',
       });
@@ -302,7 +305,7 @@ export default function Budget() {
           .update(payload)
           .eq('id', editingTransaction.id);
         if (error) throw error;
-        toast.success('Transaction updated!');
+        toast.success(t('budget.transactionUpdated'));
       } else {
         const { error } = await supabase.from('transactions').insert(payload);
         if (error) throw error;
@@ -317,14 +320,14 @@ export default function Budget() {
             const newTotal = currentSpent + parseFloat(formData.amount);
             
             if (newTotal > Number(budget.amount)) {
-              toast.warning(`Budget exceeded for this category! Spent: ৳${newTotal.toLocaleString()} / ৳${Number(budget.amount).toLocaleString()}`);
+              toast.warning(`${t('budget.budgetExceeded')} ৳${newTotal.toLocaleString()} / ৳${Number(budget.amount).toLocaleString()}`);
             } else if ((newTotal / Number(budget.amount)) >= 0.8) {
-              toast.info(`Approaching budget limit! ${Math.round((newTotal / Number(budget.amount)) * 100)}% used`);
+              toast.info(`${t('budget.approachingLimit')} ${Math.round((newTotal / Number(budget.amount)) * 100)}% ${t('budget.used')}`);
             }
           }
         }
         
-        toast.success('Transaction added!');
+        toast.success(t('budget.transactionAdded'));
       }
 
       setDialogOpen(false);
@@ -360,7 +363,7 @@ export default function Budget() {
         if (error) throw error;
       }
 
-      toast.success('Budget limit saved!');
+      toast.success(t('budget.budgetSaved'));
       setBudgetDialogOpen(false);
       setBudgetForm({ category_id: '', amount: '' });
       loadBudgets();
@@ -370,13 +373,13 @@ export default function Budget() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Delete this transaction?')) return;
+    if (!confirm(t('budget.deleteConfirm'))) return;
     
     const { error } = await supabase.from('transactions').delete().eq('id', id);
     if (error) {
       toast.error('Failed to delete');
     } else {
-      toast.success('Transaction deleted');
+      toast.success(t('budget.transactionDeleted'));
       loadTransactions();
     }
   };
@@ -394,16 +397,16 @@ export default function Budget() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl font-bold text-foreground">Budget & Spending</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('budget.title')}</h1>
         
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={filterMember} onValueChange={setFilterMember}>
             <SelectTrigger className="w-[160px]">
               <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="All Members" />
+              <SelectValue placeholder={t('budget.allMembers')} />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Transactions</SelectItem>
+              <SelectItem value="all">{t('budget.allMembers')}</SelectItem>
               {familyMembers.map(member => (
                 <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
               ))}
@@ -414,18 +417,18 @@ export default function Budget() {
             <DialogTrigger asChild>
               <Button variant="outline">
                 <Target className="h-4 w-4 mr-2" />
-                Set Budget
+                {t('budget.setBudget')}
               </Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Set Monthly Budget Limit</DialogTitle>
+                <DialogTitle>{t('budget.setMonthlyLimit')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleBudgetSubmit} className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Category</Label>
+                  <Label>{t('budget.category')}</Label>
                   <Select value={budgetForm.category_id} onValueChange={(v) => setBudgetForm(f => ({ ...f, category_id: v }))}>
-                    <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('budget.selectCategory')} /></SelectTrigger>
                     <SelectContent>
                       {expenseCategories.map(cat => (
                         <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
@@ -434,7 +437,7 @@ export default function Budget() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label>Monthly Limit (৳)</Label>
+                  <Label>{t('budget.monthlyLimit')} (৳)</Label>
                   <Input
                     type="number"
                     value={budgetForm.amount}
@@ -445,11 +448,11 @@ export default function Budget() {
                   />
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  This limit applies to {format(new Date(currentYear, currentMonth - 1), 'MMMM yyyy')}
+                  {t('budget.limitApplies')} {format(new Date(currentYear, currentMonth - 1), 'MMMM yyyy')}
                 </p>
                 <div className="flex justify-end gap-2 pt-2">
-                  <Button type="button" variant="outline" onClick={() => setBudgetDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit">Save Limit</Button>
+                  <Button type="button" variant="outline" onClick={() => setBudgetDialogOpen(false)}>{t('common.cancel')}</Button>
+                  <Button type="submit">{t('budget.saveLimit')}</Button>
                 </div>
               </form>
             </DialogContent>
@@ -460,29 +463,29 @@ export default function Budget() {
             if (!open) resetForm();
           }}>
             <DialogTrigger asChild>
-              <Button><Plus className="h-4 w-4 mr-2" />Add Transaction</Button>
+              <Button><Plus className="h-4 w-4 mr-2" />{t('budget.addTransaction')}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingTransaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
+                <DialogTitle>{editingTransaction ? t('budget.editTransaction') : t('budget.addTransaction')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Type</Label>
+                    <Label>{t('budget.type')}</Label>
                     <Select 
                       value={formData.type} 
                       onValueChange={(v: 'expense' | 'income') => setFormData(f => ({ ...f, type: v, category_id: '' }))}
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="expense">Expense</SelectItem>
-                        <SelectItem value="income">Income</SelectItem>
+                        <SelectItem value="expense">{t('budget.expense')}</SelectItem>
+                        <SelectItem value="income">{t('budget.income')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Amount (৳)</Label>
+                    <Label>{t('budget.amount')} (৳)</Label>
                     <Input
                       type="number"
                       step="0.01"
@@ -497,11 +500,11 @@ export default function Budget() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Category</Label>
+                    <Label>{t('budget.category')}</Label>
                     <Select value={formData.category_id || "none"} onValueChange={(v) => setFormData(f => ({ ...f, category_id: v === "none" ? "" : v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('budget.select')} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="none">{t('common.none')}</SelectItem>
                         {filteredCategories.map(cat => (
                           <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
                         ))}
@@ -509,7 +512,7 @@ export default function Budget() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Date</Label>
+                    <Label>{t('budget.date')}</Label>
                     <Input
                       type="date"
                       value={formData.date}
@@ -521,12 +524,12 @@ export default function Budget() {
                 {/* Income Source - Only show for income type */}
                 {formData.type === 'income' && (
                   <div className="space-y-2">
-                    <Label>Source of Income</Label>
+                    <Label>{t('budget.incomeSource')}</Label>
                     <Select value={formData.account} onValueChange={(v) => setFormData(f => ({ ...f, account: v }))}>
-                      <SelectTrigger><SelectValue placeholder="Select source" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('budget.selectSource')} /></SelectTrigger>
                       <SelectContent>
-                        {INCOME_SOURCES.map(source => (
-                          <SelectItem key={source.value} value={source.value}>{source.label}</SelectItem>
+                        {INCOME_SOURCE_KEYS.map(source => (
+                          <SelectItem key={source.value} value={source.value}>{t(source.key as any)}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -535,22 +538,22 @@ export default function Budget() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Description</Label>
+                    <Label>{t('budget.description')}</Label>
                     <Input
                       value={formData.merchant}
                       onChange={(e) => setFormData(f => ({ ...f, merchant: e.target.value }))}
-                      placeholder="Where/what?"
+                      placeholder={t('budget.whereWhat')}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label className="flex items-center gap-1.5">
                       <Users className="h-3.5 w-3.5" />
-                      Family Member
+                      {t('family.familyMember')}
                     </Label>
                     <Select value={formData.family_member_id || "none"} onValueChange={(v) => setFormData(f => ({ ...f, family_member_id: v === "none" ? "" : v }))}>
-                      <SelectTrigger><SelectValue placeholder="Optional" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('common.optional')} /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="none">{t('common.none')}</SelectItem>
                         {familyMembers.map(member => (
                           <SelectItem key={member.id} value={member.id}>{member.name}</SelectItem>
                         ))}
@@ -560,8 +563,8 @@ export default function Budget() {
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-                  <Button type="submit">{editingTransaction ? 'Save' : 'Add'}</Button>
+                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
+                  <Button type="submit">{editingTransaction ? t('common.save') : t('common.add')}</Button>
                 </div>
               </form>
             </DialogContent>

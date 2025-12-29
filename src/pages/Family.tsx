@@ -21,6 +21,7 @@ import { useFamily, FamilyMember, FamilyEvent, FamilyDocument } from '@/hooks/us
 import { FamilyTree } from '@/components/family/FamilyTree';
 import { AvatarUpload } from '@/components/family/AvatarUpload';
 import { FamilyMemberDetail } from '@/components/family/FamilyMemberDetail';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
 const RELATIONSHIPS = [
@@ -251,6 +252,7 @@ function DocumentCard({ doc, onDelete }: {
 }
 
 export default function Family() {
+  const { t } = useLanguage();
   const { 
     members, events, documents, connections, isLoading,
     createMember, updateMember, deleteMember,
@@ -341,8 +343,8 @@ export default function Family() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Family</h1>
-          <p className="text-muted-foreground">Manage family members, events, and documents</p>
+          <h1 className="text-2xl font-bold text-foreground">{t('family.title')}</h1>
+          <p className="text-muted-foreground">{t('family.manageDescription')}</p>
         </div>
       </div>
 
@@ -355,23 +357,23 @@ export default function Family() {
                 <Gift className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">Upcoming Events</h3>
+                <h3 className="font-semibold text-foreground">{t('family.upcomingEvents')}</h3>
                 <div className="mt-2 space-y-1">
                   {upcomingEvents.slice(0, 3).map(event => {
                     const eventType = EVENT_TYPES.find(t => t.value === event.event_type);
-                    return (
-                      <p key={event.id} className="text-sm text-muted-foreground">
-                        <span className="font-medium text-foreground">{event.title}</span>
-                        {' - '}
-                        {event.daysUntil === 0 ? (
-                          <span className="text-primary font-medium">Today!</span>
-                        ) : event.daysUntil === 1 ? (
-                          <span className="text-orange-500">Tomorrow</span>
-                        ) : (
-                          <span>in {event.daysUntil} days</span>
-                        )}
-                      </p>
-                    );
+                      return (
+                        <p key={event.id} className="text-sm text-muted-foreground">
+                          <span className="font-medium text-foreground">{event.title}</span>
+                          {' - '}
+                          {event.daysUntil === 0 ? (
+                            <span className="text-primary font-medium">{t('family.today')}</span>
+                          ) : event.daysUntil === 1 ? (
+                            <span className="text-orange-500">{t('family.tomorrow')}</span>
+                          ) : (
+                            <span>{event.daysUntil} {t('family.inDays')}</span>
+                          )}
+                        </p>
+                      );
                   })}
                 </div>
               </div>
@@ -390,7 +392,7 @@ export default function Family() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{members.length}</p>
-                <p className="text-sm text-muted-foreground">Family Members</p>
+                <p className="text-sm text-muted-foreground">{t('family.familyMembers')}</p>
               </div>
             </div>
           </CardContent>
@@ -404,7 +406,7 @@ export default function Family() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{events.length}</p>
-                <p className="text-sm text-muted-foreground">Events</p>
+                <p className="text-sm text-muted-foreground">{t('family.events')}</p>
               </div>
             </div>
           </CardContent>
@@ -418,7 +420,7 @@ export default function Family() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{documents.length}</p>
-                <p className="text-sm text-muted-foreground">Documents</p>
+                <p className="text-sm text-muted-foreground">{t('family.documents')}</p>
               </div>
             </div>
           </CardContent>
@@ -429,16 +431,16 @@ export default function Family() {
       <Tabs defaultValue="members" className="space-y-4">
         <TabsList>
           <TabsTrigger value="members" className="gap-2">
-            <Users className="h-4 w-4" /> Members
+            <Users className="h-4 w-4" /> {t('family.members')}
           </TabsTrigger>
           <TabsTrigger value="tree" className="gap-2">
-            <GitBranch className="h-4 w-4" /> Tree
+            <GitBranch className="h-4 w-4" /> {t('family.treeView')}
           </TabsTrigger>
           <TabsTrigger value="events" className="gap-2">
-            <Calendar className="h-4 w-4" /> Events
+            <Calendar className="h-4 w-4" /> {t('family.events')}
           </TabsTrigger>
           <TabsTrigger value="documents" className="gap-2">
-            <FileText className="h-4 w-4" /> Documents
+            <FileText className="h-4 w-4" /> {t('family.documents')}
           </TabsTrigger>
         </TabsList>
 
