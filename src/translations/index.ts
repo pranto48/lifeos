@@ -202,6 +202,18 @@ export const translations = {
   'budget.uncategorized': { bn: 'শ্রেণীবিহীন', en: 'Uncategorized' },
   'budget.overBudgetBy': { bn: 'অতিরিক্ত খরচ', en: 'Over budget by' },
   'budget.used': { bn: 'ব্যবহৃত', en: 'used' },
+  'budget.manageCategories': { bn: 'বিভাগ পরিচালনা', en: 'Manage Categories' },
+  'budget.addCategory': { bn: 'বিভাগ যোগ করুন', en: 'Add Category' },
+  'budget.categoryName': { bn: 'বিভাগের নাম', en: 'Category Name' },
+  'budget.categoryType': { bn: 'বিভাগের ধরন', en: 'Category Type' },
+  'budget.expenseCategory': { bn: 'ব্যয় বিভাগ', en: 'Expense Category' },
+  'budget.incomeCategory': { bn: 'আয় বিভাগ', en: 'Income Category' },
+  'budget.categoryColor': { bn: 'রং', en: 'Color' },
+  'budget.categoryAdded': { bn: 'বিভাগ যোগ হয়েছে!', en: 'Category added!' },
+  'budget.categoryDeleted': { bn: 'বিভাগ মুছে ফেলা হয়েছে', en: 'Category deleted' },
+  'budget.deleteCategoryConfirm': { bn: 'এই বিভাগ মুছে ফেলবেন?', en: 'Delete this category?' },
+  'budget.existingCategories': { bn: 'বিদ্যমান বিভাগসমূহ', en: 'Existing Categories' },
+  'budget.noCategories': { bn: 'কোন বিভাগ নেই', en: 'No categories yet' },
 
   // Family Additional
   'family.manageDescription': { bn: 'পরিবারের সদস্য, ইভেন্ট এবং ডকুমেন্ট পরিচালনা করুন', en: 'Manage family members, events, and documents' },
