@@ -284,6 +284,99 @@ export const translations = {
   'month.october': { bn: 'অক্টোবর', en: 'October' },
   'month.november': { bn: 'নভেম্বর', en: 'November' },
   'month.december': { bn: 'ডিসেম্বর', en: 'December' },
+
+  // Dashboard Additional
+  'dashboard.goodMorning': { bn: 'শুভ সকাল', en: 'Good morning' },
+  'dashboard.goodAfternoon': { bn: 'শুভ অপরাহ্ন', en: 'Good afternoon' },
+  'dashboard.goodEvening': { bn: 'শুভ সন্ধ্যা', en: 'Good evening' },
+  'dashboard.there': { bn: '', en: 'there' },
+  'dashboard.overdue': { bn: 'বিলম্বিত', en: 'Overdue' },
+  'dashboard.activeGoals': { bn: 'সক্রিয় লক্ষ্য', en: 'Active Goals' },
+  'dashboard.completed': { bn: 'সম্পন্ন', en: 'Completed' },
+  'dashboard.thisMonthBudget': { bn: 'এই মাসের বাজেট', en: "This Month's Budget" },
+  'dashboard.recentNotes': { bn: 'সাম্প্রতিক নোট', en: 'Recent Notes' },
+  'dashboard.upcomingTasks': { bn: 'আসন্ন কাজ', en: 'Upcoming Tasks' },
+  'dashboard.noNotesYet': { bn: "এখনো কোন নোট নেই। 'n' চাপুন যোগ করতে!", en: "No notes yet. Press 'n' to add one!" },
+  'dashboard.noTasksYet': { bn: "এখনো কোন কাজ নেই। 't' চাপুন যোগ করতে!", en: "No tasks yet. Press 't' to add one!" },
+
+  // Tasks Additional
+  'tasks.noTasksYet': { bn: "এখনো কোন কাজ নেই। 't' চাপুন যোগ করতে!", en: "No tasks yet. Press 't' to add one!" },
+  'tasks.active': { bn: 'সক্রিয়', en: 'Active' },
+  'tasks.urgent': { bn: 'জরুরি', en: 'Urgent' },
+
+  // Notes Additional
+  'notes.newNote': { bn: 'নতুন নোট', en: 'New Note' },
+  'notes.searchNotes': { bn: 'নোট অনুসন্ধান...', en: 'Search notes...' },
+  'notes.noNotesYet': { bn: "এখনো কোন নোট নেই। 'n' চাপুন যোগ করতে!", en: "No notes yet. Press 'n' to add one!" },
+  'notes.createNewNote': { bn: 'নতুন নোট তৈরি করুন', en: 'Create New Note' },
+  'notes.noteTitlePlaceholder': { bn: 'নোটের শিরোনাম', en: 'Note title' },
+  'notes.writeNote': { bn: 'আপনার নোট লিখুন...', en: 'Write your note...' },
+  'notes.tagsComma': { bn: 'ট্যাগ (কমা দিয়ে আলাদা)', en: 'Tags (comma separated)' },
+  'notes.vaultNote': { bn: 'ভল্ট নোট', en: 'Vault Note' },
+  'notes.encryptPassphrase': { bn: 'পাসফ্রেজ দিয়ে এনক্রিপ্ট করুন', en: 'Encrypt with a passphrase' },
+  'notes.passphrase': { bn: 'পাসফ্রেজ', en: 'Passphrase' },
+  'notes.confirmPassphrase': { bn: 'পাসফ্রেজ নিশ্চিত করুন', en: 'Confirm Passphrase' },
+  'notes.passphraseWarning': { bn: 'গুরুত্বপূর্ণ: আপনার পাসফ্রেজ কোথাও সংরক্ষিত হয় না। ভুলে গেলে নোট পুনরুদ্ধার করা যাবে না।', en: 'Important: Your passphrase is NOT stored anywhere. If you forget it, your note cannot be recovered.' },
+  'notes.passphraseHint': { bn: 'ন্যূনতম ৮ অক্ষর, বড় হাতের, ছোট হাতের এবং সংখ্যা সহ', en: 'Min 8 characters, with uppercase, lowercase, and number' },
+  'notes.enterPassphrase': { bn: 'আপনার পাসফ্রেজ লিখুন', en: 'Enter your passphrase' },
+  'notes.encryptedNote': { bn: 'এনক্রিপ্টেড কন্টেন্ট - আনলক করতে ক্লিক করুন', en: 'Encrypted content - click to unlock' },
+  'notes.unlockNote': { bn: 'নোট আনলক করুন', en: 'Unlock Note' },
+  'notes.decrypting': { bn: 'ডিক্রিপ্ট হচ্ছে...', en: 'Decrypting...' },
+  'notes.creating': { bn: 'তৈরি হচ্ছে...', en: 'Creating...' },
+  'notes.createVaultNote': { bn: 'ভল্ট নোট তৈরি করুন', en: 'Create Vault Note' },
+  'notes.createNote': { bn: 'নোট তৈরি করুন', en: 'Create Note' },
+  'notes.noContent': { bn: 'কোন কন্টেন্ট নেই', en: 'No content' },
+  'notes.created': { bn: 'তৈরি হয়েছে', en: 'Created' },
+
+  // Goals Additional
+  'goals.goalsAndPlans': { bn: 'লক্ষ্য ও পরিকল্পনা', en: 'Goals & Plans' },
+  'goals.noGoalsYet': { bn: "এখনো কোন লক্ষ্য নেই। 'g' চাপুন যোগ করতে!", en: "No goals yet. Press 'g' to add one!" },
+
+  // Habits Additional
+  'habits.buildHabits': { bn: 'ভালো অভ্যাস গড়ুন, একদিন একটি করে', en: 'Build better habits, one day at a time' },
+  'habits.newHabit': { bn: 'অভ্যাস যোগ করুন', en: 'Add Habit' },
+  'habits.createNewHabit': { bn: 'নতুন অভ্যাস তৈরি করুন', en: 'Create New Habit' },
+  'habits.habitName': { bn: 'অভ্যাসের নাম', en: 'Habit Name' },
+  'habits.habitNamePlaceholder': { bn: 'যেমন, সকালের ধ্যান', en: 'e.g., Morning Meditation' },
+  'habits.descriptionOptional': { bn: 'বিবরণ (ঐচ্ছিক)', en: 'Description (optional)' },
+  'habits.whyImportant': { bn: 'এই অভ্যাস আপনার কাছে কেন গুরুত্বপূর্ণ?', en: 'Why is this habit important to you?' },
+  'habits.color': { bn: 'রঙ', en: 'Color' },
+  'habits.emailReminder': { bn: 'ইমেইল রিমাইন্ডার', en: 'Email Reminder' },
+  'habits.reminderTime': { bn: 'রিমাইন্ডার সময়', en: 'Reminder Time' },
+  'habits.reminderHint': { bn: 'এই সময়ে আপনি ইমেইল রিমাইন্ডার পাবেন (আপনার টাইমজোনে)', en: "You'll receive an email reminder at this time (in your timezone)" },
+  'habits.saveChanges': { bn: 'পরিবর্তন সংরক্ষণ করুন', en: 'Save Changes' },
+  'habits.createHabit': { bn: 'অভ্যাস তৈরি করুন', en: 'Create Habit' },
+  'habits.completedToday': { bn: 'আজ সম্পন্ন', en: 'Completed Today' },
+  'habits.longestStreak': { bn: 'দীর্ঘতম ধারাবাহিকতা', en: 'Longest Streak' },
+  'habits.totalCompletions': { bn: 'মোট সম্পন্ন', en: 'Total Completions' },
+  'habits.grid': { bn: 'গ্রিড', en: 'Grid' },
+  'habits.calendar': { bn: 'ক্যালেন্ডার', en: 'Calendar' },
+  'habits.noHabitsYet': { bn: 'এখনো কোন অভ্যাস নেই', en: 'No habits yet' },
+  'habits.startBuilding': { bn: 'আজই ভালো অভ্যাস গড়ে তোলা শুরু করুন!', en: 'Start building better habits today!' },
+  'habits.createFirstHabit': { bn: 'আপনার প্রথম অভ্যাস তৈরি করুন', en: 'Create Your First Habit' },
+  'habits.dayStreak': { bn: 'দিনের ধারাবাহিকতা', en: 'day streak' },
+  'habits.total': { bn: 'মোট', en: 'total' },
+  'habits.daysAgo': { bn: '৭ দিন আগে', en: '7 days ago' },
+  'habits.today': { bn: 'আজ', en: 'Today' },
+  'habits.deleteConfirm': { bn: 'আপনি কি এই অভ্যাস মুছে ফেলতে চান?', en: 'Are you sure you want to delete this habit?' },
+
+  // Investments Additional
+  'investments.totalValue': { bn: 'মোট মূল্য', en: 'Total Value' },
+  'investments.noInvestmentsYet': { bn: 'এখনো কোন বিনিয়োগ নেই।', en: 'No investments yet.' },
+  'investments.profitLoss': { bn: 'লাভ/ক্ষতি', en: 'P/L' },
+  'investments.current': { bn: 'বর্তমান', en: 'Current' },
+
+  // Salary Additional
+  'salary.salaryHistory': { bn: 'বেতন ইতিহাস', en: 'Salary History' },
+  'salary.totalNetEarned': { bn: 'মোট নিট আয়', en: 'Total Net Earned' },
+  'salary.salaryTimeline': { bn: 'বেতন টাইমলাইন', en: 'Salary Timeline' },
+  'salary.noEntriesYet': { bn: 'এখনো কোন বেতন এন্ট্রি নেই।', en: 'No salary entries yet.' },
+  'salary.gross': { bn: 'মোট', en: 'Gross' },
+  'salary.net': { bn: 'নিট', en: 'Net' },
+
+  // Projects Additional
+  'projects.projectIdeas': { bn: 'প্রকল্প আইডিয়া', en: 'Project Ideas' },
+  'projects.noProjectsYet': { bn: 'এখনো কোন প্রকল্প আইডিয়া নেই।', en: 'No project ideas yet.' },
 } as const;
 
 export type TranslationKey = keyof typeof translations;
