@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Lightbulb } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -9,6 +10,7 @@ const statusColors: Record<string, string> = { idea: 'bg-blue-500/20 text-blue-4
 
 export default function Projects() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [projects, setProjects] = useState<any[]>([]);
 
   useEffect(() => {
@@ -22,14 +24,14 @@ export default function Projects() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Project Ideas</h1>
+      <h1 className="text-2xl font-bold text-foreground">{t('projects.projectIdeas')}</h1>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {projects.length === 0 ? (
           <Card className="bg-card border-border col-span-full">
             <CardContent className="py-12 text-center">
               <Lightbulb className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No project ideas yet.</p>
+              <p className="text-muted-foreground">{t('projects.noProjectsYet')}</p>
             </CardContent>
           </Card>
         ) : (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Target } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +12,7 @@ const categoryColors: Record<string, string> = { family: 'bg-pink-500/20 text-pi
 
 export default function Goals() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [goals, setGoals] = useState<any[]>([]);
 
   useEffect(() => {
@@ -24,14 +26,14 @@ export default function Goals() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-foreground">Goals & Plans</h1>
+      <h1 className="text-2xl font-bold text-foreground">{t('goals.goalsAndPlans')}</h1>
 
       <div className="grid gap-4 md:grid-cols-2">
         {goals.length === 0 ? (
           <Card className="bg-card border-border col-span-full">
             <CardContent className="py-12 text-center">
               <Target className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No goals yet. Press 'g' to add one!</p>
+              <p className="text-muted-foreground">{t('goals.noGoalsYet')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -51,13 +53,13 @@ export default function Goals() {
                   {goal.target_amount && (
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Progress</span>
+                        <span className="text-muted-foreground">{t('goals.progress')}</span>
                         <span className="font-mono text-foreground">৳{Number(goal.current_amount || 0).toLocaleString()} / ৳{Number(goal.target_amount).toLocaleString()}</span>
                       </div>
                       <Progress value={progress} className="h-2" />
                     </div>
                   )}
-                  {goal.target_date && <p className="text-xs text-muted-foreground">Target: {format(new Date(goal.target_date), 'MMM d, yyyy')}</p>}
+                  {goal.target_date && <p className="text-xs text-muted-foreground">{t('goals.targetDate')}: {format(new Date(goal.target_date), 'MMM d, yyyy')}</p>}
                 </CardContent>
               </Card>
             );

@@ -3,6 +3,7 @@ import { FileText, Pin, Star, Search, Lock, LockOpen, Plus, X, Eye, EyeOff } fro
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -17,6 +18,7 @@ import { format } from 'date-fns';
 
 export default function Notes() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [notes, setNotes] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [selectedNote, setSelectedNote] = useState<any>(null);
@@ -158,19 +160,19 @@ export default function Notes() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h1 className="text-2xl font-bold text-foreground">Notes</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('notes.title')}</h1>
         <div className="flex items-center gap-4">
           <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input 
               value={search} 
               onChange={e => setSearch(e.target.value)} 
-              placeholder="Search notes..." 
+              placeholder={t('notes.searchNotes')} 
               className="pl-9 bg-muted/50" 
             />
           </div>
           <Button onClick={() => setIsCreateDialogOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" /> New Note
+            <Plus className="h-4 w-4 mr-2" /> {t('notes.newNote')}
           </Button>
         </div>
       </div>
@@ -180,7 +182,7 @@ export default function Notes() {
           <Card className="bg-card border-border col-span-full">
             <CardContent className="py-12 text-center">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No notes yet. Press 'n' to add one!</p>
+              <p className="text-muted-foreground">{t('notes.noNotesYet')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -212,7 +214,7 @@ export default function Notes() {
                   </div>
                 </div>
                 {note.is_vault ? (
-                  <p className="text-sm text-muted-foreground italic">🔒 Encrypted content - click to unlock</p>
+                  <p className="text-sm text-muted-foreground italic">🔒 {t('notes.encryptedNote')}</p>
                 ) : note.content ? (
                   <p className="text-sm text-muted-foreground line-clamp-3">{note.content}</p>
                 ) : null}
@@ -244,16 +246,16 @@ export default function Notes() {
           {selectedNote?.is_vault && !decryptedContent ? (
             <div className="space-y-4 py-4">
               <p className="text-sm text-muted-foreground">
-                This note is encrypted. Enter your passphrase to unlock it.
+                {t('notes.passphraseWarning').split('.')[0]}.
               </p>
               <div className="space-y-2">
-                <Label>Passphrase</Label>
+                <Label>{t('notes.passphrase')}</Label>
                 <div className="relative">
                   <Input
                     type={showPassphrase ? 'text' : 'password'}
                     value={passphrase}
                     onChange={e => setPassphrase(e.target.value)}
-                    placeholder="Enter your passphrase"
+                    placeholder={t('notes.enterPassphrase')}
                     className="bg-muted/50 pr-10"
                     onKeyDown={e => e.key === 'Enter' && handleDecrypt()}
                   />
@@ -268,13 +270,13 @@ export default function Notes() {
               </div>
               <Button onClick={handleDecrypt} disabled={!passphrase || isDecrypting} className="w-full">
                 <LockOpen className="h-4 w-4 mr-2" />
-                {isDecrypting ? 'Decrypting...' : 'Unlock Note'}
+                {isDecrypting ? t('notes.decrypting') : t('notes.unlockNote')}
               </Button>
             </div>
           ) : (
             <div className="space-y-4 py-4">
               <div className="bg-muted/30 rounded-lg p-4 min-h-[200px] whitespace-pre-wrap text-foreground">
-                {selectedNote?.is_vault ? decryptedContent : selectedNote?.content || 'No content'}
+                {selectedNote?.is_vault ? decryptedContent : selectedNote?.content || t('notes.noContent')}
               </div>
               <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <div className="flex gap-1">
@@ -282,7 +284,7 @@ export default function Notes() {
                     <Badge key={tag} variant="secondary">{tag}</Badge>
                   ))}
                 </div>
-                <span>Created {selectedNote && format(new Date(selectedNote.created_at), 'MMM d, yyyy')}</span>
+                <span>{t('notes.created')} {selectedNote && format(new Date(selectedNote.created_at), 'MMM d, yyyy')}</span>
               </div>
             </div>
           )}
@@ -293,32 +295,32 @@ export default function Notes() {
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
         <DialogContent className="sm:max-w-[600px] bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Create New Note</DialogTitle>
+            <DialogTitle className="text-foreground">{t('notes.createNewNote')}</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Title</Label>
+              <Label>{t('notes.title')}</Label>
               <Input
                 value={newTitle}
                 onChange={e => setNewTitle(e.target.value)}
-                placeholder="Note title"
+                placeholder={t('notes.noteTitlePlaceholder')}
                 className="bg-muted/50"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Content</Label>
+              <Label>{t('notes.content')}</Label>
               <Textarea
                 value={newContent}
                 onChange={e => setNewContent(e.target.value)}
-                placeholder="Write your note..."
+                placeholder={t('notes.writeNote')}
                 className="bg-muted/50 min-h-[150px]"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Tags (comma separated)</Label>
+              <Label>{t('notes.tagsComma')}</Label>
               <Input
                 value={newTags}
                 onChange={e => setNewTags(e.target.value)}
@@ -331,8 +333,8 @@ export default function Notes() {
               <div className="flex items-center gap-2">
                 <Lock className="h-4 w-4 text-primary" />
                 <div>
-                  <p className="text-sm font-medium text-foreground">Vault Note</p>
-                  <p className="text-xs text-muted-foreground">Encrypt with a passphrase</p>
+                  <p className="text-sm font-medium text-foreground">{t('notes.vaultNote')}</p>
+                  <p className="text-xs text-muted-foreground">{t('notes.encryptPassphrase')}</p>
                 </div>
               </div>
               <Switch checked={isVault} onCheckedChange={setIsVault} />
@@ -348,30 +350,29 @@ export default function Notes() {
                 >
                   <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
                     <p className="text-sm text-foreground mb-3">
-                      ⚠️ <strong>Important:</strong> Your passphrase is NOT stored anywhere. 
-                      If you forget it, your note cannot be recovered.
+                      ⚠️ <strong>{t('notes.passphraseWarning')}</strong>
                     </p>
                     <div className="space-y-3">
                       <div className="space-y-2">
-                        <Label>Passphrase</Label>
+                        <Label>{t('notes.passphrase')}</Label>
                         <Input
                           type="password"
                           value={vaultPassphrase}
                           onChange={e => setVaultPassphrase(e.target.value)}
-                          placeholder="Enter a strong passphrase"
+                          placeholder={t('notes.enterPassphrase')}
                           className="bg-background"
                         />
                         <p className="text-xs text-muted-foreground">
-                          Min 8 characters, with uppercase, lowercase, and number
+                          {t('notes.passphraseHint')}
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label>Confirm Passphrase</Label>
+                        <Label>{t('notes.confirmPassphrase')}</Label>
                         <Input
                           type="password"
                           value={confirmPassphrase}
                           onChange={e => setConfirmPassphrase(e.target.value)}
-                          placeholder="Confirm your passphrase"
+                          placeholder={t('notes.confirmPassphrase')}
                           className="bg-background"
                         />
                       </div>
@@ -382,9 +383,9 @@ export default function Notes() {
             </AnimatePresence>
 
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="ghost" onClick={() => setIsCreateDialogOpen(false)}>Cancel</Button>
+              <Button variant="ghost" onClick={() => setIsCreateDialogOpen(false)}>{t('common.cancel')}</Button>
               <Button onClick={handleCreateNote} disabled={!newTitle.trim() || isCreating}>
-                {isCreating ? 'Creating...' : isVault ? '🔒 Create Vault Note' : 'Create Note'}
+                {isCreating ? t('notes.creating') : isVault ? `🔒 ${t('notes.createVaultNote')}` : t('notes.createNote')}
               </Button>
             </div>
           </div>

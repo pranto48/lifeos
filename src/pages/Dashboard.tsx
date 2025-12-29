@@ -6,12 +6,14 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { UpcomingFamilyEvents } from '@/components/dashboard/UpcomingFamilyEvents';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [stats, setStats] = useState({
     todayTasks: 0,
     completedTasks: 0,
@@ -62,11 +64,18 @@ export default function Dashboard() {
     setLoading(false);
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return t('dashboard.goodMorning');
+    if (hour < 18) return t('dashboard.goodAfternoon');
+    return t('dashboard.goodEvening');
+  };
+
   const statCards = [
-    { title: "Today's Tasks", value: stats.todayTasks, icon: CheckSquare, color: 'text-blue-400' },
-    { title: 'Overdue', value: stats.overdueTasks, icon: Clock, color: 'text-red-400' },
-    { title: 'Active Goals', value: stats.activeGoals, icon: Target, color: 'text-yellow-400' },
-    { title: 'Completed', value: stats.completedTasks, icon: CheckSquare, color: 'text-green-400' },
+    { title: t('dashboard.todayTasks'), value: stats.todayTasks, icon: CheckSquare, color: 'text-blue-400' },
+    { title: t('dashboard.overdue'), value: stats.overdueTasks, icon: Clock, color: 'text-red-400' },
+    { title: t('dashboard.activeGoals'), value: stats.activeGoals, icon: Target, color: 'text-yellow-400' },
+    { title: t('dashboard.completed'), value: stats.completedTasks, icon: CheckSquare, color: 'text-green-400' },
   ];
 
   return (
@@ -75,7 +84,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">
-            Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {user?.user_metadata?.full_name?.split(' ')[0] || 'there'}
+            {getGreeting()}, {user?.user_metadata?.full_name?.split(' ')[0] || t('dashboard.there')}
           </h1>
           <p className="text-muted-foreground">{format(new Date(), 'EEEE, MMMM d, yyyy')}</p>
         </div>
@@ -108,27 +117,27 @@ export default function Dashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Wallet className="h-4 w-4" /> This Month's Budget
+              <Wallet className="h-4 w-4" /> {t('dashboard.thisMonthBudget')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ArrowUpRight className="h-4 w-4 text-green-400" />
-                <span className="text-sm text-muted-foreground">Income</span>
+                <span className="text-sm text-muted-foreground">{t('budget.income')}</span>
               </div>
               <span className="font-mono font-semibold text-green-400">৳{stats.monthlyIncome.toLocaleString()}</span>
             </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ArrowDownRight className="h-4 w-4 text-red-400" />
-                <span className="text-sm text-muted-foreground">Expenses</span>
+                <span className="text-sm text-muted-foreground">{t('budget.expenses')}</span>
               </div>
               <span className="font-mono font-semibold text-red-400">৳{stats.monthlyExpense.toLocaleString()}</span>
             </div>
             <div className="pt-2 border-t border-border">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">Balance</span>
+                <span className="text-sm font-medium">{t('budget.balance')}</span>
                 <span className={`font-mono font-bold ${stats.monthlyIncome - stats.monthlyExpense >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                   ৳{(stats.monthlyIncome - stats.monthlyExpense).toLocaleString()}
                 </span>
@@ -141,12 +150,12 @@ export default function Dashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <FileText className="h-4 w-4" /> Recent Notes
+              <FileText className="h-4 w-4" /> {t('dashboard.recentNotes')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {stats.recentNotes.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No notes yet. Press 'n' to add one!</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noNotesYet')}</p>
             ) : (
               <div className="space-y-2">
                 {stats.recentNotes.map(note => (
@@ -166,12 +175,12 @@ export default function Dashboard() {
         <Card className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Calendar className="h-4 w-4" /> Upcoming Tasks
+              <Calendar className="h-4 w-4" /> {t('dashboard.upcomingTasks')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {stats.upcomingTasks.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">No tasks yet. Press 't' to add one!</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noTasksYet')}</p>
             ) : (
               <div className="space-y-2">
                 {stats.upcomingTasks.map(task => (

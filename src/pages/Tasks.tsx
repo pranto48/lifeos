@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, CheckSquare, Clock, Filter } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -10,6 +11,7 @@ import { format } from 'date-fns';
 
 export default function Tasks() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [tasks, setTasks] = useState<any[]>([]);
   const [filter, setFilter] = useState('all');
 
@@ -43,14 +45,20 @@ export default function Tasks() {
     low: 'bg-green-500/20 text-green-400',
   };
 
+  const filterLabels: Record<string, string> = {
+    all: t('common.all'),
+    active: t('tasks.active'),
+    completed: t('tasks.completed'),
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Tasks</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('tasks.title')}</h1>
         <div className="flex gap-2">
           {['all', 'active', 'completed'].map(f => (
-            <Button key={f} variant={filter === f ? 'default' : 'ghost'} size="sm" onClick={() => setFilter(f)} className="capitalize">
-              {f}
+            <Button key={f} variant={filter === f ? 'default' : 'ghost'} size="sm" onClick={() => setFilter(f)}>
+              {filterLabels[f]}
             </Button>
           ))}
         </div>
@@ -61,7 +69,7 @@ export default function Tasks() {
           <Card className="bg-card border-border">
             <CardContent className="py-12 text-center">
               <CheckSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No tasks yet. Press 't' to add one!</p>
+              <p className="text-muted-foreground">{t('tasks.noTasksYet')}</p>
             </CardContent>
           </Card>
         ) : (

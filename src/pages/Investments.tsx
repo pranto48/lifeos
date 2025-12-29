@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
@@ -9,6 +10,7 @@ const typeLabels: Record<string, string> = { dps: 'DPS', fdr: 'FDR', stocks: 'St
 
 export default function Investments() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [investments, setInvestments] = useState<any[]>([]);
 
   useEffect(() => {
@@ -27,9 +29,9 @@ export default function Investments() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Investments</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('investments.title')}</h1>
         <div className="text-right">
-          <p className="text-sm text-muted-foreground">Total Value</p>
+          <p className="text-sm text-muted-foreground">{t('investments.totalValue')}</p>
           <p className="font-mono text-2xl font-bold text-primary">৳{totalCurrent.toLocaleString()}</p>
           <p className={`text-sm font-mono ${totalPL >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {totalPL >= 0 ? '+' : ''}৳{totalPL.toLocaleString()} ({totalPrincipal > 0 ? ((totalPL / totalPrincipal) * 100).toFixed(1) : 0}%)
@@ -42,7 +44,7 @@ export default function Investments() {
           <Card className="bg-card border-border col-span-full">
             <CardContent className="py-12 text-center">
               <TrendingUp className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No investments yet.</p>
+              <p className="text-muted-foreground">{t('investments.noInvestmentsYet')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -59,15 +61,15 @@ export default function Investments() {
                     {pl >= 0 ? <TrendingUp className="h-5 w-5 text-green-400" /> : <TrendingDown className="h-5 w-5 text-red-400" />}
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Principal</span>
+                    <span className="text-muted-foreground">{t('investments.principal')}</span>
                     <span className="font-mono text-foreground">৳{Number(inv.principal).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Current</span>
+                    <span className="text-muted-foreground">{t('investments.current')}</span>
                     <span className="font-mono text-foreground">৳{Number(inv.current_value || inv.principal).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between text-sm pt-2 border-t border-border">
-                    <span className="text-muted-foreground">P/L</span>
+                    <span className="text-muted-foreground">{t('investments.profitLoss')}</span>
                     <span className={`font-mono font-semibold ${pl >= 0 ? 'text-green-400' : 'text-red-400'}`}>{pl >= 0 ? '+' : ''}৳{pl.toLocaleString()}</span>
                   </div>
                 </CardContent>

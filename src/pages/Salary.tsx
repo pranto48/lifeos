@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { DollarSign, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export default function Salary() {
   const { user } = useAuth();
+  const { t } = useLanguage();
   const [entries, setEntries] = useState<any[]>([]);
 
   useEffect(() => {
@@ -24,20 +26,20 @@ export default function Salary() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-foreground">Salary History</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t('salary.salaryHistory')}</h1>
         <div className="text-right">
-          <p className="text-sm text-muted-foreground">Total Net Earned</p>
+          <p className="text-sm text-muted-foreground">{t('salary.totalNetEarned')}</p>
           <p className="font-mono text-2xl font-bold text-primary">৳{totalNet.toLocaleString()}</p>
         </div>
       </div>
 
       <Card className="bg-card border-border">
-        <CardHeader><CardTitle className="text-sm text-muted-foreground">Salary Timeline</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-sm text-muted-foreground">{t('salary.salaryTimeline')}</CardTitle></CardHeader>
         <CardContent>
           {entries.length === 0 ? (
             <div className="text-center py-12">
               <DollarSign className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No salary entries yet.</p>
+              <p className="text-muted-foreground">{t('salary.noEntriesYet')}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -45,11 +47,11 @@ export default function Salary() {
                 <div key={e.id} className="flex items-center justify-between p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
                   <div>
                     <p className="font-medium text-foreground">{months[e.month - 1]} {e.year}</p>
-                    <p className="text-sm text-muted-foreground">Gross: ৳{Number(e.gross_amount).toLocaleString()}</p>
+                    <p className="text-sm text-muted-foreground">{t('salary.gross')}: ৳{Number(e.gross_amount).toLocaleString()}</p>
                   </div>
                   <div className="text-right">
                     <p className="font-mono text-lg font-bold text-primary">৳{Number(e.net_amount).toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground">Net</p>
+                    <p className="text-xs text-muted-foreground">{t('salary.net')}</p>
                   </div>
                 </div>
               ))}
