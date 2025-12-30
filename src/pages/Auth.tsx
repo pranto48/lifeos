@@ -5,12 +5,14 @@ import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { useRateLimit } from '@/hooks/useRateLimit';
+import { useTrustedDevice } from '@/hooks/useTrustedDevice';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone, AlertTriangle, KeyRound } from 'lucide-react';
+import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone, AlertTriangle, KeyRound, Monitor } from 'lucide-react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 const loginSchema = z.object({
@@ -43,6 +45,8 @@ export default function Auth() {
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
   const [mfaCode, setMfaCode] = useState('');
   const [mfaLoading, setMfaLoading] = useState(false);
+  const [trustThisDevice, setTrustThisDevice] = useState(false);
+  const [pendingMfaUserId, setPendingMfaUserId] = useState<string | null>(null);
 
   const { signIn, signUp, user, session } = useAuth();
   const navigate = useNavigate();
@@ -53,6 +57,7 @@ export default function Auth() {
     recordAttempt,
     reset: resetRateLimit,
   } = useRateLimit('auth', { maxAttempts: 5, windowMs: 60000, lockoutMs: 300000 });
+  const { checkTrustedDevice, trustDevice } = useTrustedDevice();
   const {
     capabilities,
     isLoading: biometricLoading,
@@ -123,13 +128,29 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
+          // Get the current user for trusted device check
+          const { data: { user: currentUser } } = await supabase.auth.getUser();
+          
           // Check if MFA is enabled for this user
           const { data: factorsData } = await supabase.auth.mfa.listFactors();
           const verifiedFactor = factorsData?.totp.find(f => f.status === 'verified');
           
-          if (verifiedFactor) {
-            // User has MFA enabled, show verification screen
+          if (verifiedFactor && currentUser) {
+            // Check if this device is trusted
+            if (checkTrustedDevice(currentUser.id)) {
+              // Device is trusted, skip MFA
+              resetRateLimit();
+              toast({
+                title: 'Welcome back!',
+                description: 'Signed in from trusted device.',
+              });
+              navigate('/');
+              return;
+            }
+            
+            // User has MFA enabled and device is not trusted, show verification screen
             setMfaFactorId(verifiedFactor.id);
+            setPendingMfaUserId(currentUser.id);
             setShowMfaVerification(true);
             setLoading(false);
             return;
@@ -269,13 +290,21 @@ export default function Auth() {
         return;
       }
 
-      // MFA verification successful
+      // MFA verification successful - trust device if requested
+      if (trustThisDevice && pendingMfaUserId) {
+        trustDevice(pendingMfaUserId);
+      }
+
       resetRateLimit();
       toast({
         title: 'Welcome back!',
-        description: 'Successfully signed in with 2FA.',
+        description: trustThisDevice 
+          ? 'Signed in with 2FA. This device is now trusted for 30 days.'
+          : 'Successfully signed in with 2FA.',
       });
       setShowMfaVerification(false);
+      setTrustThisDevice(false);
+      setPendingMfaUserId(null);
       navigate('/');
     } finally {
       setMfaLoading(false);
@@ -288,6 +317,8 @@ export default function Auth() {
     setShowMfaVerification(false);
     setMfaFactorId(null);
     setMfaCode('');
+    setTrustThisDevice(false);
+    setPendingMfaUserId(null);
   };
 
   return (
@@ -641,6 +672,28 @@ export default function Auth() {
                       <InputOTPSlot index={5} />
                     </InputOTPGroup>
                   </InputOTP>
+                </div>
+
+                {/* Trust Device Option */}
+                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 border border-border">
+                  <Checkbox
+                    id="trustDevice"
+                    checked={trustThisDevice}
+                    onCheckedChange={(checked) => setTrustThisDevice(checked === true)}
+                    disabled={mfaLoading}
+                  />
+                  <div className="flex-1">
+                    <Label 
+                      htmlFor="trustDevice" 
+                      className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-2"
+                    >
+                      <Monitor className="w-4 h-4 text-muted-foreground" />
+                      Trust this device
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Skip 2FA for 30 days on this browser
+                    </p>
+                  </div>
                 </div>
 
                 <Button
