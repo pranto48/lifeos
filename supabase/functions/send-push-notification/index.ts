@@ -6,8 +6,30 @@ const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
 };
+
+async function validateApiKey(supabase: any, apiKey: string | null): Promise<boolean> {
+  if (!apiKey) return false;
+  
+  try {
+    const { data, error } = await supabase
+      .from('app_secrets')
+      .select('value')
+      .eq('id', 'edge_function_secret')
+      .single();
+    
+    if (error || !data) {
+      console.error('Error fetching API key from database:', error);
+      return false;
+    }
+    
+    return data.value === apiKey;
+  } catch (e) {
+    console.error('API key validation error:', e);
+    return false;
+  }
+}
 
 // Simple base64url encoding
 function base64UrlEncode(data: Uint8Array): string {
@@ -96,11 +118,23 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Validate API key
+  const apiKey = req.headers.get('x-api-key');
+  const isValid = await validateApiKey(supabase, apiKey);
+  
+  if (!isValid) {
+    console.error('Unauthorized: Invalid or missing API key');
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
+  }
+
+  try {
     const { user_id, title, body, url, tag } = await req.json();
 
     if (!user_id || !title || !body) {
@@ -110,7 +144,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Sending push notification to user ${user_id}: ${title}`);
+    console.log(`API key validated, sending push notification to user ${user_id}: ${title}`);
 
     // Get user's push subscriptions
     const { data: subscriptions, error: subError } = await supabase
