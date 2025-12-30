@@ -940,6 +940,8 @@ export type Database = {
           family_member_id: string | null
           id: string
           is_recurring: boolean | null
+          linked_entity_id: string | null
+          linked_entity_type: string | null
           merchant: string | null
           notes: string | null
           recurring_pattern: string | null
@@ -957,6 +959,8 @@ export type Database = {
           family_member_id?: string | null
           id?: string
           is_recurring?: boolean | null
+          linked_entity_id?: string | null
+          linked_entity_type?: string | null
           merchant?: string | null
           notes?: string | null
           recurring_pattern?: string | null
@@ -974,6 +978,8 @@ export type Database = {
           family_member_id?: string | null
           id?: string
           is_recurring?: boolean | null
+          linked_entity_id?: string | null
+          linked_entity_type?: string | null
           merchant?: string | null
           notes?: string | null
           recurring_pattern?: string | null

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle, Settings, Tag, CreditCard, Banknote, PiggyBank, Receipt, ShoppingCart, ShoppingBag, Utensils, Coffee, Car, Fuel, Home, Lightbulb, Wifi, Phone, Laptop, Gamepad2, Music, Film, Book, GraduationCap, Briefcase, Heart, Activity, Pill, Plane, Train, Bus, Gift, Baby, Dog, Shirt, Scissors, Wrench, Building, DollarSign, HandCoins, Coins, MoreHorizontal } from 'lucide-react';
+import { Wallet, ArrowUpRight, ArrowDownRight, TrendingUp, Users, Plus, Filter, MoreVertical, Pencil, Trash2, Target, AlertTriangle, Settings, Tag, CreditCard, Banknote, PiggyBank, Receipt, ShoppingCart, ShoppingBag, Utensils, Coffee, Car, Fuel, Home, Lightbulb, Wifi, Phone, Laptop, Gamepad2, Music, Film, Book, GraduationCap, Briefcase, Heart, Activity, Pill, Plane, Train, Bus, Gift, Baby, Dog, Shirt, Scissors, Wrench, Building, DollarSign, HandCoins, Coins, MoreHorizontal, CheckSquare, FolderKanban, FileText, Zap, Link2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -25,9 +25,35 @@ interface Transaction {
   category_id: string | null;
   family_member_id: string | null;
   account: string | null;
+  linked_entity_type: string | null;
+  linked_entity_id: string | null;
   budget_categories: { name: string; color: string } | null;
   family_members: { name: string; relationship: string } | null;
 }
+
+type EntityType = 'goal' | 'task' | 'project' | 'note' | 'habit';
+
+interface LinkedEntity {
+  id: string;
+  title: string;
+  type: EntityType;
+}
+
+const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string }>> = {
+  goal: Target,
+  task: CheckSquare,
+  project: FolderKanban,
+  note: FileText,
+  habit: Zap,
+};
+
+const ENTITY_COLORS: Record<EntityType, string> = {
+  goal: 'text-green-400 bg-green-500/20',
+  task: 'text-blue-400 bg-blue-500/20',
+  project: 'text-purple-400 bg-purple-500/20',
+  note: 'text-orange-400 bg-orange-500/20',
+  habit: 'text-cyan-400 bg-cyan-500/20',
+};
 
 // Income sources will be translated in component
 const INCOME_SOURCE_KEYS = [
@@ -92,11 +118,14 @@ export default function Budget() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [filterMember, setFilterMember] = useState<string>('all');
+  const [filterEntity, setFilterEntity] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [budgetDialogOpen, setBudgetDialogOpen] = useState(false);
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [newCategory, setNewCategory] = useState({ name: '', is_income: false, color: '#6b7280', icon: 'Wallet' });
+  const [availableEntities, setAvailableEntities] = useState<LinkedEntity[]>([]);
+  const [entityNamesMap, setEntityNamesMap] = useState<Record<string, string>>({});
   
   const currentMonth = new Date().getMonth() + 1;
   const currentYear = new Date().getFullYear();
@@ -109,6 +138,8 @@ export default function Budget() {
     merchant: '',
     account: 'cash',
     date: new Date().toISOString().split('T')[0],
+    linked_entity_type: '' as EntityType | '',
+    linked_entity_id: '',
   });
 
   const [budgetForm, setBudgetForm] = useState({
@@ -123,6 +154,7 @@ export default function Budget() {
       loadCategories();
       loadFamilyMembers();
       loadBudgets();
+      loadAvailableEntities();
     }
   }, [user]);
 
@@ -134,6 +166,35 @@ export default function Budget() {
       .order('date', { ascending: false })
       .limit(100);
     setTransactions((data as Transaction[]) || []);
+    
+    // Build entity names map for linked entities
+    if (data) {
+      const linkedIds = data
+        .filter((t: any) => t.linked_entity_id)
+        .map((t: any) => ({ type: t.linked_entity_type, id: t.linked_entity_id }));
+      
+      if (linkedIds.length > 0) {
+        const namesMap: Record<string, string> = {};
+        // Fetch names for each entity type
+        for (const entityType of ['goal', 'task', 'project', 'note', 'habit'] as EntityType[]) {
+          const ids = linkedIds.filter(e => e.type === entityType).map(e => e.id);
+          if (ids.length > 0) {
+            const table = entityType === 'goal' ? 'goals' : 
+                          entityType === 'task' ? 'tasks' :
+                          entityType === 'project' ? 'projects' :
+                          entityType === 'note' ? 'notes' : 'habits';
+            const { data: entityData } = await supabase
+              .from(table)
+              .select('id, title')
+              .in('id', ids);
+            entityData?.forEach((e: any) => {
+              namesMap[e.id] = e.title;
+            });
+          }
+        }
+        setEntityNamesMap(prev => ({ ...prev, ...namesMap }));
+      }
+    }
   };
 
   const loadAllTransactions = async () => {
@@ -167,6 +228,59 @@ export default function Budget() {
     setBudgets(data || []);
   };
 
+  const loadAvailableEntities = async () => {
+    if (!user) return;
+    
+    const entities: LinkedEntity[] = [];
+    
+    // Load Goals
+    const { data: goals } = await supabase
+      .from('goals')
+      .select('id, title')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    goals?.forEach(g => entities.push({ id: g.id, title: g.title, type: 'goal' }));
+    
+    // Load Tasks
+    const { data: tasks } = await supabase
+      .from('tasks')
+      .select('id, title')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    tasks?.forEach(t => entities.push({ id: t.id, title: t.title, type: 'task' }));
+    
+    // Load Projects
+    const { data: projects } = await supabase
+      .from('projects')
+      .select('id, title')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    projects?.forEach(p => entities.push({ id: p.id, title: p.title, type: 'project' }));
+    
+    // Load Notes
+    const { data: notes } = await supabase
+      .from('notes')
+      .select('id, title')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    notes?.forEach(n => entities.push({ id: n.id, title: n.title, type: 'note' }));
+    
+    // Load Habits
+    const { data: habits } = await supabase
+      .from('habits')
+      .select('id, title')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50);
+    habits?.forEach(h => entities.push({ id: h.id, title: h.title, type: 'habit' }));
+    
+    setAvailableEntities(entities);
+  };
+
   const loadFamilyMembers = async () => {
     const { data } = await supabase
       .from('family_members')
@@ -176,10 +290,37 @@ export default function Budget() {
     setFamilyMembers(data || []);
   };
 
-  const filteredTransactions = filterMember === 'all' 
+  // Apply filters
+  const filteredByMember = filterMember === 'all' 
     ? transactions 
     : transactions.filter(t => t.family_member_id === filterMember);
+    
+  const filteredTransactions = filterEntity === 'all'
+    ? filteredByMember
+    : filteredByMember.filter(t => t.linked_entity_type === filterEntity);
 
+  // Entity statistics
+  const entityStats = useMemo(() => {
+    const stats: Record<EntityType, { count: number; total: number }> = {
+      goal: { count: 0, total: 0 },
+      task: { count: 0, total: 0 },
+      project: { count: 0, total: 0 },
+      note: { count: 0, total: 0 },
+      habit: { count: 0, total: 0 },
+    };
+    
+    transactions.forEach(t => {
+      if (t.linked_entity_type && t.type === 'expense') {
+        const type = t.linked_entity_type as EntityType;
+        if (stats[type]) {
+          stats[type].count++;
+          stats[type].total += Number(t.amount);
+        }
+      }
+    });
+    
+    return stats;
+  }, [transactions]);
   // Filter to current month for budget tracking
   const currentMonthTransactions = transactions.filter(t => {
     const date = new Date(t.date);
@@ -289,6 +430,8 @@ export default function Budget() {
       merchant: '',
       account: 'cash',
       date: new Date().toISOString().split('T')[0],
+      linked_entity_type: '',
+      linked_entity_id: '',
     });
     setEditingTransaction(null);
   };
@@ -303,6 +446,8 @@ export default function Budget() {
       merchant: transaction.merchant || '',
       account: transaction.account || 'cash',
       date: transaction.date,
+      linked_entity_type: (transaction.linked_entity_type as EntityType) || '',
+      linked_entity_id: transaction.linked_entity_id || '',
     });
     setDialogOpen(true);
   };
@@ -321,6 +466,8 @@ export default function Budget() {
         merchant: formData.merchant.trim() || null,
         account: formData.type === 'income' ? formData.account : 'cash',
         date: formData.date,
+        linked_entity_type: formData.linked_entity_type || null,
+        linked_entity_id: formData.linked_entity_id || null,
       };
 
       if (editingTransaction) {
@@ -727,6 +874,77 @@ export default function Budget() {
                   </div>
                 </div>
 
+                {/* Entity Linking */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1.5">
+                    <Link2 className="h-3.5 w-3.5" />
+                    Link to Entity
+                  </Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Select 
+                      value={formData.linked_entity_type || "none"} 
+                      onValueChange={(v) => setFormData(f => ({ 
+                        ...f, 
+                        linked_entity_type: v === "none" ? '' : v as EntityType,
+                        linked_entity_id: '' 
+                      }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">None</SelectItem>
+                        <SelectItem value="goal">
+                          <span className="flex items-center gap-2">
+                            <Target className="h-3.5 w-3.5 text-green-400" /> Goal
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="task">
+                          <span className="flex items-center gap-2">
+                            <CheckSquare className="h-3.5 w-3.5 text-blue-400" /> Task
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="project">
+                          <span className="flex items-center gap-2">
+                            <FolderKanban className="h-3.5 w-3.5 text-purple-400" /> Project
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="note">
+                          <span className="flex items-center gap-2">
+                            <FileText className="h-3.5 w-3.5 text-orange-400" /> Note
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="habit">
+                          <span className="flex items-center gap-2">
+                            <Zap className="h-3.5 w-3.5 text-cyan-400" /> Habit
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    {formData.linked_entity_type && (
+                      <Select 
+                        value={formData.linked_entity_id || "none"} 
+                        onValueChange={(v) => setFormData(f => ({ ...f, linked_entity_id: v === "none" ? '' : v }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select item" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          {availableEntities
+                            .filter(e => e.type === formData.linked_entity_type)
+                            .map(entity => (
+                              <SelectItem key={entity.id} value={entity.id}>
+                                {entity.title}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex justify-end gap-2 pt-4">
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>{t('common.cancel')}</Button>
                   <Button type="submit">{editingTransaction ? t('common.save') : t('common.add')}</Button>
@@ -784,7 +1002,63 @@ export default function Budget() {
         </Card>
       </div>
 
-      {/* Monthly Spending Trend Chart */}
+      {/* Entity Expense Indicators */}
+      <Card className="bg-card border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+            <Link2 className="h-4 w-4" />
+            Expenses by Entity
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            {(['goal', 'task', 'project', 'note', 'habit'] as EntityType[]).map(type => {
+              const Icon = ENTITY_ICONS[type];
+              const colorClass = ENTITY_COLORS[type];
+              const stats = entityStats[type];
+              const isActive = filterEntity === type;
+              
+              return (
+                <button
+                  key={type}
+                  onClick={() => setFilterEntity(isActive ? 'all' : type)}
+                  className={`p-3 rounded-lg border transition-all text-left ${
+                    isActive 
+                      ? 'border-primary bg-primary/10 ring-2 ring-primary/20' 
+                      : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className={`p-1.5 rounded-md ${colorClass.split(' ')[1]}`}>
+                      <Icon className={`h-4 w-4 ${colorClass.split(' ')[0]}`} />
+                    </div>
+                    <span className="text-sm font-medium text-foreground capitalize">{type}s</span>
+                  </div>
+                  <div className="space-y-0.5">
+                    <p className="font-mono text-lg font-bold text-foreground">
+                      ৳{stats.total.toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {stats.count} expense{stats.count !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {filterEntity !== 'all' && (
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Showing expenses linked to <span className="font-medium text-foreground capitalize">{filterEntity}s</span>
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => setFilterEntity('all')}>
+                Clear filter
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {allTransactions.length > 0 && (
         <Card className="bg-card border-border">
           <CardHeader>
@@ -989,7 +1263,9 @@ export default function Budget() {
           <CardTitle className="text-sm text-muted-foreground">
             {filterMember !== 'all' 
               ? `Transactions for ${familyMembers.find(m => m.id === filterMember)?.name}` 
-              : 'Recent Transactions'
+              : filterEntity !== 'all'
+                ? `${filterEntity.charAt(0).toUpperCase() + filterEntity.slice(1)} Expenses`
+                : 'Recent Transactions'
             }
           </CardTitle>
         </CardHeader>
@@ -1011,6 +1287,18 @@ export default function Budget() {
                           <Users className="h-3 w-3 mr-1" />
                           {t.family_members.name}
                         </Badge>
+                      )}
+                      {t.linked_entity_type && (
+                        (() => {
+                          const Icon = ENTITY_ICONS[t.linked_entity_type as EntityType];
+                          const colorClass = ENTITY_COLORS[t.linked_entity_type as EntityType];
+                          return (
+                            <Badge variant="outline" className={`text-xs py-0 ${colorClass}`}>
+                              <Icon className="h-3 w-3 mr-1" />
+                              {entityNamesMap[t.linked_entity_id!] || t.linked_entity_type}
+                            </Badge>
+                          );
+                        })()
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground">{format(new Date(t.date), 'MMM d, yyyy')}</p>
