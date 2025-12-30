@@ -80,7 +80,7 @@ export function QuickAddExpense({ onClose }: QuickAddExpenseProps) {
         amount: parseFloat(amount),
         type,
         category_id: categoryId || null,
-        family_member_id: familyMemberId || null,
+        family_member_id: familyMemberId && familyMemberId !== 'none' ? familyMemberId : null,
         merchant: merchant.trim() || null,
         date,
       });
@@ -186,7 +186,7 @@ export function QuickAddExpense({ onClose }: QuickAddExpenseProps) {
               <SelectValue placeholder="Optional" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">None</SelectItem>
+              <SelectItem value="none">None</SelectItem>
               {familyMembers.map(member => (
                 <SelectItem key={member.id} value={member.id}>
                   {member.name} ({member.relationship})
