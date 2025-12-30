@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_secrets: {
+        Row: {
+          created_at: string
+          id: string
+          value: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          value: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          value?: string
+        }
+        Relationships: []
+      }
       attachments: {
         Row: {
           created_at: string
