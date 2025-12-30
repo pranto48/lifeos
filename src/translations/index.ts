@@ -155,6 +155,8 @@ export const translations = {
   'goals.updateAmount': { bn: 'পরিমাণ আপডেট করুন', en: 'Update amount' },
   'goals.milestones': { bn: 'মাইলস্টোন', en: 'Milestones' },
   'goals.addMilestone': { bn: 'মাইলস্টোন যোগ করুন', en: 'Add milestone' },
+  'goals.noFinancialGoals': { bn: 'আর্থিক লক্ষ্য নেই', en: 'No financial goals yet' },
+  'goals.overallProgress': { bn: 'সামগ্রিক অগ্রগতি', en: 'Overall Progress' },
 
   // Habits
   'habits.title': { bn: 'অভ্যাস', en: 'Habits' },
