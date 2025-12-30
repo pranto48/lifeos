@@ -5,11 +5,13 @@ import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { useRateLimit } from '@/hooks/useRateLimit';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone, AlertTriangle } from 'lucide-react';
+import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone, AlertTriangle, KeyRound } from 'lucide-react';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -35,6 +37,12 @@ export default function Auth() {
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [pendingUserData, setPendingUserData] = useState<{ email: string; fullName: string } | null>(null);
+  
+  // MFA state
+  const [showMfaVerification, setShowMfaVerification] = useState(false);
+  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [mfaLoading, setMfaLoading] = useState(false);
 
   const { signIn, signUp, user, session } = useAuth();
   const navigate = useNavigate();
@@ -115,6 +123,18 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
+          // Check if MFA is enabled for this user
+          const { data: factorsData } = await supabase.auth.mfa.listFactors();
+          const verifiedFactor = factorsData?.totp.find(f => f.status === 'verified');
+          
+          if (verifiedFactor) {
+            // User has MFA enabled, show verification screen
+            setMfaFactorId(verifiedFactor.id);
+            setShowMfaVerification(true);
+            setLoading(false);
+            return;
+          }
+          
           // Reset rate limit on successful login
           resetRateLimit();
           // Check if we should offer biometric setup
@@ -203,6 +223,71 @@ export default function Auth() {
 
   const handleSkipBiometric = () => {
     setShowBiometricPrompt(false);
+  };
+
+  // Handle MFA verification
+  const handleMfaVerification = async () => {
+    if (!mfaFactorId || mfaCode.length !== 6) {
+      toast({
+        title: 'Invalid Code',
+        description: 'Please enter a valid 6-digit code.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setMfaLoading(true);
+    try {
+      // Create a challenge for the factor
+      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+        factorId: mfaFactorId,
+      });
+
+      if (challengeError) {
+        toast({
+          title: 'Verification Failed',
+          description: challengeError.message,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Verify the code
+      const { error: verifyError } = await supabase.auth.mfa.verify({
+        factorId: mfaFactorId,
+        challengeId: challengeData.id,
+        code: mfaCode,
+      });
+
+      if (verifyError) {
+        toast({
+          title: 'Invalid Code',
+          description: 'The verification code is incorrect. Please try again.',
+          variant: 'destructive',
+        });
+        setMfaCode('');
+        return;
+      }
+
+      // MFA verification successful
+      resetRateLimit();
+      toast({
+        title: 'Welcome back!',
+        description: 'Successfully signed in with 2FA.',
+      });
+      setShowMfaVerification(false);
+      navigate('/');
+    } finally {
+      setMfaLoading(false);
+    }
+  };
+
+  const handleCancelMfa = async () => {
+    // Sign out since we're cancelling MFA
+    await supabase.auth.signOut();
+    setShowMfaVerification(false);
+    setMfaFactorId(null);
+    setMfaCode('');
   };
 
   return (
@@ -505,6 +590,83 @@ export default function Auth() {
                   disabled={biometricLoading}
                 >
                   Maybe Later
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MFA Verification Modal */}
+      <AnimatePresence>
+        {showMfaVerification && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="glass-card rounded-2xl p-6 max-w-sm w-full"
+            >
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                  <KeyRound className="w-8 h-8 text-primary" />
+                </div>
+                <h2 className="text-xl font-semibold text-foreground mb-2">
+                  Two-Factor Authentication
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  Enter the 6-digit code from your authenticator app
+                </p>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={mfaCode}
+                    onChange={setMfaCode}
+                    disabled={mfaLoading}
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+
+                <Button
+                  onClick={handleMfaVerification}
+                  className="w-full"
+                  disabled={mfaCode.length !== 6 || mfaLoading}
+                >
+                  {mfaLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="mr-2 h-4 w-4" />
+                      Verify & Sign In
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={handleCancelMfa}
+                  className="w-full text-muted-foreground"
+                  disabled={mfaLoading}
+                >
+                  Cancel
                 </Button>
               </div>
             </motion.div>
