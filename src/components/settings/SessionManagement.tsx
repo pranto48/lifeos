@@ -45,7 +45,8 @@ export function SessionManagement() {
       .select('*')
       .eq('user_id', user?.id)
       .eq('is_revoked', false)
-      .order('last_active', { ascending: false });
+      .order('last_active', { ascending: false })
+      .limit(5); // Show only last 5 sessions
 
     if (error) {
       console.error('Error loading sessions:', error);
@@ -165,10 +166,10 @@ export function SessionManagement() {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2 text-foreground">
-              <Monitor className="h-5 w-5" /> Active Sessions
+              <Monitor className="h-5 w-5" /> Active Sessions (Last 5)
             </CardTitle>
             <CardDescription className="mt-1">
-              Manage your active sessions across devices
+              Manage your active sessions across devices. Showing last 5 sessions.
             </CardDescription>
           </div>
           {sessions.length > 1 && (
