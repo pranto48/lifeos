@@ -14,6 +14,7 @@ import { PasswordChange } from '@/components/settings/PasswordChange';
 import { TwoFactorAuth } from '@/components/settings/TwoFactorAuth';
 import { BiometricManagement } from '@/components/settings/BiometricManagement';
 import { PushNotificationSettings } from '@/components/settings/PushNotificationSettings';
+import { TrustedDevicesManagement } from '@/components/settings/TrustedDevicesManagement';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -165,6 +166,8 @@ export default function Settings() {
       <PasswordChange />
       
       <TwoFactorAuth />
+      
+      <TrustedDevicesManagement />
 
       <BiometricManagement />
 
