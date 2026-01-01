@@ -136,9 +136,10 @@ export default function Auth() {
           const verifiedFactor = factorsData?.totp.find(f => f.status === 'verified');
           
           if (verifiedFactor && currentUser) {
-            // Check if this device is trusted
-            if (checkTrustedDevice(currentUser.id)) {
-              // Device is trusted, skip MFA
+            // Check if this device is trusted (now async - checks database for device + IP)
+            const isDeviceTrusted = await checkTrustedDevice(currentUser.id);
+            if (isDeviceTrusted) {
+              // Device is trusted and IP matches, skip MFA
               resetRateLimit();
               toast({
                 title: 'Welcome back!',
@@ -148,7 +149,7 @@ export default function Auth() {
               return;
             }
             
-            // User has MFA enabled and device is not trusted, show verification screen
+            // User has MFA enabled and device is not trusted or IP changed, show verification screen
             setMfaFactorId(verifiedFactor.id);
             setPendingMfaUserId(currentUser.id);
             setShowMfaVerification(true);
@@ -290,16 +291,16 @@ export default function Auth() {
         return;
       }
 
-      // MFA verification successful - trust device if requested
+      // MFA verification successful - trust device if requested (stored in database)
       if (trustThisDevice && pendingMfaUserId) {
-        trustDevice(pendingMfaUserId);
+        await trustDevice(pendingMfaUserId);
       }
 
       resetRateLimit();
       toast({
         title: 'Welcome back!',
         description: trustThisDevice 
-          ? 'Signed in with 2FA. This device is now trusted for 30 days.'
+          ? 'Signed in with 2FA. This device is now trusted for 90 days.'
           : 'Successfully signed in with 2FA.',
       });
       setShowMfaVerification(false);

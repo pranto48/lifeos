@@ -124,7 +124,6 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // If there's already a window open, focus it
         for (const client of clientList) {
           if (client.url.includes(self.location.origin) && 'focus' in client) {
             client.focus();
@@ -134,22 +133,9 @@ self.addEventListener('notificationclick', (event) => {
             return;
           }
         }
-        // Otherwise, open a new window
         if (clients.openWindow) {
           return clients.openWindow(urlToOpen);
         }
       })
   );
-});
-  }
-});
-
-// Handle notification clicks
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  if (event.notification.data) {
-    event.waitUntil(
-      clients.openWindow(event.notification.data)
-    );
-  }
 });

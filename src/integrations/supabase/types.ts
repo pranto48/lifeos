@@ -1022,6 +1022,39 @@ export type Database = {
           },
         ]
       }
+      trusted_devices: {
+        Row: {
+          created_at: string
+          device_fingerprint: string
+          device_info: string | null
+          expires_at: string
+          id: string
+          ip_address: string | null
+          trusted_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_fingerprint: string
+          device_info?: string | null
+          expires_at: string
+          id?: string
+          ip_address?: string | null
+          trusted_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_fingerprint?: string
+          device_info?: string | null
+          expires_at?: string
+          id?: string
+          ip_address?: string | null
+          trusted_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_sessions: {
         Row: {
           created_at: string
@@ -1030,6 +1063,8 @@ export type Database = {
           ip_address: string | null
           is_revoked: boolean | null
           last_active: string | null
+          mfa_expires_at: string | null
+          mfa_verified_at: string | null
           session_token: string
           user_id: string
         }
@@ -1040,6 +1075,8 @@ export type Database = {
           ip_address?: string | null
           is_revoked?: boolean | null
           last_active?: string | null
+          mfa_expires_at?: string | null
+          mfa_verified_at?: string | null
           session_token: string
           user_id: string
         }
@@ -1050,6 +1087,8 @@ export type Database = {
           ip_address?: string | null
           is_revoked?: boolean | null
           last_active?: string | null
+          mfa_expires_at?: string | null
+          mfa_verified_at?: string | null
           session_token?: string
           user_id?: string
         }
