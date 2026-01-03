@@ -17,21 +17,29 @@ import {
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TranslationKey } from '@/translations';
 
-const navItems: { titleKey: TranslationKey; url: string; icon: any }[] = [
+interface NavItem {
+  titleKey: TranslationKey;
+  url: string;
+  icon: any;
+  personalOnly?: boolean;
+}
+
+const navItems: NavItem[] = [
   { titleKey: 'nav.dashboard', url: '/', icon: LayoutDashboard },
   { titleKey: 'nav.tasks', url: '/tasks', icon: CheckSquare },
   { titleKey: 'nav.notes', url: '/notes', icon: FileText },
-  { titleKey: 'nav.habits', url: '/habits', icon: Repeat },
-  { titleKey: 'nav.family', url: '/family', icon: Users },
-  { titleKey: 'nav.budget', url: '/budget', icon: Wallet },
-  { titleKey: 'nav.salary', url: '/salary', icon: DollarSign },
-  { titleKey: 'nav.investments', url: '/investments', icon: TrendingUp },
+  { titleKey: 'nav.habits', url: '/habits', icon: Repeat, personalOnly: true },
+  { titleKey: 'nav.family', url: '/family', icon: Users, personalOnly: true },
+  { titleKey: 'nav.budget', url: '/budget', icon: Wallet, personalOnly: true },
+  { titleKey: 'nav.salary', url: '/salary', icon: DollarSign, personalOnly: true },
+  { titleKey: 'nav.investments', url: '/investments', icon: TrendingUp, personalOnly: true },
   { titleKey: 'nav.goals', url: '/goals', icon: Target },
   { titleKey: 'nav.projects', url: '/projects', icon: Lightbulb },
 ];
@@ -43,6 +51,7 @@ const bottomNavItems: { titleKey: TranslationKey; url: string; icon: any }[] = [
 export function AppSidebar() {
   const { signOut, user } = useAuth();
   const { t } = useLanguage();
+  const { mode } = useDashboardMode();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -50,6 +59,14 @@ export function AppSidebar() {
     if (path === '/') return location.pathname === '/';
     return location.pathname.startsWith(path);
   };
+
+  // Filter nav items based on dashboard mode
+  const filteredNavItems = navItems.filter(item => {
+    if (mode === 'office' && item.personalOnly) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <motion.aside
@@ -87,7 +104,7 @@ export function AppSidebar() {
 
       {/* Main Navigation */}
       <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto scrollbar-hide">
-        {navItems.map(item => (
+        {filteredNavItems.map(item => (
           <NavLink
             key={item.url}
             to={item.url}

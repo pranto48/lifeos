@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { DashboardModeProvider } from "@/contexts/DashboardModeContext";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import Auth from "./pages/Auth";
@@ -27,28 +28,30 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <LanguageProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <PWAInstallPrompt />
-          <BrowserRouter>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
-              <Route path="/tasks" element={<AppLayout><Tasks /></AppLayout>} />
-              <Route path="/notes" element={<AppLayout><Notes /></AppLayout>} />
-              <Route path="/habits" element={<AppLayout><Habits /></AppLayout>} />
-              <Route path="/family" element={<AppLayout><Family /></AppLayout>} />
-              <Route path="/budget" element={<AppLayout><Budget /></AppLayout>} />
-              <Route path="/salary" element={<AppLayout><Salary /></AppLayout>} />
-              <Route path="/investments" element={<AppLayout><Investments /></AppLayout>} />
-              <Route path="/goals" element={<AppLayout><Goals /></AppLayout>} />
-              <Route path="/projects" element={<AppLayout><Projects /></AppLayout>} />
-              <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-        </TooltipProvider>
+        <DashboardModeProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <PWAInstallPrompt />
+            <BrowserRouter>
+              <Routes>
+                <Route path="/auth" element={<Auth />} />
+                <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
+                <Route path="/tasks" element={<AppLayout><Tasks /></AppLayout>} />
+                <Route path="/notes" element={<AppLayout><Notes /></AppLayout>} />
+                <Route path="/habits" element={<AppLayout><Habits /></AppLayout>} />
+                <Route path="/family" element={<AppLayout><Family /></AppLayout>} />
+                <Route path="/budget" element={<AppLayout><Budget /></AppLayout>} />
+                <Route path="/salary" element={<AppLayout><Salary /></AppLayout>} />
+                <Route path="/investments" element={<AppLayout><Investments /></AppLayout>} />
+                <Route path="/goals" element={<AppLayout><Goals /></AppLayout>} />
+                <Route path="/projects" element={<AppLayout><Projects /></AppLayout>} />
+                <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </BrowserRouter>
+          </TooltipProvider>
+        </DashboardModeProvider>
       </LanguageProvider>
     </AuthProvider>
   </QueryClientProvider>
