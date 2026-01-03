@@ -39,7 +39,10 @@ export default function Auth() {
   const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [pendingUserData, setPendingUserData] = useState<{ email: string; fullName: string } | null>(null);
-  
+
+  // Prevent redirecting away from /auth while we're enforcing MFA on login
+  const [authGate, setAuthGate] = useState<'idle' | 'checking' | 'mfa'>('idle');
+
   // MFA state
   const [showMfaVerification, setShowMfaVerification] = useState(false);
   const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
@@ -68,10 +71,10 @@ export default function Auth() {
   } = useBiometricAuth();
 
   useEffect(() => {
-    if (user) {
+    if (user && authGate === 'idle') {
       navigate('/');
     }
-  }, [user, navigate]);
+  }, [user, authGate, navigate]);
 
   // Handle biometric login
   const handleBiometricLogin = async () => {
@@ -117,9 +120,11 @@ export default function Auth() {
 
         // Record the attempt before making the request
         recordAttempt();
+        setAuthGate('checking');
 
         const { error } = await signIn(email, password);
         if (error) {
+          setAuthGate('idle');
           toast({
             title: 'Authentication Failed',
             description: remainingAttempts > 1 
@@ -136,10 +141,11 @@ export default function Auth() {
           const verifiedFactor = factorsData?.totp.find(f => f.status === 'verified');
           
           if (verifiedFactor && currentUser) {
-            // Check if this device is trusted (now async - checks database for device + IP)
+            // Check if this device is trusted (checks database for device + IP)
             const isDeviceTrusted = await checkTrustedDevice(currentUser.id);
             if (isDeviceTrusted) {
               // Device is trusted and IP matches, skip MFA
+              setAuthGate('idle');
               resetRateLimit();
               toast({
                 title: 'Welcome back!',
@@ -150,6 +156,7 @@ export default function Auth() {
             }
             
             // User has MFA enabled and device is not trusted or IP changed, show verification screen
+            setAuthGate('mfa');
             setMfaFactorId(verifiedFactor.id);
             setPendingMfaUserId(currentUser.id);
             setShowMfaVerification(true);
@@ -158,7 +165,9 @@ export default function Auth() {
           }
           
           // Reset rate limit on successful login
+          setAuthGate('idle');
           resetRateLimit();
+
           // Check if we should offer biometric setup
           if (capabilities?.canUseBiometrics && !hasBiometricSetup) {
             // We'll handle biometric prompt after successful login
@@ -306,6 +315,7 @@ export default function Auth() {
       setShowMfaVerification(false);
       setTrustThisDevice(false);
       setPendingMfaUserId(null);
+      setAuthGate('idle');
       navigate('/');
     } finally {
       setMfaLoading(false);
@@ -320,6 +330,7 @@ export default function Auth() {
     setMfaCode('');
     setTrustThisDevice(false);
     setPendingMfaUserId(null);
+    setAuthGate('idle');
   };
 
   return (
@@ -692,7 +703,7 @@ export default function Auth() {
                       Trust this device
                     </Label>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Skip 2FA for 30 days on this browser
+                      Skip 2FA for 90 days on this browser
                     </p>
                   </div>
                 </div>

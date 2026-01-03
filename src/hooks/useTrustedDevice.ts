@@ -12,25 +12,42 @@ interface TrustedDevice {
   expires_at: string;
 }
 
-// Generate a device fingerprint based on browser characteristics
+// Generate a device fingerprint.
+// Prefer a stable per-browser random id to avoid collisions between different devices
+// that happen to share the same browser/OS/screen characteristics.
+const DEVICE_ID_STORAGE_KEY = 'lifeos_device_fingerprint_v1';
+
 function generateDeviceFingerprint(): string {
-  const ua = navigator.userAgent;
-  const screen = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const language = navigator.language;
-  const platform = navigator.platform;
-  const cores = navigator.hardwareConcurrency || 'unknown';
-  
-  const raw = `${ua}-${screen}-${timezone}-${language}-${platform}-${cores}`;
-  
-  // Create a hash
-  let hash = 0;
-  for (let i = 0; i < raw.length; i++) {
-    const char = raw.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
+  try {
+    const existing = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (existing) return existing;
+
+    const newId =
+      typeof crypto !== 'undefined' && 'randomUUID' in crypto
+        ? crypto.randomUUID()
+        : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, newId);
+    return newId;
+  } catch {
+    // Fall back to a deterministic fingerprint when storage is unavailable.
+    const ua = navigator.userAgent;
+    const screen = `${window.screen.width}x${window.screen.height}x${window.screen.colorDepth}`;
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const language = navigator.language;
+    const platform = navigator.platform;
+    const cores = navigator.hardwareConcurrency || 'unknown';
+
+    const raw = `${ua}-${screen}-${timezone}-${language}-${platform}-${cores}`;
+
+    let hash = 0;
+    for (let i = 0; i < raw.length; i++) {
+      const char = raw.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36);
   }
-  return Math.abs(hash).toString(36);
 }
 
 // Get device info string
