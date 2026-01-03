@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { AppSidebar } from './AppSidebar';
 import { QuickAddButton } from '@/components/quick-add/QuickAddButton';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
+import { MfaGuard } from '@/components/auth/MfaGuard';
 import { Loader2 } from 'lucide-react';
 
 interface AppLayoutProps {
@@ -36,22 +37,24 @@ export function AppLayout({ children }: AppLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <AppSidebar />
-      
-      {/* Main Content */}
-      <main className="ml-[72px] md:ml-[240px] min-h-screen transition-all duration-200">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/80 backdrop-blur-xl flex items-center justify-between px-6">
-          <GlobalSearch />
-          <QuickAddButton />
-        </header>
+    <MfaGuard>
+      <div className="min-h-screen bg-background">
+        <AppSidebar />
+        
+        {/* Main Content */}
+        <main className="ml-[72px] md:ml-[240px] min-h-screen transition-all duration-200">
+          {/* Top Bar */}
+          <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/80 backdrop-blur-xl flex items-center justify-between px-6">
+            <GlobalSearch />
+            <QuickAddButton />
+          </header>
 
-        {/* Page Content */}
-        <div className="p-6">
-          {children}
-        </div>
-      </main>
-    </div>
+          {/* Page Content */}
+          <div className="p-6">
+            {children}
+          </div>
+        </main>
+      </div>
+    </MfaGuard>
   );
 }
