@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Pin, Star, Search, Lock, LockOpen, Plus, X, Eye, EyeOff } from 'lucide-react';
+import { FileText, Pin, Star, Search, Lock, LockOpen, Plus, X, Eye, EyeOff, Trash2, MoreVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
 import { encryptContent, decryptContent, validatePassphrase } from '@/lib/encryption';
 import { format } from 'date-fns';
@@ -157,6 +158,18 @@ export default function Notes() {
     loadNotes();
   };
 
+  const handleDeleteNote = async (noteId: string) => {
+    if (!confirm('Are you sure you want to delete this note?')) return;
+
+    const { error } = await supabase.from('notes').delete().eq('id', noteId);
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to delete note', variant: 'destructive' });
+    } else {
+      toast({ title: 'Deleted', description: 'Note deleted successfully' });
+      loadNotes();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -198,7 +211,7 @@ export default function Notes() {
                     {note.is_vault && <Lock className="h-4 w-4 text-primary" />}
                     <h3 className="font-medium text-foreground">{note.title}</h3>
                   </div>
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 items-center">
                     <button 
                       onClick={(e) => { e.stopPropagation(); togglePin(note.id, note.is_pinned); }}
                       className="opacity-0 group-hover:opacity-100 transition-opacity"
@@ -211,6 +224,22 @@ export default function Notes() {
                     >
                       <Star className={`h-4 w-4 ${note.is_favorite ? 'text-yellow-400 fill-yellow-400' : 'text-muted-foreground'}`} />
                     </button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                        <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-muted rounded">
+                          <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
                 {note.is_vault ? (
