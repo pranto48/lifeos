@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Lightbulb, Plus, MoreVertical, Pencil, Trash2, Calendar, Target, CheckCircle2, Circle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Lightbulb, Plus, MoreVertical, Pencil, Trash2, Calendar, Target, CheckCircle2, Circle, ChevronDown, ChevronUp, Check, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -35,6 +35,109 @@ interface Project {
   target_date: string | null;
   tags: string[] | null;
   created_at: string;
+}
+
+interface MilestoneItemProps {
+  milestone: Milestone;
+  onToggle: (milestone: Milestone) => void;
+  onDelete: (id: string) => void;
+  onUpdate: () => void;
+}
+
+function MilestoneItem({ milestone, onToggle, onDelete, onUpdate }: MilestoneItemProps) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState(milestone.title);
+
+  const handleSave = async () => {
+    if (!editTitle.trim()) return;
+
+    const { error } = await supabase
+      .from('project_milestones')
+      .update({ title: editTitle.trim() })
+      .eq('id', milestone.id);
+
+    if (!error) {
+      setIsEditing(false);
+      onUpdate();
+    } else {
+      toast.error('Failed to update milestone');
+    }
+  };
+
+  const handleCancel = () => {
+    setEditTitle(milestone.title);
+    setIsEditing(false);
+  };
+
+  return (
+    <div className="flex items-center gap-2 group/milestone">
+      <button
+        onClick={() => onToggle(milestone)}
+        className="flex-shrink-0"
+      >
+        {milestone.is_completed ? (
+          <CheckCircle2 className="h-4 w-4 text-primary" />
+        ) : (
+          <Circle className="h-4 w-4 text-muted-foreground hover:text-primary" />
+        )}
+      </button>
+      
+      {isEditing ? (
+        <div className="flex-1 flex items-center gap-1">
+          <Input
+            value={editTitle}
+            onChange={(e) => setEditTitle(e.target.value)}
+            className="h-6 text-sm py-0"
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave();
+              if (e.key === 'Escape') handleCancel();
+            }}
+          />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            onClick={handleSave}
+          >
+            <Check className="h-3 w-3 text-primary" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-6 w-6 p-0"
+            onClick={handleCancel}
+          >
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      ) : (
+        <>
+          <span className={`text-sm flex-1 ${milestone.is_completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+            {milestone.title}
+          </span>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/milestone:opacity-100 transition-opacity">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil className="h-3 w-3 text-muted-foreground hover:text-foreground" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-6 w-6 p-0"
+              onClick={() => onDelete(milestone.id)}
+            >
+              <Trash2 className="h-3 w-3 text-destructive" />
+            </Button>
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 const statusColors: Record<string, string> = { 
@@ -423,32 +526,13 @@ export default function Projects() {
                       ) : (
                         <div className="space-y-1">
                           {projectMilestones.map(milestone => (
-                            <div
+                            <MilestoneItem
                               key={milestone.id}
-                              className="flex items-center gap-2 group/milestone"
-                            >
-                              <button
-                                onClick={() => toggleMilestone(milestone)}
-                                className="flex-shrink-0"
-                              >
-                                {milestone.is_completed ? (
-                                  <CheckCircle2 className="h-4 w-4 text-primary" />
-                                ) : (
-                                  <Circle className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                                )}
-                              </button>
-                              <span className={`text-sm flex-1 ${milestone.is_completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                                {milestone.title}
-                              </span>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0 opacity-0 group-hover/milestone:opacity-100"
-                                onClick={() => deleteMilestone(milestone.id)}
-                              >
-                                <Trash2 className="h-3 w-3 text-destructive" />
-                              </Button>
-                            </div>
+                              milestone={milestone}
+                              onToggle={toggleMilestone}
+                              onDelete={deleteMilestone}
+                              onUpdate={loadProjects}
+                            />
                           ))}
                         </div>
                       )}

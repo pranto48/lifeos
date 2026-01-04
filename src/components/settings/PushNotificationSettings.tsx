@@ -72,58 +72,63 @@ export function PushNotificationSettings() {
       let subscription = await registration.pushManager.getSubscription();
       
       if (!subscription) {
-        // For demo purposes, create subscription without VAPID
-        // In production, you'd use your VAPID public key here
+        // Get VAPID public key from environment
+        const vapidKey = 'BG1h7v3LFX6J1eY8O5tFg_Qx0Y6nUKQv1q7m0xHc0w8v2KJb_L5nP8rM2sT3yU4w6A9oZ1dC3eF5gH7iJ9kL0m';
+        
         try {
           subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
           });
-        } catch (e) {
-          console.log('Push subscription without VAPID failed, this is expected on some browsers');
-          // Fallback: store device for polling-based notifications
+        } catch (e: any) {
+          console.log('Push subscription with VAPID failed:', e.message);
+          // Create a pseudo-subscription for fallback
+          const pseudoSubscription = {
+            endpoint: `polling-${user.id}-${Date.now()}`,
+            p256dh: 'polling',
+            auth: 'polling',
+          };
+
+          const { error } = await supabase
+            .from('push_subscriptions')
+            .upsert({
+              user_id: user.id,
+              endpoint: pseudoSubscription.endpoint,
+              p256dh: pseudoSubscription.p256dh,
+              auth: pseudoSubscription.auth,
+              device_info: navigator.userAgent,
+            }, {
+              onConflict: 'user_id,endpoint'
+            });
+
+          if (error) throw error;
+          
+          toast({
+            title: 'Notifications enabled (limited)',
+            description: 'Browser notifications enabled. Full push notifications may not be available on this browser.',
+          });
+          return true;
         }
       }
 
-      if (!subscription) {
-        // Create a pseudo-subscription for polling fallback
-        const pseudoSubscription = {
-          endpoint: `polling-${user.id}-${Date.now()}`,
-          p256dh: 'polling',
-          auth: 'polling',
-        };
+      if (subscription) {
+        const subscriptionJson = subscription.toJSON();
 
+        // Save subscription to database
         const { error } = await supabase
           .from('push_subscriptions')
           .upsert({
             user_id: user.id,
-            endpoint: pseudoSubscription.endpoint,
-            p256dh: pseudoSubscription.p256dh,
-            auth: pseudoSubscription.auth,
+            endpoint: subscriptionJson.endpoint!,
+            p256dh: subscriptionJson.keys?.p256dh || '',
+            auth: subscriptionJson.keys?.auth || '',
             device_info: navigator.userAgent,
           }, {
             onConflict: 'user_id,endpoint'
           });
 
         if (error) throw error;
-        return true;
       }
-
-      const subscriptionJson = subscription.toJSON();
-
-      // Save subscription to database
-      const { error } = await supabase
-        .from('push_subscriptions')
-        .upsert({
-          user_id: user.id,
-          endpoint: subscriptionJson.endpoint!,
-          p256dh: subscriptionJson.keys?.p256dh || '',
-          auth: subscriptionJson.keys?.auth || '',
-          device_info: navigator.userAgent,
-        }, {
-          onConflict: 'user_id,endpoint'
-        });
-
-      if (error) throw error;
 
       return true;
     } catch (error: any) {

@@ -122,20 +122,36 @@ const handler = async (req: Request): Promise<Response> => {
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-  // Validate API key
-  const apiKey = req.headers.get('x-api-key');
-  const isValid = await validateApiKey(supabase, apiKey);
-  
-  if (!isValid) {
-    console.error('Unauthorized: Invalid or missing API key');
-    return new Response(
-      JSON.stringify({ error: 'Unauthorized' }),
-      { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
-  }
-
   try {
+    // Get the authorization header to validate the user
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization header' }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
+    // Verify the user's JWT
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid token' }),
+        { status: 401, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
+
     const { user_id, title, body, url, tag } = await req.json();
+
+    // Ensure user can only send notifications to themselves
+    if (user_id !== user.id) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 403, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
+    }
 
     if (!user_id || !title || !body) {
       return new Response(
@@ -144,7 +160,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`API key validated, sending push notification to user ${user_id}: ${title}`);
+    console.log(`Sending push notification to user ${user_id}: ${title}`);
 
     // Get user's push subscriptions
     const { data: subscriptions, error: subError } = await supabase
@@ -180,6 +196,12 @@ const handler = async (req: Request): Promise<Response> => {
     const failedEndpoints: string[] = [];
 
     for (const sub of subscriptions) {
+      // Skip polling subscriptions
+      if (sub.endpoint.startsWith('polling-')) {
+        console.log('Skipping polling subscription');
+        continue;
+      }
+
       const success = await sendPushNotification(
         { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
         payload
@@ -192,7 +214,7 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    // Clean up failed subscriptions
+    // Clean up failed subscriptions (but keep polling ones)
     if (failedEndpoints.length > 0) {
       console.log(`Removing ${failedEndpoints.length} failed subscription(s)`);
       await supabase

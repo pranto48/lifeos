@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical } from 'lucide-react';
+import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -13,8 +13,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { TaskChecklist } from '@/components/tasks/TaskChecklist';
 import {
   DndContext,
   closestCenter,
@@ -33,6 +35,13 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+interface ChecklistItem {
+  id: string;
+  title: string;
+  is_completed: boolean;
+  sort_order: number;
+}
+
 interface Task {
   id: string;
   title: string;
@@ -45,13 +54,16 @@ interface Task {
 
 interface SortableTaskProps {
   task: Task;
+  checklists: ChecklistItem[];
   onToggle: (id: string, completed: boolean) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
+  onChecklistUpdate: () => void;
   priorityColors: Record<string, string>;
 }
 
-function SortableTask({ task, onToggle, onEdit, onDelete, priorityColors }: SortableTaskProps) {
+function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onChecklistUpdate, priorityColors }: SortableTaskProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
   const {
     attributes,
     listeners,
@@ -67,62 +79,88 @@ function SortableTask({ task, onToggle, onEdit, onDelete, priorityColors }: Sort
     opacity: isDragging ? 0.5 : 1,
   };
 
+  const completedCount = checklists.filter(c => c.is_completed).length;
+
   return (
     <Card
       ref={setNodeRef}
       style={style}
       className="bg-card border-border hover:bg-muted/30 transition-colors"
     >
-      <CardContent className="p-4 flex items-center gap-4">
-        <button
-          {...attributes}
-          {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
-        >
-          <GripVertical className="h-4 w-4 text-muted-foreground" />
-        </button>
-        <Checkbox
-          checked={task.status === 'completed'}
-          onCheckedChange={(c) => onToggle(task.id, !!c)}
-        />
-        <div className="flex-1 min-w-0">
-          <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-            {task.title}
-          </p>
-          {task.description && (
-            <p className="text-sm text-muted-foreground truncate">{task.description}</p>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-4">
+          <button
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+          >
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+          </button>
+          <Checkbox
+            checked={task.status === 'completed'}
+            onCheckedChange={(c) => onToggle(task.id, !!c)}
+          />
+          <div className="flex-1 min-w-0">
+            <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+              {task.title}
+            </p>
+            {task.description && (
+              <p className="text-sm text-muted-foreground truncate">{task.description}</p>
+            )}
+          </div>
+          {checklists.length > 0 && (
+            <Badge variant="outline" className="text-xs">
+              {completedCount}/{checklists.length}
+            </Badge>
           )}
+          {task.priority && (
+            <Badge className={priorityColors[task.priority] || 'bg-muted text-muted-foreground'}>
+              {task.priority}
+            </Badge>
+          )}
+          {task.due_date && (
+            <span className="text-xs text-muted-foreground">
+              {format(new Date(task.due_date), 'MMM d')}
+            </span>
+          )}
+          <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            </CollapsibleTrigger>
+          </Collapsible>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEdit(task)}>
+                <Pencil className="h-4 w-4 mr-2" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => onDelete(task.id)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
-        {task.priority && (
-          <Badge className={priorityColors[task.priority] || 'bg-muted text-muted-foreground'}>
-            {task.priority}
-          </Badge>
-        )}
-        {task.due_date && (
-          <span className="text-xs text-muted-foreground">
-            {format(new Date(task.due_date), 'MMM d')}
-          </span>
-        )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreVertical className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => onEdit(task)}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(task.id)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+
+        <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+          <CollapsibleContent className="pt-4 border-t border-border mt-4">
+            <TaskChecklist
+              taskId={task.id}
+              items={checklists}
+              onUpdate={onChecklistUpdate}
+            />
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
     </Card>
   );
@@ -132,6 +170,7 @@ export default function Tasks() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
   const [filter, setFilter] = useState('all');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -150,16 +189,31 @@ export default function Tasks() {
   );
 
   useEffect(() => {
-    if (user) loadTasks();
+    if (user) loadData();
   }, [user]);
 
-  const loadTasks = async () => {
-    const { data } = await supabase
+  const loadData = async () => {
+    // Load tasks
+    const { data: tasksData } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', user?.id)
       .order('sort_order', { ascending: true });
-    setTasks(data || []);
+    setTasks(tasksData || []);
+
+    // Load all checklists
+    const { data: checklistData } = await supabase
+      .from('task_checklists')
+      .select('*')
+      .eq('user_id', user?.id)
+      .order('sort_order', { ascending: true });
+
+    const grouped: Record<string, ChecklistItem[]> = {};
+    (checklistData || []).forEach((c) => {
+      if (!grouped[c.task_id]) grouped[c.task_id] = [];
+      grouped[c.task_id].push(c);
+    });
+    setChecklists(grouped);
   };
 
   const toggleTask = async (id: string, completed: boolean) => {
@@ -167,7 +221,7 @@ export default function Tasks() {
       status: completed ? 'completed' : 'todo',
       completed_at: completed ? new Date().toISOString() : null,
     }).eq('id', id);
-    loadTasks();
+    loadData();
   };
 
   const handleEdit = (task: Task) => {
@@ -198,19 +252,22 @@ export default function Tasks() {
       toast.success('Task updated');
       setEditDialogOpen(false);
       setEditingTask(null);
-      loadTasks();
+      loadData();
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this task?')) return;
 
+    // Delete checklists first
+    await supabase.from('task_checklists').delete().eq('task_id', id);
+    
     const { error } = await supabase.from('tasks').delete().eq('id', id);
     if (error) {
       toast.error('Failed to delete task');
     } else {
       toast.success('Task deleted');
-      loadTasks();
+      loadData();
     }
   };
 
@@ -292,9 +349,11 @@ export default function Tasks() {
                 <SortableTask
                   key={task.id}
                   task={task}
+                  checklists={checklists[task.id] || []}
                   onToggle={toggleTask}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onChecklistUpdate={loadData}
                   priorityColors={priorityColors}
                 />
               ))}

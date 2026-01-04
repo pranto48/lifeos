@@ -86,9 +86,9 @@ export function AppSidebar() {
               className="flex items-center gap-3"
             >
               <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center">
-                <span className="text-primary font-bold text-sm">P</span>
+                <span className="text-primary font-bold text-sm">L</span>
               </div>
-              <span className="font-semibold text-sidebar-foreground">Life OS</span>
+              <span className="font-semibold text-sidebar-foreground">LifeOS</span>
             </motion.div>
           )}
         </AnimatePresence>
