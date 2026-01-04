@@ -358,10 +358,10 @@ export default function Auth() {
             <Shield className="w-8 h-8 text-primary" />
           </motion.div>
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            Pranto <span className="text-primary">Life OS</span>
+            <span className="text-primary">LifeOS</span>
           </h1>
           <p className="text-muted-foreground">
-            Your personal command center
+            Your personal life management system
           </p>
         </div>
 

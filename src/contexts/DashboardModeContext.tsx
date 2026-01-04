@@ -1,7 +1,9 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 
 type DashboardMode = 'office' | 'personal';
+
+const AUTO_LOCK_TIMEOUT = 5 * 60 * 1000; // 5 minutes of inactivity
 
 interface DashboardModeContextType {
   mode: DashboardMode;
@@ -9,6 +11,7 @@ interface DashboardModeContextType {
   isPersonalUnlocked: boolean;
   unlockPersonal: (password: string) => Promise<boolean>;
   lockPersonal: () => void;
+  resetAutoLockTimer: () => void;
 }
 
 const DashboardModeContext = createContext<DashboardModeContextType | undefined>(undefined);
@@ -17,12 +20,64 @@ export function DashboardModeProvider({ children }: { children: ReactNode }) {
   const { user, session } = useAuth();
   const [mode, setModeState] = useState<DashboardMode>('office');
   const [isPersonalUnlocked, setIsPersonalUnlocked] = useState(false);
+  const autoLockTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Reset to office mode and lock personal on session change
   useEffect(() => {
     setModeState('office');
     setIsPersonalUnlocked(false);
   }, [session?.access_token]);
+
+  const lockPersonal = useCallback(() => {
+    setIsPersonalUnlocked(false);
+    setModeState('office');
+    if (autoLockTimerRef.current) {
+      clearTimeout(autoLockTimerRef.current);
+      autoLockTimerRef.current = null;
+    }
+  }, []);
+
+  const resetAutoLockTimer = useCallback(() => {
+    if (!isPersonalUnlocked || mode !== 'personal') return;
+    
+    // Clear existing timer
+    if (autoLockTimerRef.current) {
+      clearTimeout(autoLockTimerRef.current);
+    }
+    
+    // Set new timer
+    autoLockTimerRef.current = setTimeout(() => {
+      lockPersonal();
+    }, AUTO_LOCK_TIMEOUT);
+  }, [isPersonalUnlocked, mode, lockPersonal]);
+
+  // Start auto-lock timer when entering personal mode
+  useEffect(() => {
+    if (isPersonalUnlocked && mode === 'personal') {
+      resetAutoLockTimer();
+      
+      // Listen for user activity to reset timer
+      const handleActivity = () => resetAutoLockTimer();
+      
+      window.addEventListener('mousemove', handleActivity);
+      window.addEventListener('keydown', handleActivity);
+      window.addEventListener('click', handleActivity);
+      window.addEventListener('scroll', handleActivity);
+      window.addEventListener('touchstart', handleActivity);
+      
+      return () => {
+        window.removeEventListener('mousemove', handleActivity);
+        window.removeEventListener('keydown', handleActivity);
+        window.removeEventListener('click', handleActivity);
+        window.removeEventListener('scroll', handleActivity);
+        window.removeEventListener('touchstart', handleActivity);
+        
+        if (autoLockTimerRef.current) {
+          clearTimeout(autoLockTimerRef.current);
+        }
+      };
+    }
+  }, [isPersonalUnlocked, mode, resetAutoLockTimer]);
 
   const setMode = (newMode: DashboardMode) => {
     if (newMode === 'personal' && !isPersonalUnlocked) {
@@ -54,18 +109,14 @@ export function DashboardModeProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const lockPersonal = () => {
-    setIsPersonalUnlocked(false);
-    setModeState('office');
-  };
-
   return (
     <DashboardModeContext.Provider value={{ 
       mode, 
       setMode, 
       isPersonalUnlocked, 
       unlockPersonal, 
-      lockPersonal 
+      lockPersonal,
+      resetAutoLockTimer,
     }}>
       {children}
     </DashboardModeContext.Provider>
