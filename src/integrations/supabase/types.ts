@@ -895,6 +895,7 @@ export type Database = {
           priority: string | null
           project_id: string | null
           recurring_pattern: string | null
+          sort_order: number | null
           status: string | null
           tags: string[] | null
           title: string
@@ -913,6 +914,7 @@ export type Database = {
           priority?: string | null
           project_id?: string | null
           recurring_pattern?: string | null
+          sort_order?: number | null
           status?: string | null
           tags?: string[] | null
           title: string
@@ -931,6 +933,7 @@ export type Database = {
           priority?: string | null
           project_id?: string | null
           recurring_pattern?: string | null
+          sort_order?: number | null
           status?: string | null
           tags?: string[] | null
           title?: string
