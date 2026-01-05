@@ -597,6 +597,7 @@ export type Database = {
           is_favorite: boolean | null
           is_pinned: boolean | null
           is_vault: boolean | null
+          note_type: string
           project_id: string | null
           search_vector: unknown
           tags: string[] | null
@@ -612,6 +613,7 @@ export type Database = {
           is_favorite?: boolean | null
           is_pinned?: boolean | null
           is_vault?: boolean | null
+          note_type?: string
           project_id?: string | null
           search_vector?: unknown
           tags?: string[] | null
@@ -627,6 +629,7 @@ export type Database = {
           is_favorite?: boolean | null
           is_pinned?: boolean | null
           is_vault?: boolean | null
+          note_type?: string
           project_id?: string | null
           search_vector?: unknown
           tags?: string[] | null
