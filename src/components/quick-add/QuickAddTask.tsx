@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Loader2 } from 'lucide-react';
 
 interface QuickAddTaskProps {
@@ -15,6 +16,7 @@ interface QuickAddTaskProps {
 
 export function QuickAddTask({ onClose }: QuickAddTaskProps) {
   const { user } = useAuth();
+  const { mode } = useDashboardMode();
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -34,6 +36,7 @@ export function QuickAddTask({ onClose }: QuickAddTaskProps) {
         priority,
         due_date: dueDate || null,
         status: 'todo',
+        task_type: mode, // Set task type based on current dashboard mode
       });
 
       if (error) throw error;
