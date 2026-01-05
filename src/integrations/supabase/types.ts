@@ -898,6 +898,7 @@ export type Database = {
           sort_order: number | null
           status: string | null
           tags: string[] | null
+          task_type: string
           title: string
           updated_at: string
           user_id: string
@@ -917,6 +918,7 @@ export type Database = {
           sort_order?: number | null
           status?: string | null
           tags?: string[] | null
+          task_type?: string
           title: string
           updated_at?: string
           user_id: string
@@ -936,6 +938,7 @@ export type Database = {
           sort_order?: number | null
           status?: string | null
           tags?: string[] | null
+          task_type?: string
           title?: string
           updated_at?: string
           user_id?: string

@@ -3,6 +3,7 @@ import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, C
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -169,6 +170,7 @@ function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onChecklis
 export default function Tasks() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { mode } = useDashboardMode();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
   const [filter, setFilter] = useState('all');
@@ -190,14 +192,15 @@ export default function Tasks() {
 
   useEffect(() => {
     if (user) loadData();
-  }, [user]);
+  }, [user, mode]);
 
   const loadData = async () => {
-    // Load tasks
+    // Load tasks filtered by current mode (office/personal)
     const { data: tasksData } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', user?.id)
+      .eq('task_type', mode)
       .order('sort_order', { ascending: true });
     setTasks(tasksData || []);
 
