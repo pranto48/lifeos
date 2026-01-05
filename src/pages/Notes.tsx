@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +21,7 @@ import { format } from 'date-fns';
 export default function Notes() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { mode } = useDashboardMode();
   const [notes, setNotes] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const [selectedNote, setSelectedNote] = useState<any>(null);
@@ -41,13 +43,14 @@ export default function Notes() {
 
   useEffect(() => {
     if (user) loadNotes();
-  }, [user]);
+  }, [user, mode]);
 
   const loadNotes = async () => {
     const { data } = await supabase
       .from('notes')
       .select('*')
       .eq('user_id', user?.id)
+      .eq('note_type', mode)
       .order('is_pinned', { ascending: false })
       .order('created_at', { ascending: false });
     setNotes(data || []);
@@ -123,6 +126,7 @@ export default function Notes() {
         encrypted_content,
         tags: tagsArray,
         is_vault: isVault,
+        note_type: mode,
       });
 
       if (error) throw error;

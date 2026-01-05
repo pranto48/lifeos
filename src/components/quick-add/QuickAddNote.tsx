@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Loader2 } from 'lucide-react';
 
 interface QuickAddNoteProps {
@@ -14,6 +15,7 @@ interface QuickAddNoteProps {
 
 export function QuickAddNote({ onClose }: QuickAddNoteProps) {
   const { user } = useAuth();
+  const { mode } = useDashboardMode();
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
@@ -32,6 +34,7 @@ export function QuickAddNote({ onClose }: QuickAddNoteProps) {
         title: title.trim(),
         content: content.trim() || null,
         tags: tagsArray,
+        note_type: mode,
       });
 
       if (error) throw error;
