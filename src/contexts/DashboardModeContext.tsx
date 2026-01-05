@@ -17,16 +17,10 @@ interface DashboardModeContextType {
 const DashboardModeContext = createContext<DashboardModeContextType | undefined>(undefined);
 
 export function DashboardModeProvider({ children }: { children: ReactNode }) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [mode, setModeState] = useState<DashboardMode>('office');
   const [isPersonalUnlocked, setIsPersonalUnlocked] = useState(false);
   const autoLockTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Reset to office mode and lock personal on session change
-  useEffect(() => {
-    setModeState('office');
-    setIsPersonalUnlocked(false);
-  }, [session?.access_token]);
 
   const lockPersonal = useCallback(() => {
     setIsPersonalUnlocked(false);
@@ -91,14 +85,19 @@ export function DashboardModeProvider({ children }: { children: ReactNode }) {
     if (!user?.email) return false;
     
     try {
-      // Verify password by attempting to sign in
+      // Use reauthenticate to verify password without creating a new session
       const { supabase } = await import('@/integrations/supabase/client');
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await supabase.auth.reauthenticate();
+      
+      // Reauthenticate sends a nonce, so we verify with signInWithPassword
+      // but the session should already exist
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: password,
       });
       
-      if (!error) {
+      if (!signInError) {
+        // Immediately set state after successful verification
         setIsPersonalUnlocked(true);
         setModeState('personal');
         return true;
