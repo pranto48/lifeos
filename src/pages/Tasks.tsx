@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -51,6 +51,7 @@ interface Task {
   status: string | null;
   due_date: string | null;
   sort_order: number | null;
+  task_type: string;
 }
 
 interface SortableTaskProps {
@@ -59,11 +60,12 @@ interface SortableTaskProps {
   onToggle: (id: string, completed: boolean) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
+  onMove: (id: string, currentType: string) => void;
   onChecklistUpdate: () => void;
   priorityColors: Record<string, string>;
 }
 
-function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onChecklistUpdate, priorityColors }: SortableTaskProps) {
+function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onMove, onChecklistUpdate, priorityColors }: SortableTaskProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     attributes,
@@ -141,6 +143,10 @@ function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onChecklis
               <DropdownMenuItem onClick={() => onEdit(task)}>
                 <Pencil className="h-4 w-4 mr-2" />
                 Edit
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onMove(task.id, task.task_type)}>
+                <ArrowRightLeft className="h-4 w-4 mr-2" />
+                Move to {task.task_type === 'office' ? 'Personal' : 'Office'}
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => onDelete(task.id)}
@@ -274,6 +280,17 @@ export default function Tasks() {
     }
   };
 
+  const handleMove = async (id: string, currentType: string) => {
+    const newType = currentType === 'office' ? 'personal' : 'office';
+    const { error } = await supabase.from('tasks').update({ task_type: newType }).eq('id', id);
+    if (error) {
+      toast.error('Failed to move task');
+    } else {
+      toast.success(`Task moved to ${newType}`);
+      loadData();
+    }
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -356,6 +373,7 @@ export default function Tasks() {
                   onToggle={toggleTask}
                   onEdit={handleEdit}
                   onDelete={handleDelete}
+                  onMove={handleMove}
                   onChecklistUpdate={loadData}
                   priorityColors={priorityColors}
                 />
