@@ -173,6 +173,8 @@ function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onMove, on
   );
 }
 
+const TASKS_PER_PAGE = 20;
+
 export default function Tasks() {
   const { user } = useAuth();
   const { t } = useLanguage();
@@ -182,6 +184,9 @@ export default function Tasks() {
   const [filter, setFilter] = useState('all');
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -197,32 +202,57 @@ export default function Tasks() {
   );
 
   useEffect(() => {
-    if (user) loadData();
+    if (user) {
+      setTasks([]);
+      setPage(0);
+      setHasMore(true);
+      loadData(0, true);
+    }
   }, [user, mode]);
 
-  const loadData = async () => {
+  const loadData = async (pageNum: number = page, reset: boolean = false) => {
+    if (loading) return;
+    setLoading(true);
+    
     // Load tasks filtered by current mode (office/personal)
     const { data: tasksData } = await supabase
       .from('tasks')
       .select('*')
       .eq('user_id', user?.id)
       .eq('task_type', mode)
-      .order('sort_order', { ascending: true });
-    setTasks(tasksData || []);
+      .order('sort_order', { ascending: true })
+      .range(pageNum * TASKS_PER_PAGE, (pageNum + 1) * TASKS_PER_PAGE - 1);
 
-    // Load all checklists
-    const { data: checklistData } = await supabase
-      .from('task_checklists')
-      .select('*')
-      .eq('user_id', user?.id)
-      .order('sort_order', { ascending: true });
+    const newTasks = tasksData || [];
+    setTasks(prev => reset ? newTasks : [...prev, ...newTasks]);
+    setHasMore(newTasks.length === TASKS_PER_PAGE);
+    setPage(pageNum);
 
-    const grouped: Record<string, ChecklistItem[]> = {};
-    (checklistData || []).forEach((c) => {
-      if (!grouped[c.task_id]) grouped[c.task_id] = [];
-      grouped[c.task_id].push(c);
-    });
-    setChecklists(grouped);
+    // Load all checklists for the loaded tasks
+    const taskIds = reset ? newTasks.map(t => t.id) : [...tasks, ...newTasks].map(t => t.id);
+    if (taskIds.length > 0) {
+      const { data: checklistData } = await supabase
+        .from('task_checklists')
+        .select('*')
+        .eq('user_id', user?.id)
+        .in('task_id', taskIds)
+        .order('sort_order', { ascending: true });
+
+      const grouped: Record<string, ChecklistItem[]> = {};
+      (checklistData || []).forEach((c) => {
+        if (!grouped[c.task_id]) grouped[c.task_id] = [];
+        grouped[c.task_id].push(c);
+      });
+      setChecklists(prev => reset ? grouped : { ...prev, ...grouped });
+    }
+    
+    setLoading(false);
+  };
+
+  const loadMore = () => {
+    if (hasMore && !loading) {
+      loadData(page + 1);
+    }
   };
 
   const toggleTask = async (id: string, completed: boolean) => {
@@ -230,7 +260,8 @@ export default function Tasks() {
       status: completed ? 'completed' : 'todo',
       completed_at: completed ? new Date().toISOString() : null,
     }).eq('id', id);
-    loadData();
+    // Update local state instead of full reload
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: completed ? 'completed' : 'todo' } : t));
   };
 
   const handleEdit = (task: Task) => {
@@ -248,12 +279,14 @@ export default function Tasks() {
     e.preventDefault();
     if (!editingTask || !formData.title.trim()) return;
 
-    const { error } = await supabase.from('tasks').update({
+    const updatedData = {
       title: formData.title.trim(),
       description: formData.description.trim() || null,
       priority: formData.priority,
       due_date: formData.due_date || null,
-    }).eq('id', editingTask.id);
+    };
+
+    const { error } = await supabase.from('tasks').update(updatedData).eq('id', editingTask.id);
 
     if (error) {
       toast.error('Failed to update task');
@@ -261,7 +294,8 @@ export default function Tasks() {
       toast.success('Task updated');
       setEditDialogOpen(false);
       setEditingTask(null);
-      loadData();
+      // Update local state
+      setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...updatedData } : t));
     }
   };
 
@@ -276,7 +310,7 @@ export default function Tasks() {
       toast.error('Failed to delete task');
     } else {
       toast.success('Task deleted');
-      loadData();
+      setTasks(prev => prev.filter(t => t.id !== id));
     }
   };
 
@@ -287,7 +321,7 @@ export default function Tasks() {
       toast.error('Failed to move task');
     } else {
       toast.success(`Task moved to ${newType}`);
-      loadData();
+      setTasks(prev => prev.filter(t => t.id !== id));
     }
   };
 
@@ -359,27 +393,40 @@ export default function Tasks() {
             </CardContent>
           </Card>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={filteredTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-              {filteredTasks.map((task) => (
-                <SortableTask
-                  key={task.id}
-                  task={task}
-                  checklists={checklists[task.id] || []}
-                  onToggle={toggleTask}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onMove={handleMove}
-                  onChecklistUpdate={loadData}
-                  priorityColors={priorityColors}
-                />
-              ))}
-            </SortableContext>
-          </DndContext>
+          <>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext items={filteredTasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+                {filteredTasks.map((task) => (
+                  <SortableTask
+                    key={task.id}
+                    task={task}
+                    checklists={checklists[task.id] || []}
+                    onToggle={toggleTask}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onMove={handleMove}
+                    onChecklistUpdate={() => loadData(0, true)}
+                    priorityColors={priorityColors}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+            {hasMore && (
+              <div className="pt-4 text-center">
+                <Button
+                  variant="outline"
+                  onClick={loadMore}
+                  disabled={loading}
+                >
+                  {loading ? 'Loading...' : 'Load More'}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </div>
 

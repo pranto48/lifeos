@@ -25,6 +25,10 @@ export default function Dashboard() {
     activeGoals: 0,
     recentNotes: [] as any[],
     upcomingTasks: [] as any[],
+    officeTasks: 0,
+    personalTasks: 0,
+    officeNotes: 0,
+    personalNotes: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -38,16 +42,23 @@ export default function Dashboard() {
     
     const [tasksRes, notesRes, transactionsRes, goalsRes] = await Promise.all([
       supabase.from('tasks').select('*').eq('user_id', user?.id),
-      supabase.from('notes').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }).limit(3),
+      supabase.from('notes').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }),
       supabase.from('transactions').select('*').eq('user_id', user?.id).gte('date', startOfMonth.split('T')[0]),
       supabase.from('goals').select('*').eq('user_id', user?.id).eq('status', 'active'),
     ]);
 
     const tasks = tasksRes.data || [];
+    const notes = notesRes.data || [];
     const todayTasks = tasks.filter(t => t.due_date?.split('T')[0] === today && t.status !== 'completed').length;
     const completedTasks = tasks.filter(t => t.status === 'completed').length;
     const overdueTasks = tasks.filter(t => t.due_date && t.due_date < new Date().toISOString() && t.status !== 'completed').length;
     const upcomingTasks = tasks.filter(t => t.status !== 'completed').slice(0, 5);
+
+    // Count by type
+    const officeTasks = tasks.filter(t => t.task_type === 'office' && t.status !== 'completed').length;
+    const personalTasks = tasks.filter(t => t.task_type === 'personal' && t.status !== 'completed').length;
+    const officeNotes = notes.filter(n => n.note_type === 'office').length;
+    const personalNotes = notes.filter(n => n.note_type === 'personal').length;
 
     const transactions = transactionsRes.data || [];
     const monthlyIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
@@ -60,8 +71,12 @@ export default function Dashboard() {
       monthlyIncome,
       monthlyExpense,
       activeGoals: goalsRes.data?.length || 0,
-      recentNotes: notesRes.data || [],
+      recentNotes: notes.slice(0, 3),
       upcomingTasks,
+      officeTasks,
+      personalTasks,
+      officeNotes,
+      personalNotes,
     });
     setLoading(false);
   };
@@ -80,8 +95,15 @@ export default function Dashboard() {
     { title: t('dashboard.completed'), value: stats.completedTasks, icon: CheckSquare, color: 'text-green-400' },
   ];
 
-  // Office mode only shows work-related stats
-  const officeStatCards = statCards;
+  const modeCountCards = mode === 'office' 
+    ? [
+        { title: 'Office Tasks', value: stats.officeTasks, icon: CheckSquare, color: 'text-primary' },
+        { title: 'Office Notes', value: stats.officeNotes, icon: FileText, color: 'text-primary' },
+      ]
+    : [
+        { title: 'Personal Tasks', value: stats.personalTasks, icon: CheckSquare, color: 'text-primary' },
+        { title: 'Personal Notes', value: stats.personalNotes, icon: FileText, color: 'text-primary' },
+      ];
 
   return (
     <div className="space-y-6">
@@ -102,7 +124,7 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {officeStatCards.map((stat, i) => (
+        {statCards.map((stat, i) => (
           <motion.div
             key={stat.title}
             initial={{ opacity: 0, y: 20 }}
@@ -116,6 +138,30 @@ export default function Dashboard() {
                   <span className="font-mono text-2xl font-bold text-foreground">{stat.value}</span>
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">{stat.title}</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Mode-specific counts */}
+      <div className="grid grid-cols-2 gap-4">
+        {modeCountCards.map((stat, i) => (
+          <motion.div
+            key={stat.title}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 + i * 0.1 }}
+          >
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <stat.icon className={`h-5 w-5 ${stat.color}`} />
+                    <span className="text-sm font-medium text-foreground">{stat.title}</span>
+                  </div>
+                  <span className="font-mono text-xl font-bold text-primary">{stat.value}</span>
+                </div>
               </CardContent>
             </Card>
           </motion.div>
