@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
+import { ArrowRightLeft } from 'lucide-react';
 import { FileText, Pin, Star, Search, Lock, LockOpen, Plus, X, Eye, EyeOff, Trash2, MoreVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
@@ -174,6 +175,17 @@ export default function Notes() {
     }
   };
 
+  const handleMoveNote = async (noteId: string, currentType: string) => {
+    const newType = currentType === 'office' ? 'personal' : 'office';
+    const { error } = await supabase.from('notes').update({ note_type: newType }).eq('id', noteId);
+    if (error) {
+      toast({ title: 'Error', description: 'Failed to move note', variant: 'destructive' });
+    } else {
+      toast({ title: 'Moved', description: `Note moved to ${newType}` });
+      loadNotes();
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
@@ -234,15 +246,21 @@ export default function Notes() {
                           <MoreVertical className="h-4 w-4 text-muted-foreground" />
                         </button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem 
-                          onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
-                          className="text-destructive focus:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem 
+                                          onClick={(e) => { e.stopPropagation(); handleMoveNote(note.id, note.note_type); }}
+                                        >
+                                          <ArrowRightLeft className="h-4 w-4 mr-2" />
+                                          Move to {note.note_type === 'office' ? 'Personal' : 'Office'}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem 
+                                          onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}
+                                          className="text-destructive focus:text-destructive"
+                                        >
+                                          <Trash2 className="h-4 w-4 mr-2" />
+                                          Delete
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
                 </div>
