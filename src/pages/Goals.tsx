@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Target, Plus, Pencil, Trash2, MoreVertical, CheckCircle2, Circle, Calendar, TrendingUp, Flag } from 'lucide-react';
+import { Target, Plus, Pencil, Trash2, MoreVertical, CheckCircle2, Circle, Calendar, TrendingUp, Flag, ArrowRightLeft } from 'lucide-react';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -28,6 +29,7 @@ interface Goal {
   current_amount: number | null;
   target_date: string | null;
   is_next_year_plan: boolean | null;
+  goal_type: string;
 }
 
 interface Milestone {
@@ -60,6 +62,7 @@ const STATUSES = [
 export default function Goals() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { mode } = useDashboardMode();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [milestones, setMilestones] = useState<Record<string, Milestone[]>>({});
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -84,13 +87,14 @@ export default function Goals() {
     if (user) {
       loadGoals();
     }
-  }, [user]);
+  }, [user, mode]);
 
   const loadGoals = async () => {
     const { data } = await supabase
       .from('goals')
       .select('*')
       .eq('user_id', user?.id)
+      .eq('goal_type', mode)
       .order('created_at', { ascending: false });
     setGoals(data || []);
     
@@ -166,7 +170,7 @@ export default function Goals() {
         if (error) throw error;
         toast.success(t('goals.updated'));
       } else {
-        const { error } = await supabase.from('goals').insert(payload);
+        const { error } = await supabase.from('goals').insert({ ...payload, goal_type: mode });
         if (error) throw error;
         toast.success(t('goals.added'));
       }
@@ -188,6 +192,21 @@ export default function Goals() {
     } else {
       toast.success(t('goals.deleted'));
       loadGoals();
+    }
+  };
+
+  const handleMoveGoal = async (goal: Goal) => {
+    const newType = goal.goal_type === 'office' ? 'personal' : 'office';
+    const { error } = await supabase
+      .from('goals')
+      .update({ goal_type: newType })
+      .eq('id', goal.id);
+
+    if (error) {
+      toast.error('Failed to move goal');
+    } else {
+      toast.success(`Goal moved to ${newType}`);
+      setGoals(goals.filter(g => g.id !== goal.id));
     }
   };
 
@@ -666,6 +685,10 @@ export default function Goals() {
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEditDialog(goal); }}>
                   <Pencil className="h-4 w-4 mr-2" />
                   {t('common.edit')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleMoveGoal(goal); }}>
+                  <ArrowRightLeft className="h-4 w-4 mr-2" />
+                  Move to {goal.goal_type === 'office' ? 'Personal' : 'Office'}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(goal.id); }} className="text-destructive">
                   <Trash2 className="h-4 w-4 mr-2" />

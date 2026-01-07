@@ -415,6 +415,7 @@ export type Database = {
           created_at: string
           current_amount: number | null
           description: string | null
+          goal_type: string
           id: string
           is_next_year_plan: boolean | null
           status: string | null
@@ -429,6 +430,7 @@ export type Database = {
           created_at?: string
           current_amount?: number | null
           description?: string | null
+          goal_type?: string
           id?: string
           is_next_year_plan?: boolean | null
           status?: string | null
@@ -443,6 +445,7 @@ export type Database = {
           created_at?: string
           current_amount?: number | null
           description?: string | null
+          goal_type?: string
           id?: string
           is_next_year_plan?: boolean | null
           status?: string | null
