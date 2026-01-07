@@ -739,6 +739,7 @@ export type Database = {
           description: string | null
           id: string
           priority: string | null
+          project_type: string
           status: string | null
           tags: string[] | null
           target_date: string | null
@@ -751,6 +752,7 @@ export type Database = {
           description?: string | null
           id?: string
           priority?: string | null
+          project_type?: string
           status?: string | null
           tags?: string[] | null
           target_date?: string | null
@@ -763,6 +765,7 @@ export type Database = {
           description?: string | null
           id?: string
           priority?: string | null
+          project_type?: string
           status?: string | null
           tags?: string[] | null
           target_date?: string | null
