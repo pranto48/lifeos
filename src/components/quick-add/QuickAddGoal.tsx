@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Loader2 } from 'lucide-react';
 
 interface QuickAddGoalProps {
@@ -24,6 +25,7 @@ const categories = [
 
 export function QuickAddGoal({ onClose }: QuickAddGoalProps) {
   const { user } = useAuth();
+  const { mode } = useDashboardMode();
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -45,6 +47,7 @@ export function QuickAddGoal({ onClose }: QuickAddGoalProps) {
         target_amount: targetAmount ? parseFloat(targetAmount) : null,
         target_date: targetDate || null,
         status: 'active',
+        goal_type: mode,
       });
 
       if (error) throw error;
