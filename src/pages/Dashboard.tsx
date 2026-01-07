@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   CheckSquare, FileText, Wallet, Target, 
-  Calendar, Clock, ArrowUpRight, ArrowDownRight
+  Calendar, Clock, ArrowUpRight, ArrowDownRight, Lightbulb
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -29,6 +29,8 @@ export default function Dashboard() {
     personalTasks: 0,
     officeNotes: 0,
     personalNotes: 0,
+    officeProjects: 0,
+    personalProjects: 0,
   });
   const [loading, setLoading] = useState(true);
 
@@ -40,11 +42,12 @@ export default function Dashboard() {
     const today = new Date().toISOString().split('T')[0];
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     
-    const [tasksRes, notesRes, transactionsRes, goalsRes] = await Promise.all([
+    const [tasksRes, notesRes, transactionsRes, goalsRes, projectsRes] = await Promise.all([
       supabase.from('tasks').select('*').eq('user_id', user?.id),
       supabase.from('notes').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }),
       supabase.from('transactions').select('*').eq('user_id', user?.id).gte('date', startOfMonth.split('T')[0]),
       supabase.from('goals').select('*').eq('user_id', user?.id).eq('status', 'active'),
+      supabase.from('projects').select('id, project_type').eq('user_id', user?.id),
     ]);
 
     const tasks = tasksRes.data || [];
@@ -59,6 +62,10 @@ export default function Dashboard() {
     const personalTasks = tasks.filter(t => t.task_type === 'personal' && t.status !== 'completed').length;
     const officeNotes = notes.filter(n => n.note_type === 'office').length;
     const personalNotes = notes.filter(n => n.note_type === 'personal').length;
+    
+    const projects = projectsRes.data || [];
+    const officeProjects = projects.filter(p => p.project_type === 'office').length;
+    const personalProjects = projects.filter(p => p.project_type === 'personal').length;
 
     const transactions = transactionsRes.data || [];
     const monthlyIncome = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
@@ -77,6 +84,8 @@ export default function Dashboard() {
       personalTasks,
       officeNotes,
       personalNotes,
+      officeProjects,
+      personalProjects,
     });
     setLoading(false);
   };
@@ -99,10 +108,12 @@ export default function Dashboard() {
     ? [
         { title: 'Office Tasks', value: stats.officeTasks, icon: CheckSquare, color: 'text-primary' },
         { title: 'Office Notes', value: stats.officeNotes, icon: FileText, color: 'text-primary' },
+        { title: 'Office Projects', value: stats.officeProjects, icon: Lightbulb, color: 'text-primary' },
       ]
     : [
         { title: 'Personal Tasks', value: stats.personalTasks, icon: CheckSquare, color: 'text-primary' },
         { title: 'Personal Notes', value: stats.personalNotes, icon: FileText, color: 'text-primary' },
+        { title: 'Personal Projects', value: stats.personalProjects, icon: Lightbulb, color: 'text-primary' },
       ];
 
   return (
@@ -145,7 +156,7 @@ export default function Dashboard() {
       </div>
 
       {/* Mode-specific counts */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         {modeCountCards.map((stat, i) => (
           <motion.div
             key={stat.title}
