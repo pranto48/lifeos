@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Lightbulb, Plus, MoreVertical, Pencil, Trash2, Calendar, Target, CheckCircle2, Circle, ChevronDown, ChevronUp, Check, X } from 'lucide-react';
+import { Lightbulb, Plus, MoreVertical, Pencil, Trash2, Calendar, Target, CheckCircle2, Circle, ChevronDown, ChevronUp, Check, X, ArrowRightLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ interface Project {
   target_date: string | null;
   tags: string[] | null;
   created_at: string;
+  project_type: string;
 }
 
 interface MilestoneItemProps {
@@ -158,6 +160,7 @@ const priorityColors: Record<string, string> = {
 export default function Projects() {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { mode } = useDashboardMode();
   const [projects, setProjects] = useState<Project[]>([]);
   const [milestones, setMilestones] = useState<Record<string, Milestone[]>>({});
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
@@ -175,29 +178,36 @@ export default function Projects() {
 
   useEffect(() => {
     if (user) loadProjects();
-  }, [user]);
+  }, [user, mode]);
 
   const loadProjects = async () => {
     const { data: projectsData } = await supabase
       .from('projects')
       .select('*')
       .eq('user_id', user?.id)
+      .eq('project_type', mode)
       .order('created_at', { ascending: false });
     setProjects(projectsData || []);
 
-    // Load all milestones
-    const { data: milestonesData } = await supabase
-      .from('project_milestones')
-      .select('*')
-      .eq('user_id', user?.id)
-      .order('sort_order', { ascending: true });
-    
-    const grouped: Record<string, Milestone[]> = {};
-    (milestonesData || []).forEach((m: Milestone) => {
-      if (!grouped[m.project_id]) grouped[m.project_id] = [];
-      grouped[m.project_id].push(m);
-    });
-    setMilestones(grouped);
+    // Load all milestones for filtered projects
+    const projectIds = (projectsData || []).map(p => p.id);
+    if (projectIds.length > 0) {
+      const { data: milestonesData } = await supabase
+        .from('project_milestones')
+        .select('*')
+        .eq('user_id', user?.id)
+        .in('project_id', projectIds)
+        .order('sort_order', { ascending: true });
+      
+      const grouped: Record<string, Milestone[]> = {};
+      (milestonesData || []).forEach((m: Milestone) => {
+        if (!grouped[m.project_id]) grouped[m.project_id] = [];
+        grouped[m.project_id].push(m);
+      });
+      setMilestones(grouped);
+    } else {
+      setMilestones({});
+    }
   };
 
   const resetForm = () => {
@@ -238,6 +248,7 @@ export default function Projects() {
         priority: formData.priority,
         target_date: formData.target_date || null,
         tags: formData.tags ? formData.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+        project_type: mode,
       };
 
       if (editingProject) {
@@ -258,6 +269,21 @@ export default function Projects() {
       loadProjects();
     } catch (error: any) {
       toast.error(error.message);
+    }
+  };
+
+  const handleMove = async (project: Project) => {
+    const newType = project.project_type === 'office' ? 'personal' : 'office';
+    const { error } = await supabase
+      .from('projects')
+      .update({ project_type: newType })
+      .eq('id', project.id);
+
+    if (error) {
+      toast.error('Failed to move project');
+    } else {
+      toast.success(`Moved to ${newType}`);
+      setProjects(prev => prev.filter(p => p.id !== project.id));
     }
   };
 
@@ -466,6 +492,10 @@ export default function Projects() {
                           <DropdownMenuItem onClick={() => openEditDialog(project)}>
                             <Pencil className="h-4 w-4 mr-2" />
                             {t('common.edit')}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleMove(project)}>
+                            <ArrowRightLeft className="h-4 w-4 mr-2" />
+                            Move to {project.project_type === 'office' ? 'Personal' : 'Office'}
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDelete(project.id)} className="text-destructive">
                             <Trash2 className="h-4 w-4 mr-2" />
