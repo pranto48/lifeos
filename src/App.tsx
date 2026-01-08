@@ -20,6 +20,7 @@ import Salary from "./pages/Salary";
 import Investments from "./pages/Investments";
 import Goals from "./pages/Goals";
 import Projects from "./pages/Projects";
+import Calendar from "./pages/Calendar";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -47,6 +48,7 @@ const App = () => (
                 <Route path="/investments" element={<AppLayout><PersonalPageGuard><Investments /></PersonalPageGuard></AppLayout>} />
                 <Route path="/goals" element={<AppLayout><Goals /></AppLayout>} />
                 <Route path="/projects" element={<AppLayout><Projects /></AppLayout>} />
+                <Route path="/calendar" element={<AppLayout><Calendar /></AppLayout>} />
                 <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
                 <Route path="*" element={<NotFound />} />
               </Routes>

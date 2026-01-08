@@ -12,7 +12,8 @@ import {
   Settings,
   LogOut,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Calendar
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +34,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { titleKey: 'nav.dashboard', url: '/', icon: LayoutDashboard },
+  { titleKey: 'nav.calendar', url: '/calendar', icon: Calendar },
   { titleKey: 'nav.tasks', url: '/tasks', icon: CheckSquare },
   { titleKey: 'nav.notes', url: '/notes', icon: FileText },
   { titleKey: 'nav.habits', url: '/habits', icon: Repeat, personalOnly: true },
