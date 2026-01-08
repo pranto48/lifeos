@@ -361,8 +361,13 @@ export default function Budget() {
     return months;
   }, [allTransactions]);
 
-  const income = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
-  const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
+  // Apply filters to current month transactions for summary cards
+  const filteredCurrentMonthTransactions = filterMember === 'all' 
+    ? currentMonthTransactions 
+    : currentMonthTransactions.filter(t => t.family_member_id === filterMember);
+  
+  const income = filteredCurrentMonthTransactions.filter(t => t.type === 'income').reduce((s, t) => s + Number(t.amount), 0);
+  const expense = filteredCurrentMonthTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + Number(t.amount), 0);
 
   const filteredCategories = categories.filter(c => c.is_income === (formData.type === 'income'));
   const expenseCategories = categories.filter(c => !c.is_income);
