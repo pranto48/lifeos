@@ -3,6 +3,7 @@ export type Language = 'bn' | 'en';
 export const translations = {
   // Navigation
   'nav.dashboard': { bn: 'ড্যাশবোর্ড', en: 'Dashboard' },
+  'nav.calendar': { bn: 'ক্যালেন্ডার', en: 'Calendar' },
   'nav.tasks': { bn: 'কাজ', en: 'Tasks' },
   'nav.notes': { bn: 'নোট', en: 'Notes' },
   'nav.projects': { bn: 'প্রকল্প', en: 'Projects' },

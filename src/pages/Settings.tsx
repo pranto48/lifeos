@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings as SettingsIcon, User, Shield, Download, LogOut, Mail, Bell, Languages } from 'lucide-react';
+import { Settings as SettingsIcon, User, Shield, LogOut, Mail, Bell, Languages } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -15,6 +15,7 @@ import { TwoFactorAuth } from '@/components/settings/TwoFactorAuth';
 import { BiometricManagement } from '@/components/settings/BiometricManagement';
 import { PushNotificationSettings } from '@/components/settings/PushNotificationSettings';
 import { TrustedDevicesManagement } from '@/components/settings/TrustedDevicesManagement';
+import { DataExport } from '@/components/settings/DataExport';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
@@ -64,42 +65,6 @@ export default function Settings() {
     } finally {
       setSendingReminders(false);
     }
-  };
-
-  const exportData = async () => {
-    toast({ title: language === 'bn' ? 'এক্সপোর্ট হচ্ছে...' : 'Exporting...', description: language === 'bn' ? 'আপনার ডেটা এক্সপোর্ট প্রস্তুত হচ্ছে।' : 'Preparing your data export.' });
-    const [tasks, notes, transactions, goals, investments, projects, salaries, habits, family] = await Promise.all([
-      supabase.from('tasks').select('*').eq('user_id', user?.id),
-      supabase.from('notes').select('id, title, content, tags, is_pinned, is_favorite, is_vault, created_at, updated_at').eq('user_id', user?.id),
-      supabase.from('transactions').select('*').eq('user_id', user?.id),
-      supabase.from('goals').select('*').eq('user_id', user?.id),
-      supabase.from('investments').select('*').eq('user_id', user?.id),
-      supabase.from('projects').select('*').eq('user_id', user?.id),
-      supabase.from('salary_entries').select('*').eq('user_id', user?.id),
-      supabase.from('habits').select('*').eq('user_id', user?.id),
-      supabase.from('family_members').select('*').eq('user_id', user?.id),
-    ]);
-    
-    const data = { 
-      tasks: tasks.data, 
-      notes: notes.data?.map(n => ({ ...n, content: n.is_vault ? '[ENCRYPTED]' : n.content })), 
-      transactions: transactions.data, 
-      goals: goals.data, 
-      investments: investments.data, 
-      projects: projects.data,
-      salaries: salaries.data,
-      habits: habits.data,
-      family: family.data,
-      exportedAt: new Date().toISOString() 
-    };
-    
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `lifeos-backup-${new Date().toISOString().split('T')[0]}.json`;
-    a.click();
-    toast({ title: language === 'bn' ? 'এক্সপোর্ট সম্পন্ন' : 'Export complete', description: language === 'bn' ? 'আপনার ডেটা ডাউনলোড হয়েছে।' : 'Your data has been downloaded.' });
   };
 
   return (
@@ -208,6 +173,8 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      <DataExport />
+
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
@@ -250,10 +217,7 @@ export default function Settings() {
             </div>
           </div>
           
-          <div className="flex gap-2 pt-2">
-            <Button variant="outline" onClick={exportData}>
-              <Download className="h-4 w-4 mr-2" /> {language === 'bn' ? 'সব ডেটা এক্সপোর্ট' : 'Export All Data'}
-            </Button>
+          <div className="pt-2">
             <Button variant="destructive" onClick={signOut}>
               <LogOut className="h-4 w-4 mr-2" /> {t('settings.logout')}
             </Button>
