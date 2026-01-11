@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft } from 'lucide-react';
+import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -18,6 +18,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { TaskChecklist } from '@/components/tasks/TaskChecklist';
+import { RecurringEventForm } from '@/components/calendar/RecurringEventForm';
+import { getPatternLabel } from '@/lib/recurringEvents';
 import {
   DndContext,
   closestCenter,
@@ -52,6 +54,8 @@ interface Task {
   due_date: string | null;
   sort_order: number | null;
   task_type: string;
+  is_recurring: boolean | null;
+  recurring_pattern: string | null;
 }
 
 interface SortableTaskProps {
@@ -114,6 +118,12 @@ function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onMove, on
           {checklists.length > 0 && (
             <Badge variant="outline" className="text-xs">
               {completedCount}/{checklists.length}
+            </Badge>
+          )}
+          {task.is_recurring && (
+            <Badge variant="outline" className="text-xs flex items-center gap-1">
+              <Repeat className="h-3 w-3" />
+              {getPatternLabel(task.recurring_pattern || 'weekly')}
             </Badge>
           )}
           {task.priority && (
@@ -192,6 +202,8 @@ export default function Tasks() {
     description: '',
     priority: 'medium',
     due_date: '',
+    is_recurring: false,
+    recurring_pattern: 'weekly',
   });
 
   const sensors = useSensors(
@@ -271,6 +283,8 @@ export default function Tasks() {
       description: task.description || '',
       priority: task.priority || 'medium',
       due_date: task.due_date?.split('T')[0] || '',
+      is_recurring: task.is_recurring || false,
+      recurring_pattern: task.recurring_pattern || 'weekly',
     });
     setEditDialogOpen(true);
   };
@@ -284,6 +298,8 @@ export default function Tasks() {
       description: formData.description.trim() || null,
       priority: formData.priority,
       due_date: formData.due_date || null,
+      is_recurring: formData.is_recurring,
+      recurring_pattern: formData.is_recurring ? formData.recurring_pattern : null,
     };
 
     const { error } = await supabase.from('tasks').update(updatedData).eq('id', editingTask.id);
@@ -480,7 +496,13 @@ export default function Tasks() {
                   value={formData.due_date}
                   onChange={(e) => setFormData((f) => ({ ...f, due_date: e.target.value }))}
                 />
-              </div>
+            </div>
+            <RecurringEventForm
+              isRecurring={formData.is_recurring}
+              onIsRecurringChange={(v) => setFormData((f) => ({ ...f, is_recurring: v }))}
+              recurringPattern={formData.recurring_pattern}
+              onRecurringPatternChange={(v) => setFormData((f) => ({ ...f, recurring_pattern: v }))}
+            />
             </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
