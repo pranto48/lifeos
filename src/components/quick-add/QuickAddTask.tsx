@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Loader2 } from 'lucide-react';
+import { RecurringEventForm } from '@/components/calendar/RecurringEventForm';
 
 interface QuickAddTaskProps {
   onClose: () => void;
@@ -22,6 +23,8 @@ export function QuickAddTask({ onClose }: QuickAddTaskProps) {
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [dueDate, setDueDate] = useState('');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringPattern, setRecurringPattern] = useState('weekly');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,14 +39,18 @@ export function QuickAddTask({ onClose }: QuickAddTaskProps) {
         priority,
         due_date: dueDate || null,
         status: 'todo',
-        task_type: mode, // Set task type based on current dashboard mode
+        task_type: mode,
+        is_recurring: isRecurring,
+        recurring_pattern: isRecurring ? recurringPattern : null,
       });
 
       if (error) throw error;
 
       toast({
         title: 'Task created',
-        description: 'Your task has been added successfully.',
+        description: isRecurring 
+          ? `Your recurring task (${recurringPattern}) has been added.`
+          : 'Your task has been added successfully.',
       });
       onClose();
     } catch (error: any) {
@@ -109,6 +116,13 @@ export function QuickAddTask({ onClose }: QuickAddTaskProps) {
           />
         </div>
       </div>
+
+      <RecurringEventForm
+        isRecurring={isRecurring}
+        onIsRecurringChange={setIsRecurring}
+        recurringPattern={recurringPattern}
+        onRecurringPatternChange={setRecurringPattern}
+      />
 
       <div className="flex justify-end gap-2 pt-2">
         <Button type="button" variant="ghost" onClick={onClose}>

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks, addDays, subDays, isToday, parseISO } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, CheckSquare, Target, Heart, Plus, Clock, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, CheckSquare, Target, Heart, Plus, Clock, AlertCircle, Repeat } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { generateRecurringInstances } from '@/lib/recurringEvents';
 
 interface CalendarEvent {
   id: string;
@@ -19,6 +20,8 @@ interface CalendarEvent {
   priority?: string;
   status?: string;
   event_type?: string;
+  is_recurring?: boolean;
+  recurring_pattern?: string;
 }
 
 type ViewMode = 'month' | 'week' | 'day';
@@ -55,15 +58,13 @@ export default function Calendar() {
     const startStr = format(startDate, 'yyyy-MM-dd');
     const endStr = format(endDate, 'yyyy-MM-dd');
 
-    // Fetch tasks with due dates
+    // Fetch tasks with due dates (including recurring)
     const [tasksResult, goalsResult, familyEventsResult] = await Promise.all([
       supabase
         .from('tasks')
-        .select('id, title, due_date, priority, status')
+        .select('id, title, due_date, priority, status, is_recurring, recurring_pattern')
         .eq('user_id', user?.id)
-        .not('due_date', 'is', null)
-        .gte('due_date', startStr)
-        .lte('due_date', endStr),
+        .not('due_date', 'is', null),
       supabase
         .from('goals')
         .select('id, title, target_date, status')
@@ -84,14 +85,32 @@ export default function Calendar() {
     // Add tasks
     if (tasksResult.data) {
       tasksResult.data.forEach(task => {
-        calendarEvents.push({
+        const baseEvent: CalendarEvent = {
           id: task.id,
           title: task.title,
           date: task.due_date!,
           type: 'task',
           priority: task.priority || 'medium',
-          status: task.status || 'pending'
-        });
+          status: task.status || 'pending',
+          is_recurring: task.is_recurring || false,
+          recurring_pattern: task.recurring_pattern || undefined,
+        };
+
+        // Check if this task falls within the date range
+        const taskDate = parseISO(task.due_date!);
+        if (taskDate >= startDate && taskDate <= endDate) {
+          calendarEvents.push(baseEvent);
+        }
+
+        // Generate recurring instances
+        if (task.is_recurring && task.recurring_pattern) {
+          const recurringInstances = generateRecurringInstances(baseEvent, startDate, endDate);
+          // Filter out any that are the same as the base event date
+          const filteredInstances = recurringInstances.filter(
+            inst => inst.date !== task.due_date
+          );
+          calendarEvents.push(...filteredInstances);
+        }
       });
     }
 

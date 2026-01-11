@@ -11,6 +11,9 @@ import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
 import { UpcomingFamilyEvents } from '@/components/dashboard/UpcomingFamilyEvents';
+import { TaskCompletionChart } from '@/components/dashboard/TaskCompletionChart';
+import { ExpenseBreakdownChart } from '@/components/dashboard/ExpenseBreakdownChart';
+import { GoalProgressCards } from '@/components/dashboard/GoalProgressCards';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -181,66 +184,82 @@ export default function Dashboard() {
 
       {/* Office Mode Content */}
       {mode === 'office' ? (
-        <div className="grid md:grid-cols-2 gap-6">
-          {/* Recent Notes */}
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <FileText className="h-4 w-4" /> {t('dashboard.recentNotes')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {stats.recentNotes.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noNotesYet')}</p>
-              ) : (
-                <div className="space-y-2">
-                  {stats.recentNotes.map(note => (
-                    <div key={note.id} className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                      <p className="text-sm font-medium text-foreground truncate">{note.title}</p>
-                      <p className="text-xs text-muted-foreground">{format(new Date(note.created_at), 'MMM d')}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+        <div className="space-y-6">
+          {/* Charts Row */}
+          <div className="grid md:grid-cols-2 gap-6">
+            <TaskCompletionChart />
+            <GoalProgressCards />
+          </div>
 
-          {/* Upcoming Tasks */}
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Calendar className="h-4 w-4" /> {t('dashboard.upcomingTasks')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {stats.upcomingTasks.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noTasksYet')}</p>
-              ) : (
-                <div className="space-y-2">
-                  {stats.upcomingTasks.map(task => (
-                    <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-2 h-2 rounded-full ${
-                          task.priority === 'urgent' ? 'bg-red-500' :
-                          task.priority === 'high' ? 'bg-orange-500' :
-                          task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                        }`} />
-                        <span className="text-sm text-foreground">{task.title}</span>
+          {/* Notes and Tasks Row */}
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Recent Notes */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <FileText className="h-4 w-4" /> {t('dashboard.recentNotes')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.recentNotes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noNotesYet')}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {stats.recentNotes.map(note => (
+                      <div key={note.id} className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                        <p className="text-sm font-medium text-foreground truncate">{note.title}</p>
+                        <p className="text-xs text-muted-foreground">{format(new Date(note.created_at), 'MMM d')}</p>
                       </div>
-                      {task.due_date && (
-                        <span className="text-xs text-muted-foreground">{format(new Date(task.due_date), 'MMM d')}</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Upcoming Tasks */}
+            <Card className="bg-card border-border">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4" /> {t('dashboard.upcomingTasks')}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {stats.upcomingTasks.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noTasksYet')}</p>
+                ) : (
+                  <div className="space-y-2">
+                    {stats.upcomingTasks.map(task => (
+                      <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-2 h-2 rounded-full ${
+                            task.priority === 'urgent' ? 'bg-red-500' :
+                            task.priority === 'high' ? 'bg-orange-500' :
+                            task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                          }`} />
+                          <span className="text-sm text-foreground">{task.title}</span>
+                        </div>
+                        {task.due_date && (
+                          <span className="text-xs text-muted-foreground">{format(new Date(task.due_date), 'MMM d')}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       ) : (
         /* Personal Mode Content - Shows everything */
-        <>
-          {/* Budget Summary */}
+        <div className="space-y-6">
+          {/* Charts Row */}
+          <div className="grid md:grid-cols-3 gap-6">
+            <TaskCompletionChart />
+            <ExpenseBreakdownChart />
+            <GoalProgressCards />
+          </div>
+
+          {/* Budget Summary + Notes */}
           <div className="grid md:grid-cols-2 gap-6">
             <Card className="bg-card border-border">
               <CardHeader className="pb-2">
@@ -333,7 +352,7 @@ export default function Dashboard() {
 
             <UpcomingFamilyEvents />
           </div>
-        </>
+        </div>
       )}
     </div>
   );
