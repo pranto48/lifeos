@@ -110,6 +110,45 @@ export type Database = {
         }
         Relationships: []
       }
+      backup_schedules: {
+        Row: {
+          created_at: string
+          day_of_month: number | null
+          day_of_week: number | null
+          frequency: string
+          id: string
+          is_active: boolean
+          last_backup_at: string | null
+          next_backup_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          frequency: string
+          id?: string
+          is_active?: boolean
+          last_backup_at?: string | null
+          next_backup_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          day_of_month?: number | null
+          day_of_week?: number | null
+          frequency?: string
+          id?: string
+          is_active?: boolean
+          last_backup_at?: string | null
+          next_backup_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       budget_categories: {
         Row: {
           color: string | null
@@ -452,6 +491,48 @@ export type Database = {
           target_amount?: number | null
           target_date?: string | null
           title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      google_calendar_sync: {
+        Row: {
+          access_token: string
+          calendar_id: string | null
+          created_at: string
+          id: string
+          last_sync_at: string | null
+          refresh_token: string
+          sync_enabled: boolean
+          sync_token: string | null
+          token_expires_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          access_token: string
+          calendar_id?: string | null
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          refresh_token: string
+          sync_enabled?: boolean
+          sync_token?: string | null
+          token_expires_at: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          access_token?: string
+          calendar_id?: string | null
+          created_at?: string
+          id?: string
+          last_sync_at?: string | null
+          refresh_token?: string
+          sync_enabled?: boolean
+          sync_token?: string | null
+          token_expires_at?: string
           updated_at?: string
           user_id?: string
         }
@@ -847,6 +928,36 @@ export type Database = {
           updated_at?: string
           user_id?: string
           year?: number
+        }
+        Relationships: []
+      }
+      synced_calendar_events: {
+        Row: {
+          created_at: string
+          google_event_id: string
+          id: string
+          last_synced_at: string
+          local_event_id: string
+          local_event_type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          google_event_id: string
+          id?: string
+          last_synced_at?: string
+          local_event_id: string
+          local_event_type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          google_event_id?: string
+          id?: string
+          last_synced_at?: string
+          local_event_id?: string
+          local_event_type?: string
+          user_id?: string
         }
         Relationships: []
       }
