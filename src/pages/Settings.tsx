@@ -16,7 +16,7 @@ import { BiometricManagement } from '@/components/settings/BiometricManagement';
 import { PushNotificationSettings } from '@/components/settings/PushNotificationSettings';
 import { TrustedDevicesManagement } from '@/components/settings/TrustedDevicesManagement';
 import { DataExport } from '@/components/settings/DataExport';
-
+import { CalendarIntegrationSettings } from '@/components/settings/CalendarIntegrationSettings';
 export default function Settings() {
   const { user, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
@@ -137,6 +137,8 @@ export default function Settings() {
       <BiometricManagement />
 
       <PushNotificationSettings />
+
+      <CalendarIntegrationSettings />
 
       <Card className="bg-card border-border">
         <CardHeader>
