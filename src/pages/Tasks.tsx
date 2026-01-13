@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat } from 'lucide-react';
+import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -20,6 +20,7 @@ import { format } from 'date-fns';
 import { TaskChecklist } from '@/components/tasks/TaskChecklist';
 import { RecurringEventForm } from '@/components/calendar/RecurringEventForm';
 import { getPatternLabel } from '@/lib/recurringEvents';
+import { useTaskCategories, TaskCategory } from '@/hooks/useTaskCategories';
 import {
   DndContext,
   closestCenter,
@@ -56,11 +57,13 @@ interface Task {
   task_type: string;
   is_recurring: boolean | null;
   recurring_pattern: string | null;
+  category_id: string | null;
 }
 
 interface SortableTaskProps {
   task: Task;
   checklists: ChecklistItem[];
+  categories: TaskCategory[];
   onToggle: (id: string, completed: boolean) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
@@ -69,7 +72,7 @@ interface SortableTaskProps {
   priorityColors: Record<string, string>;
 }
 
-function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onMove, onChecklistUpdate, priorityColors }: SortableTaskProps) {
+function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete, onMove, onChecklistUpdate, priorityColors }: SortableTaskProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     attributes,
@@ -87,6 +90,7 @@ function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onMove, on
   };
 
   const completedCount = checklists.filter(c => c.is_completed).length;
+  const category = categories.find(c => c.id === task.category_id);
 
   return (
     <Card
@@ -118,6 +122,16 @@ function SortableTask({ task, checklists, onToggle, onEdit, onDelete, onMove, on
           {checklists.length > 0 && (
             <Badge variant="outline" className="text-xs">
               {completedCount}/{checklists.length}
+            </Badge>
+          )}
+          {category && (
+            <Badge 
+              variant="outline" 
+              className="text-xs flex items-center gap-1"
+              style={{ borderColor: category.color, color: category.color }}
+            >
+              <FolderOpen className="h-3 w-3" />
+              {category.name}
             </Badge>
           )}
           {task.is_recurring && (
@@ -189,6 +203,7 @@ export default function Tasks() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { mode } = useDashboardMode();
+  const { categories } = useTaskCategories();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
   const [filter, setFilter] = useState('all');
@@ -204,6 +219,7 @@ export default function Tasks() {
     due_date: '',
     is_recurring: false,
     recurring_pattern: 'weekly',
+    category_id: '',
   });
 
   const sensors = useSensors(
@@ -285,6 +301,7 @@ export default function Tasks() {
       due_date: task.due_date?.split('T')[0] || '',
       is_recurring: task.is_recurring || false,
       recurring_pattern: task.recurring_pattern || 'weekly',
+      category_id: task.category_id || '',
     });
     setEditDialogOpen(true);
   };
@@ -300,6 +317,7 @@ export default function Tasks() {
       due_date: formData.due_date || null,
       is_recurring: formData.is_recurring,
       recurring_pattern: formData.is_recurring ? formData.recurring_pattern : null,
+      category_id: formData.category_id || null,
     };
 
     const { error } = await supabase.from('tasks').update(updatedData).eq('id', editingTask.id);
@@ -421,6 +439,7 @@ export default function Tasks() {
                     key={task.id}
                     task={task}
                     checklists={checklists[task.id] || []}
+                    categories={categories}
                     onToggle={toggleTask}
                     onEdit={handleEdit}
                     onDelete={handleDelete}
@@ -490,12 +509,37 @@ export default function Tasks() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Due Date</Label>
-                <Input
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData((f) => ({ ...f, due_date: e.target.value }))}
-                />
+                <Label>Category</Label>
+                <Select
+                  value={formData.category_id}
+                  onValueChange={(v) => setFormData((f) => ({ ...f, category_id: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2 h-2 rounded-full"
+                            style={{ backgroundColor: cat.color }}
+                          />
+                          {cat.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Due Date</Label>
+              <Input
+                type="date"
+                value={formData.due_date}
+                onChange={(e) => setFormData((f) => ({ ...f, due_date: e.target.value }))}
+              />
             </div>
             <RecurringEventForm
               isRecurring={formData.is_recurring}
@@ -503,7 +547,6 @@ export default function Tasks() {
               recurringPattern={formData.recurring_pattern}
               onRecurringPatternChange={(v) => setFormData((f) => ({ ...f, recurring_pattern: v }))}
             />
-            </div>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
                 Cancel
