@@ -18,6 +18,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -27,9 +28,13 @@ serve(async (req) => {
       });
     }
 
+    // User client for user-specific operations
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     });
+
+    // Service client for reading app_secrets (bypasses RLS)
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
@@ -44,11 +49,16 @@ serve(async (req) => {
     const userId = claimsData.claims.sub;
     const { action, code, redirectUri } = await req.json();
 
-    // Get OAuth credentials from app_secrets
-    const { data: secrets } = await supabase
+    // Get OAuth credentials from app_secrets using service role (bypasses RLS)
+    const { data: secrets, error: secretsError } = await supabaseAdmin
       .from("app_secrets")
       .select("id, value")
       .in("id", ["MICROSOFT_CLIENT_ID", "MICROSOFT_CLIENT_SECRET"]);
+    
+    console.log("[Microsoft Calendar Sync] Secrets query result:", { 
+      found: secrets?.length || 0, 
+      error: secretsError?.message 
+    });
 
     const clientId = secrets?.find(s => s.id === "MICROSOFT_CLIENT_ID")?.value;
     const clientSecret = secrets?.find(s => s.id === "MICROSOFT_CLIENT_SECRET")?.value;
