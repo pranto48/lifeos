@@ -10,6 +10,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Loader2 } from 'lucide-react';
 import { RecurringEventForm } from '@/components/calendar/RecurringEventForm';
+import { useTaskCategories } from '@/hooks/useTaskCategories';
 
 interface QuickAddTaskProps {
   onClose: () => void;
@@ -18,10 +19,12 @@ interface QuickAddTaskProps {
 export function QuickAddTask({ onClose }: QuickAddTaskProps) {
   const { user } = useAuth();
   const { mode } = useDashboardMode();
+  const { categories } = useTaskCategories();
   const [loading, setLoading] = useState(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
+  const [categoryId, setCategoryId] = useState<string>('');
   const [dueDate, setDueDate] = useState('');
   const [isRecurring, setIsRecurring] = useState(false);
   const [recurringPattern, setRecurringPattern] = useState('weekly');
@@ -37,6 +40,7 @@ export function QuickAddTask({ onClose }: QuickAddTaskProps) {
         title: title.trim(),
         description: description.trim() || null,
         priority,
+        category_id: categoryId || null,
         due_date: dueDate || null,
         status: 'todo',
         task_type: mode,
@@ -106,15 +110,37 @@ export function QuickAddTask({ onClose }: QuickAddTaskProps) {
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="task-due">Due Date</Label>
-          <Input
-            id="task-due"
-            type="date"
-            value={dueDate}
-            onChange={(e) => setDueDate(e.target.value)}
-            className="bg-muted/50 border-border"
-          />
+          <Label>Category</Label>
+          <Select value={categoryId} onValueChange={setCategoryId}>
+            <SelectTrigger className="bg-muted/50 border-border">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: cat.color }}
+                    />
+                    {cat.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="task-due">Due Date</Label>
+        <Input
+          id="task-due"
+          type="date"
+          value={dueDate}
+          onChange={(e) => setDueDate(e.target.value)}
+          className="bg-muted/50 border-border"
+        />
       </div>
 
       <RecurringEventForm

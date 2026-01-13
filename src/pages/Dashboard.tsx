@@ -15,6 +15,7 @@ import { TaskCompletionChart } from '@/components/dashboard/TaskCompletionChart'
 import { ExpenseBreakdownChart } from '@/components/dashboard/ExpenseBreakdownChart';
 import { GoalProgressCards } from '@/components/dashboard/GoalProgressCards';
 import { TasksBreakdownChart } from '@/components/dashboard/TasksBreakdownChart';
+import { TaskCategoriesChart } from '@/components/dashboard/TaskCategoriesChart';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -187,9 +188,10 @@ export default function Dashboard() {
       {mode === 'office' ? (
         <div className="space-y-6">
           {/* Charts Row */}
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <TaskCompletionChart />
             <TasksBreakdownChart />
+            <TaskCategoriesChart />
             <GoalProgressCards />
           </div>
 
