@@ -186,8 +186,9 @@ export default function Dashboard() {
       {mode === 'office' ? (
         <div className="space-y-6">
           {/* Charts Row */}
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid md:grid-cols-3 gap-6">
             <TaskCompletionChart />
+            <ExpenseBreakdownChart />
             <GoalProgressCards />
           </div>
 
