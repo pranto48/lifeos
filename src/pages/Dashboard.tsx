@@ -14,6 +14,7 @@ import { UpcomingFamilyEvents } from '@/components/dashboard/UpcomingFamilyEvent
 import { TaskCompletionChart } from '@/components/dashboard/TaskCompletionChart';
 import { ExpenseBreakdownChart } from '@/components/dashboard/ExpenseBreakdownChart';
 import { GoalProgressCards } from '@/components/dashboard/GoalProgressCards';
+import { TasksBreakdownChart } from '@/components/dashboard/TasksBreakdownChart';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -188,7 +189,7 @@ export default function Dashboard() {
           {/* Charts Row */}
           <div className="grid md:grid-cols-3 gap-6">
             <TaskCompletionChart />
-            <ExpenseBreakdownChart />
+            <TasksBreakdownChart />
             <GoalProgressCards />
           </div>
 
