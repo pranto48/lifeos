@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Target } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -17,12 +18,13 @@ interface Goal {
 
 export function GoalProgressCards() {
   const { user } = useAuth();
+  const { mode } = useDashboardMode();
   const [goals, setGoals] = useState<Goal[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) loadGoals();
-  }, [user]);
+  }, [user, mode]);
 
   const loadGoals = async () => {
     setLoading(true);
@@ -31,6 +33,7 @@ export function GoalProgressCards() {
       .select('id, title, target_amount, current_amount, target_date, category')
       .eq('user_id', user?.id)
       .eq('status', 'active')
+      .eq('goal_type', mode)
       .not('target_amount', 'is', null)
       .order('created_at', { ascending: false })
       .limit(4);
