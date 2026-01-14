@@ -32,9 +32,8 @@ export function GoalProgressCards() {
       .from('goals')
       .select('id, title, target_amount, current_amount, target_date, category')
       .eq('user_id', user?.id)
-      .eq('status', 'active')
+      .in('status', ['active', 'in_progress'])
       .eq('goal_type', mode)
-      .not('target_amount', 'is', null)
       .order('created_at', { ascending: false })
       .limit(4);
 
@@ -63,14 +62,15 @@ export function GoalProgressCards() {
           </div>
         ) : goals.length === 0 ? (
           <div className="h-40 flex items-center justify-center">
-            <p className="text-sm text-muted-foreground">No active financial goals</p>
+            <p className="text-sm text-muted-foreground">No active goals</p>
           </div>
         ) : (
           <div className="space-y-4">
             {goals.map(goal => {
               const target = goal.target_amount || 0;
               const current = goal.current_amount || 0;
-              const progress = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
+              const hasFinancialTarget = target > 0;
+              const progress = hasFinancialTarget ? Math.min(100, Math.round((current / target) * 100)) : 0;
 
               return (
                 <div key={goal.id} className="space-y-1.5">
@@ -78,7 +78,11 @@ export function GoalProgressCards() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{goal.title}</p>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <span>৳{current.toLocaleString()} / ৳{target.toLocaleString()}</span>
+                        {hasFinancialTarget ? (
+                          <span>৳{current.toLocaleString()} / ৳{target.toLocaleString()}</span>
+                        ) : (
+                          <span>{goal.category || 'Goal'}</span>
+                        )}
                         {goal.target_date && (
                           <>
                             <span>•</span>
@@ -87,16 +91,20 @@ export function GoalProgressCards() {
                         )}
                       </div>
                     </div>
-                    <span className={`text-sm font-bold ${progress >= 100 ? 'text-green-500' : progress >= 70 ? 'text-primary' : 'text-muted-foreground'}`}>
-                      {progress}%
-                    </span>
+                    {hasFinancialTarget && (
+                      <span className={`text-sm font-bold ${progress >= 100 ? 'text-green-500' : progress >= 70 ? 'text-primary' : 'text-muted-foreground'}`}>
+                        {progress}%
+                      </span>
+                    )}
                   </div>
-                  <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 ${getProgressColor(progress)}`}
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
+                  {hasFinancialTarget && (
+                    <div className="h-2 bg-muted rounded-full overflow-hidden">
+                      <div 
+                        className={`h-full rounded-full transition-all duration-500 ${getProgressColor(progress)}`}
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}

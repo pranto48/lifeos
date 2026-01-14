@@ -208,6 +208,7 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
   const [filter, setFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -384,8 +385,14 @@ export default function Tasks() {
   };
 
   const filteredTasks = tasks.filter((t) => {
-    if (filter === 'completed') return t.status === 'completed';
-    if (filter === 'active') return t.status !== 'completed';
+    // Status filter
+    if (filter === 'completed' && t.status !== 'completed') return false;
+    if (filter === 'active' && t.status === 'completed') return false;
+    // Category filter
+    if (categoryFilter !== 'all') {
+      if (categoryFilter === 'uncategorized') return !t.category_id;
+      if (t.category_id !== categoryFilter) return false;
+    }
     return true;
   });
 
@@ -404,9 +411,9 @@ export default function Tasks() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-foreground">{t('tasks.title')}</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant={showCategoryManager ? 'secondary' : 'ghost'}
             size="sm"
@@ -427,6 +434,40 @@ export default function Tasks() {
             </Button>
           ))}
         </div>
+      </div>
+
+      {/* Category Filter */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-muted-foreground">Filter by category:</span>
+        <Button
+          variant={categoryFilter === 'all' ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => setCategoryFilter('all')}
+        >
+          All
+        </Button>
+        <Button
+          variant={categoryFilter === 'uncategorized' ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => setCategoryFilter('uncategorized')}
+        >
+          Uncategorized
+        </Button>
+        {categories.map((cat) => (
+          <Button
+            key={cat.id}
+            variant={categoryFilter === cat.id ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setCategoryFilter(cat.id)}
+            className="gap-1"
+          >
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: cat.color }}
+            />
+            {cat.name}
+          </Button>
+        ))}
       </div>
 
       {showCategoryManager && (
