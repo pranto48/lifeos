@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen, Settings2 } from 'lucide-react';
+import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen, Settings2, CheckCheck } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -22,6 +22,7 @@ import { RecurringEventForm } from '@/components/calendar/RecurringEventForm';
 import { getPatternLabel } from '@/lib/recurringEvents';
 import { useTaskCategories, TaskCategory } from '@/hooks/useTaskCategories';
 import { TaskCategoryManager } from '@/components/tasks/TaskCategoryManager';
+import { BulkCategoryAssign } from '@/components/tasks/BulkCategoryAssign';
 import {
   DndContext,
   closestCenter,
@@ -71,9 +72,12 @@ interface SortableTaskProps {
   onMove: (id: string, currentType: string) => void;
   onChecklistUpdate: () => void;
   priorityColors: Record<string, string>;
+  selectionMode: boolean;
+  isSelected: boolean;
+  onSelectionChange: (id: string, selected: boolean) => void;
 }
 
-function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete, onMove, onChecklistUpdate, priorityColors }: SortableTaskProps) {
+function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete, onMove, onChecklistUpdate, priorityColors, selectionMode, isSelected, onSelectionChange }: SortableTaskProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     attributes,
@@ -97,17 +101,24 @@ function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete
     <Card
       ref={setNodeRef}
       style={style}
-      className="bg-card border-border hover:bg-muted/30 transition-colors"
+      className={`bg-card border-border hover:bg-muted/30 transition-colors ${isSelected ? 'ring-2 ring-primary' : ''}`}
     >
       <CardContent className="p-4">
         <div className="flex items-center gap-4">
-          <button
-            {...attributes}
-            {...listeners}
-            className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
-          >
-            <GripVertical className="h-4 w-4 text-muted-foreground" />
-          </button>
+          {selectionMode ? (
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={(c) => onSelectionChange(task.id, !!c)}
+            />
+          ) : (
+            <button
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 hover:bg-muted rounded"
+            >
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
+            </button>
+          )}
           <Checkbox
             checked={task.status === 'completed'}
             onCheckedChange={(c) => onToggle(task.id, !!c)}
@@ -204,12 +215,14 @@ export default function Tasks() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { mode } = useDashboardMode();
-  const { categories } = useTaskCategories();
+  const { categories, reload: reloadCategories } = useTaskCategories();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
   const [filter, setFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showCategoryManager, setShowCategoryManager] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [page, setPage] = useState(0);
@@ -415,6 +428,18 @@ export default function Tasks() {
         <h1 className="text-2xl font-bold text-foreground">{t('tasks.title')}</h1>
         <div className="flex flex-wrap gap-2">
           <Button
+            variant={selectionMode ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => {
+              setSelectionMode(!selectionMode);
+              setSelectedTaskIds([]);
+            }}
+            className="gap-1"
+          >
+            <CheckCheck className="h-4 w-4" />
+            Bulk Edit
+          </Button>
+          <Button
             variant={showCategoryManager ? 'secondary' : 'ghost'}
             size="sm"
             onClick={() => setShowCategoryManager(!showCategoryManager)}
@@ -484,6 +509,21 @@ export default function Tasks() {
           </Card>
         ) : (
           <>
+            {selectionMode && selectedTaskIds.length > 0 && (
+              <BulkCategoryAssign
+                selectedTaskIds={selectedTaskIds}
+                categories={categories}
+                onComplete={() => {
+                  setSelectedTaskIds([]);
+                  setSelectionMode(false);
+                  loadData(0, true);
+                }}
+                onCancel={() => {
+                  setSelectedTaskIds([]);
+                  setSelectionMode(false);
+                }}
+              />
+            )}
             <DndContext
               sensors={sensors}
               collisionDetection={closestCenter}
@@ -502,6 +542,13 @@ export default function Tasks() {
                     onMove={handleMove}
                     onChecklistUpdate={() => loadData(0, true)}
                     priorityColors={priorityColors}
+                    selectionMode={selectionMode}
+                    isSelected={selectedTaskIds.includes(task.id)}
+                    onSelectionChange={(id, selected) => {
+                      setSelectedTaskIds(prev => 
+                        selected ? [...prev, id] : prev.filter(tid => tid !== id)
+                      );
+                    }}
                   />
                 ))}
               </SortableContext>
