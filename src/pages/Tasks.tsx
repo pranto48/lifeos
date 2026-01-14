@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen } from 'lucide-react';
+import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen, Settings2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -21,6 +21,7 @@ import { TaskChecklist } from '@/components/tasks/TaskChecklist';
 import { RecurringEventForm } from '@/components/calendar/RecurringEventForm';
 import { getPatternLabel } from '@/lib/recurringEvents';
 import { useTaskCategories, TaskCategory } from '@/hooks/useTaskCategories';
+import { TaskCategoryManager } from '@/components/tasks/TaskCategoryManager';
 import {
   DndContext,
   closestCenter,
@@ -207,6 +208,7 @@ export default function Tasks() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
   const [filter, setFilter] = useState('all');
+  const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [page, setPage] = useState(0);
@@ -405,6 +407,15 @@ export default function Tasks() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">{t('tasks.title')}</h1>
         <div className="flex gap-2">
+          <Button
+            variant={showCategoryManager ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setShowCategoryManager(!showCategoryManager)}
+            className="gap-1"
+          >
+            <Settings2 className="h-4 w-4" />
+            Categories
+          </Button>
           {['all', 'active', 'completed'].map((f) => (
             <Button
               key={f}
@@ -417,6 +428,10 @@ export default function Tasks() {
           ))}
         </div>
       </div>
+
+      {showCategoryManager && (
+        <TaskCategoryManager />
+      )}
 
       <div className="space-y-2">
         {filteredTasks.length === 0 ? (
