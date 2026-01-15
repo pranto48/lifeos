@@ -462,37 +462,28 @@ export default function Tasks() {
       </div>
 
       {/* Category Filter */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex items-center gap-3">
         <span className="text-sm text-muted-foreground">Filter by category:</span>
-        <Button
-          variant={categoryFilter === 'all' ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => setCategoryFilter('all')}
-        >
-          All
-        </Button>
-        <Button
-          variant={categoryFilter === 'uncategorized' ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => setCategoryFilter('uncategorized')}
-        >
-          Uncategorized
-        </Button>
-        {categories.map((cat) => (
-          <Button
-            key={cat.id}
-            variant={categoryFilter === cat.id ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setCategoryFilter(cat.id)}
-            className="gap-1"
-          >
-            <div
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: cat.color }}
-            />
-            {cat.name}
-          </Button>
-        ))}
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="uncategorized">Uncategorized</SelectItem>
+            {categories.map((cat) => (
+              <SelectItem key={cat.id} value={cat.id}>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: cat.color }}
+                  />
+                  {cat.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {showCategoryManager && (
