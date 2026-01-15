@@ -105,12 +105,22 @@ export default function Dashboard() {
     return t('dashboard.goodEvening');
   };
 
-  const statCards = [
+  // Office mode stats don't show financial goals
+  const officeStatCards = [
+    { title: t('dashboard.todayTasks'), value: stats.todayTasks, icon: CheckSquare, color: 'text-blue-400' },
+    { title: t('dashboard.overdue'), value: stats.overdueTasks, icon: Clock, color: 'text-red-400' },
+    { title: t('dashboard.completed'), value: stats.completedTasks, icon: CheckSquare, color: 'text-green-400' },
+  ];
+
+  // Personal mode stats include goals
+  const personalStatCards = [
     { title: t('dashboard.todayTasks'), value: stats.todayTasks, icon: CheckSquare, color: 'text-blue-400' },
     { title: t('dashboard.overdue'), value: stats.overdueTasks, icon: Clock, color: 'text-red-400' },
     { title: t('dashboard.activeGoals'), value: stats.activeGoals, icon: Target, color: 'text-yellow-400' },
     { title: t('dashboard.completed'), value: stats.completedTasks, icon: CheckSquare, color: 'text-green-400' },
   ];
+
+  const statCards = mode === 'office' ? officeStatCards : personalStatCards;
 
   const modeCountCards = mode === 'office' 
     ? [
@@ -142,7 +152,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className={`grid ${mode === 'office' ? 'grid-cols-3' : 'grid-cols-2 md:grid-cols-4'} gap-4`}>
         {statCards.map((stat, i) => (
           <motion.div
             key={stat.title}
@@ -187,18 +197,15 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Office Mode Content */}
+      {/* Office Mode Content - No Financial Charts */}
       {mode === 'office' ? (
         <div className="space-y-6">
-          {/* Charts Row */}
+          {/* Charts Row - Task focused only */}
           <div className="grid md:grid-cols-3 gap-6">
             <TaskCompletionChart />
             <TasksBreakdownChart />
             <TaskCategoriesChart />
           </div>
-
-          {/* Goal Progress Chart */}
-          <GoalProgressChart goals={stats.goals} />
 
           {/* Notes and Tasks Row */}
           <div className="grid md:grid-cols-2 gap-6">
@@ -259,7 +266,7 @@ export default function Dashboard() {
           </div>
         </div>
       ) : (
-        /* Personal Mode Content - Shows everything */
+        /* Personal Mode Content - Shows everything including finances */
         <div className="space-y-6">
           {/* Charts Row */}
           <div className="grid md:grid-cols-3 gap-6">
@@ -267,6 +274,9 @@ export default function Dashboard() {
             <ExpenseBreakdownChart />
             <GoalProgressCards />
           </div>
+
+          {/* Goal Progress Chart */}
+          <GoalProgressChart goals={stats.goals} />
 
           {/* Budget Summary + Notes */}
           <div className="grid md:grid-cols-2 gap-6">
