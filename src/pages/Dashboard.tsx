@@ -16,6 +16,7 @@ import { ExpenseBreakdownChart } from '@/components/dashboard/ExpenseBreakdownCh
 import { GoalProgressCards } from '@/components/dashboard/GoalProgressCards';
 import { TasksBreakdownChart } from '@/components/dashboard/TasksBreakdownChart';
 import { TaskCategoriesChart } from '@/components/dashboard/TaskCategoriesChart';
+import GoalProgressChart from '@/components/goals/GoalProgressChart';
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -36,12 +37,13 @@ export default function Dashboard() {
     personalNotes: 0,
     officeProjects: 0,
     personalProjects: 0,
+    goals: [] as any[],
   });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) loadDashboardData();
-  }, [user]);
+  }, [user, mode]);
 
   const loadDashboardData = async () => {
     const today = new Date().toISOString().split('T')[0];
@@ -51,7 +53,7 @@ export default function Dashboard() {
       supabase.from('tasks').select('*').eq('user_id', user?.id),
       supabase.from('notes').select('*').eq('user_id', user?.id).order('created_at', { ascending: false }),
       supabase.from('transactions').select('*').eq('user_id', user?.id).gte('date', startOfMonth.split('T')[0]),
-      supabase.from('goals').select('*').eq('user_id', user?.id).eq('status', 'active'),
+      supabase.from('goals').select('*').eq('user_id', user?.id).in('status', ['active', 'in_progress']).eq('goal_type', mode),
       supabase.from('projects').select('id, project_type').eq('user_id', user?.id),
     ]);
 
@@ -91,6 +93,7 @@ export default function Dashboard() {
       personalNotes,
       officeProjects,
       personalProjects,
+      goals: goalsRes.data || [],
     });
     setLoading(false);
   };
@@ -188,12 +191,14 @@ export default function Dashboard() {
       {mode === 'office' ? (
         <div className="space-y-6">
           {/* Charts Row */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-3 gap-6">
             <TaskCompletionChart />
             <TasksBreakdownChart />
             <TaskCategoriesChart />
-            <GoalProgressCards />
           </div>
+
+          {/* Goal Progress Chart */}
+          <GoalProgressChart goals={stats.goals} />
 
           {/* Notes and Tasks Row */}
           <div className="grid md:grid-cols-2 gap-6">
