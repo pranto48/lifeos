@@ -78,8 +78,8 @@ serve(async (req) => {
         "https://www.googleapis.com/auth/calendar.events",
       ];
 
-      const baseUrl = Deno.env.get("SUPABASE_URL")?.replace(".supabase.co", "");
-      const callbackUrl = `${baseUrl}.supabase.co/functions/v1/google-calendar-sync`;
+      // Use the custom domain redirect URI that matches Google Cloud Console settings
+      const callbackUrl = redirectUri || "https://my.arifmahmud.com";
 
       const authUrl = `${GOOGLE_OAUTH_URL}?` + new URLSearchParams({
         client_id: clientId,
@@ -91,7 +91,9 @@ serve(async (req) => {
         state: userId,
       });
 
-      return new Response(JSON.stringify({ authUrl }), {
+      console.log("[Google Calendar Sync] Generated auth URL with redirect:", callbackUrl);
+
+      return new Response(JSON.stringify({ authUrl, callbackUrl }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

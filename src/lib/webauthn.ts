@@ -27,8 +27,9 @@ export async function detectWebAuthnCapabilities(): Promise<WebAuthnCapabilities
     }
   }
   
-  // Biometrics work on Android Chrome, but Safari on iOS doesn't support WebAuthn for biometrics well
-  const canUseBiometrics = isSupported && isPlatformAuthenticatorAvailable && !isIOS;
+  // Biometrics work on Android Chrome AND iOS Safari 14+ supports WebAuthn
+  // Enable for all platforms that have platform authenticator available
+  const canUseBiometrics = isSupported && isPlatformAuthenticatorAvailable;
   
   return {
     isSupported,
