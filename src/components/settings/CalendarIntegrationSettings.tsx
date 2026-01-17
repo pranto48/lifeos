@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Calendar, RefreshCw, Link, Unlink, Eye, EyeOff, Save, HelpCircle, X, ExternalLink } from 'lucide-react';
+import { Calendar, RefreshCw, Link, Unlink, Eye, EyeOff, Save, HelpCircle, X, ExternalLink, AlertTriangle, CheckCircle2, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -51,6 +51,7 @@ export function CalendarIntegrationSettings() {
   // Help dialog state
   const [showGoogleHelp, setShowGoogleHelp] = useState(false);
   const [showMicrosoftHelp, setShowMicrosoftHelp] = useState(false);
+  const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -710,6 +711,18 @@ export function CalendarIntegrationSettings() {
               </div>
             </TabsContent>
           </Tabs>
+
+          {/* Troubleshooting Button */}
+          <div className="mt-6 pt-4 border-t border-border">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowTroubleshooting(true)}
+              className="w-full gap-2"
+            >
+              <AlertTriangle className="h-4 w-4" />
+              {language === 'bn' ? 'সমস্যা সমাধান গাইড' : 'Troubleshooting Guide'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -796,20 +809,24 @@ export function CalendarIntegrationSettings() {
                   Add Authorized Redirect URI
                 </h3>
                 <div className="pl-8 space-y-2">
-                  <p className="text-muted-foreground">Under "Authorized redirect URIs", add:</p>
-                  <div className="bg-muted p-3 rounded-md font-mono text-xs break-all">
-                    {redirectUri}
+                  <p className="text-muted-foreground">Under "Authorized redirect URIs", add this <strong>exact</strong> URL:</p>
+                  <div className="bg-muted p-3 rounded-md font-mono text-xs break-all flex items-center justify-between gap-2">
+                    <span>{redirectUri}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(redirectUri);
+                        toast({ title: 'Copied!', description: 'Redirect URI copied to clipboard' });
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => {
-                      navigator.clipboard.writeText(redirectUri);
-                      toast({ title: 'Copied!', description: 'Redirect URI copied to clipboard' });
-                    }}
-                  >
-                    Copy URI
-                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    This URL must match <strong>exactly</strong> including the /settings path. Do not add trailing slashes.
+                  </p>
                 </div>
               </div>
 
@@ -825,9 +842,50 @@ export function CalendarIntegrationSettings() {
                 </ul>
               </div>
 
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mt-4">
-                <p className="text-yellow-600 dark:text-yellow-400 text-sm">
-                  <strong>Note:</strong> While your app is in testing mode, you may need to add your email as a test user under "OAuth consent screen" → "Test users".
+              {/* Critical: Add Test Users Section */}
+              <div className="space-y-3 bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-base flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-white text-xs">8</span>
+                  Add Test Users (Required for Testing Mode)
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  While your app is in "Testing" status (not yet published), you <strong>must</strong> add users who can access the app:
+                </p>
+                <ul className="text-muted-foreground pl-4 space-y-1 list-disc list-inside text-sm">
+                  <li>Go to "APIs & Services" → "OAuth consent screen"</li>
+                  <li>Scroll down to "Test users" section</li>
+                  <li>Click "+ ADD USERS"</li>
+                  <li>Enter the Gmail addresses of users who need access (including your own)</li>
+                  <li>Click "Save"</li>
+                </ul>
+                <div className="bg-orange-500/20 rounded p-2 mt-2">
+                  <p className="text-xs text-orange-700 dark:text-orange-300">
+                    <strong>⚠️ Without adding test users, you'll get a "403: access_denied" error</strong> saying the app hasn't completed the Google verification process.
+                  </p>
+                </div>
+              </div>
+
+              {/* Publishing Option */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">9</span>
+                  Optional: Publish Your App
+                </h3>
+                <p className="text-muted-foreground pl-8 text-sm">
+                  To allow any Google user to connect (without adding them as test users):
+                </p>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside text-sm">
+                  <li>Go to "OAuth consent screen"</li>
+                  <li>Click "PUBLISH APP" button</li>
+                  <li>Confirm the publishing action</li>
+                  <li>For apps accessing sensitive scopes, Google may require verification</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mt-4">
+                <p className="text-green-600 dark:text-green-400 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <strong>Quick Fix:</strong> If you see "Access blocked" error, add your email as a test user in step 8.
                 </p>
               </div>
             </div>
@@ -874,26 +932,42 @@ export function CalendarIntegrationSettings() {
                 </ul>
               </div>
 
-              <div className="space-y-3">
-                <h3 className="font-semibold text-base flex items-center gap-2">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">3</span>
-                  Add Redirect URI
+              {/* Critical: Redirect URI Configuration */}
+              <div className="space-y-3 bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-base flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-white text-xs">3</span>
+                  Add Redirect URI (Critical Step!)
                 </h3>
-                <div className="pl-8 space-y-2">
-                  <p className="text-muted-foreground">Under "Redirect URI", select "Web" and add:</p>
-                  <div className="bg-muted p-3 rounded-md font-mono text-xs break-all">
-                    {redirectUri}
+                <p className="text-sm text-muted-foreground">
+                  This is the most common source of errors. The redirect URI must match <strong>exactly</strong>:
+                </p>
+                <div className="space-y-3 pl-4">
+                  <div>
+                    <p className="text-xs font-medium mb-1">Platform: Select "Web"</p>
+                    <p className="text-xs font-medium mb-1">Redirect URI (copy exactly):</p>
+                    <div className="bg-muted p-3 rounded-md font-mono text-xs break-all flex items-center justify-between gap-2">
+                      <span>{redirectUri}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(redirectUri);
+                          toast({ title: 'Copied!', description: 'Redirect URI copied to clipboard' });
+                        }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => {
-                      navigator.clipboard.writeText(redirectUri);
-                      toast({ title: 'Copied!', description: 'Redirect URI copied to clipboard' });
-                    }}
-                  >
-                    Copy URI
-                  </Button>
+                  <div className="bg-orange-500/20 rounded p-2">
+                    <p className="text-xs text-orange-700 dark:text-orange-300">
+                      <strong>⚠️ Common mistakes:</strong>
+                      <br />• Do NOT use trailing slashes (wrong: .../settings/)
+                      <br />• Do NOT use http:// (must be https://)
+                      <br />• Include the full path with /settings
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -947,10 +1021,207 @@ export function CalendarIntegrationSettings() {
                 </ul>
               </div>
 
-              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mt-4">
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mt-4">
+                <p className="text-green-600 dark:text-green-400 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <strong>Quick Fix:</strong> If you see "AADSTS50011" error, verify the redirect URI matches exactly.
+                </p>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mt-2">
                 <p className="text-blue-600 dark:text-blue-400 text-sm">
                   <strong>Tip:</strong> For personal Microsoft accounts, make sure you selected "Personal Microsoft accounts" during app registration.
                 </p>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Troubleshooting Dialog */}
+      <Dialog open={showTroubleshooting} onOpenChange={setShowTroubleshooting}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              {language === 'bn' ? 'সমস্যা সমাধান গাইড' : 'Troubleshooting Guide'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'bn' 
+                ? 'সাধারণ OAuth ত্রুটি এবং তাদের সমাধান' 
+                : 'Common OAuth errors and how to fix them'}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6 text-sm">
+              {/* Google Errors Section */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-base text-foreground border-b pb-2">
+                  Google Calendar Errors
+                </h3>
+
+                {/* 403 Access Denied */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Error 403: access_denied
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "Access blocked: [app] has not completed the Google verification process"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li><strong>Add yourself as a test user:</strong> Go to Google Cloud Console → APIs & Services → OAuth consent screen → Test users → Add Users</li>
+                      <li><strong>Publish your app:</strong> If you want anyone to use it, click "PUBLISH APP" on the OAuth consent screen</li>
+                      <li><strong>Check app status:</strong> Ensure your app isn't in "Needs verification" status</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Redirect URI Mismatch */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    redirect_uri_mismatch
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "The redirect URI in the request does not match the ones authorized"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Go to Google Cloud Console → Credentials → Your OAuth client</li>
+                      <li>Add this exact URI to "Authorized redirect URIs":</li>
+                    </ul>
+                    <div className="bg-muted p-2 rounded font-mono text-xs break-all flex items-center justify-between gap-2 mt-1">
+                      <span>{redirectUri}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-5 w-5 shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(redirectUri);
+                          toast({ title: 'Copied!' });
+                        }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Invalid Client */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    invalid_client
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "The OAuth client was not found"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Verify your Client ID is correct (no extra spaces)</li>
+                      <li>Check that the Client Secret hasn't expired or been deleted</li>
+                      <li>Ensure you're using the correct Google Cloud project</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Microsoft Errors Section */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-base text-foreground border-b pb-2">
+                  Microsoft Outlook Errors
+                </h3>
+
+                {/* AADSTS50011 */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    AADSTS50011: Redirect URI mismatch
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "The redirect URI specified in the request does not match"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Go to Azure Portal → Microsoft Entra ID → App registrations → Your app</li>
+                      <li>Click "Authentication" in the left menu</li>
+                      <li>Under "Platform configurations", add or update the redirect URI:</li>
+                    </ul>
+                    <div className="bg-muted p-2 rounded font-mono text-xs break-all flex items-center justify-between gap-2 mt-1">
+                      <span>{redirectUri}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-5 w-5 shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(redirectUri);
+                          toast({ title: 'Copied!' });
+                        }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+                      ⚠️ Make sure to select "Web" as the platform type, not "SPA" or "Mobile"
+                    </p>
+                  </div>
+                </div>
+
+                {/* AADSTS700016 */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    AADSTS700016: Application not found
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "Application with identifier was not found in the directory"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Verify the Application (Client) ID is correct</li>
+                      <li>Check you're using the ID from the correct Azure tenant</li>
+                      <li>Ensure the app registration hasn't been deleted</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Consent Required */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    AADSTS65001: Consent required
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "The user or administrator has not consented to use the application"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Go to Azure Portal → Your app → API permissions</li>
+                      <li>Click "Grant admin consent" if you're an admin</li>
+                      <li>Or remove and re-add the permissions</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* General Tips */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 space-y-2">
+                <h4 className="font-medium text-blue-600 dark:text-blue-400">General Tips</h4>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Always use HTTPS for redirect URIs in production</li>
+                  <li>Clear browser cookies if you're stuck in an error loop</li>
+                  <li>Try using an incognito/private window for testing</li>
+                  <li>Check that your domain matches exactly (including www or subdomain)</li>
+                  <li>Credential changes may take a few minutes to propagate</li>
+                </ul>
               </div>
             </div>
           </ScrollArea>
