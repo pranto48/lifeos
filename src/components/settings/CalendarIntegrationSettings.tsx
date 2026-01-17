@@ -63,8 +63,12 @@ export function CalendarIntegrationSettings() {
       const state = urlParams.get('state');
       
       if (code && state) {
-        // Exchange the code for tokens
-        handleOAuthCallback(code, state);
+        // Exchange the code for tokens based on the provider
+        if (state === 'microsoft_calendar') {
+          handleMicrosoftOAuthCallback(code);
+        } else {
+          handleOAuthCallback(code, state);
+        }
         // Clean up the URL
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -101,6 +105,41 @@ export function CalendarIntegrationSettings() {
       toast({
         title: language === 'bn' ? 'ত্রুটি' : 'Error',
         description: error.message || 'Failed to connect Google Calendar',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleMicrosoftOAuthCallback = async (code: string) => {
+    try {
+      toast({
+        title: language === 'bn' ? 'সংযোগ করা হচ্ছে...' : 'Connecting...',
+        description: language === 'bn' ? 'Outlook Calendar সংযোগ করা হচ্ছে' : 'Connecting to Outlook Calendar'
+      });
+
+      const redirectUri = window.location.origin + window.location.pathname;
+      
+      const { data, error } = await supabase.functions.invoke('microsoft-calendar-sync', {
+        body: { 
+          action: 'exchange_code', 
+          code, 
+          redirectUri 
+        }
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: language === 'bn' ? 'সংযুক্ত!' : 'Connected!',
+        description: language === 'bn' ? 'Outlook Calendar সফলভাবে সংযুক্ত হয়েছে' : 'Outlook Calendar connected successfully'
+      });
+
+      loadCalendarSyncStatus();
+    } catch (error: any) {
+      console.error('Microsoft OAuth callback error:', error);
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: error.message || 'Failed to connect Outlook Calendar',
         variant: 'destructive'
       });
     }
@@ -269,18 +308,18 @@ export function CalendarIntegrationSettings() {
   const connectMicrosoftCalendar = async () => {
     setConnectingMicrosoft(true);
     try {
+      // Use the custom domain that's configured in Azure Portal
+      const redirectUri = window.location.origin;
+      
       const { data, error } = await supabase.functions.invoke('microsoft-calendar-sync', {
-        body: { action: 'get_auth_url' }
+        body: { action: 'get_auth_url', redirectUri }
       });
 
       if (error) throw error;
 
       if (data?.authUrl) {
-        window.open(data.authUrl, '_blank', 'width=500,height=600');
-        toast({
-          title: language === 'bn' ? 'অনুমোদন প্রয়োজন' : 'Authorization Required',
-          description: language === 'bn' ? 'Microsoft সাথে সংযোগ করতে নতুন উইন্ডোতে লগইন করুন' : 'Please log in to Microsoft in the new window to connect'
-        });
+        // Open OAuth in same window for proper redirect handling
+        window.location.href = data.authUrl;
       }
     } catch (error: any) {
       toast({

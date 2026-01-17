@@ -79,8 +79,10 @@ serve(async (req) => {
         "User.Read",
       ];
 
-      const baseUrl = Deno.env.get("SUPABASE_URL")?.replace(".supabase.co", "");
-      const callbackUrl = `${baseUrl}.supabase.co/functions/v1/microsoft-calendar-sync`;
+      // Use the redirectUri from the client (user's domain + /settings)
+      const callbackUrl = redirectUri ? `${redirectUri}/settings` : "https://my.arifmahmud.com/settings";
+
+      console.log(`[Microsoft Calendar Sync] Generated auth URL with redirect: ${callbackUrl}`);
 
       const authUrl = `${MICROSOFT_AUTH_URL}?` + new URLSearchParams({
         client_id: clientId,
@@ -88,7 +90,7 @@ serve(async (req) => {
         response_type: "code",
         scope: scopes.join(" "),
         response_mode: "query",
-        state: userId,
+        state: "microsoft_calendar",
       });
 
       return new Response(JSON.stringify({ authUrl }), {
