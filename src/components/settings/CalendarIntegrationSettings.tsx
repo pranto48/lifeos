@@ -53,6 +53,13 @@ export function CalendarIntegrationSettings() {
   const [showMicrosoftHelp, setShowMicrosoftHelp] = useState(false);
   const [showTroubleshooting, setShowTroubleshooting] = useState(false);
 
+  // Get the redirect URI - this must be consistent across auth URL generation and code exchange
+  const getRedirectUri = () => {
+    // Always use origin + /settings for the redirect URI
+    // This must match exactly what's registered in Azure Portal / Google Cloud Console
+    return `${window.location.origin}/settings`;
+  };
+
   useEffect(() => {
     if (user) {
       loadCalendarSyncStatus();
@@ -83,7 +90,8 @@ export function CalendarIntegrationSettings() {
         description: language === 'bn' ? 'Google Calendar সংযোগ করা হচ্ছে' : 'Connecting to Google Calendar'
       });
 
-      const redirectUri = window.location.origin + window.location.pathname;
+      // Use the same redirect URI that was used to generate the auth URL
+      const redirectUri = getRedirectUri();
       
       const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
         body: { 
@@ -118,7 +126,11 @@ export function CalendarIntegrationSettings() {
         description: language === 'bn' ? 'Outlook Calendar সংযোগ করা হচ্ছে' : 'Connecting to Outlook Calendar'
       });
 
-      const redirectUri = window.location.origin + window.location.pathname;
+      // Use the same redirect URI that was used to generate the auth URL
+      // This MUST match exactly or Microsoft will reject the token exchange
+      const redirectUri = getRedirectUri();
+      
+      console.log('[Microsoft OAuth] Exchanging code with redirect_uri:', redirectUri);
       
       const { data, error } = await supabase.functions.invoke('microsoft-calendar-sync', {
         body: { 
@@ -282,8 +294,8 @@ export function CalendarIntegrationSettings() {
   const connectGoogleCalendar = async () => {
     setConnectingGoogle(true);
     try {
-      // Use the custom domain that's configured in Google Cloud Console
-      const redirectUri = window.location.origin;
+      // Use the consistent redirect URI
+      const redirectUri = getRedirectUri();
       
       const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
         body: { action: 'get_auth_url', redirectUri }
@@ -309,8 +321,10 @@ export function CalendarIntegrationSettings() {
   const connectMicrosoftCalendar = async () => {
     setConnectingMicrosoft(true);
     try {
-      // Use the custom domain that's configured in Azure Portal
-      const redirectUri = window.location.origin;
+      // Use the consistent redirect URI - MUST include /settings to match Azure Portal config
+      const redirectUri = getRedirectUri();
+      
+      console.log('[Microsoft OAuth] Requesting auth URL with redirect_uri:', redirectUri);
       
       const { data, error } = await supabase.functions.invoke('microsoft-calendar-sync', {
         body: { action: 'get_auth_url', redirectUri }
@@ -319,6 +333,7 @@ export function CalendarIntegrationSettings() {
       if (error) throw error;
 
       if (data?.authUrl) {
+        console.log('[Microsoft OAuth] Redirecting to auth URL');
         // Open OAuth in same window for proper redirect handling
         window.location.href = data.authUrl;
       }
@@ -449,7 +464,7 @@ export function CalendarIntegrationSettings() {
     }
   };
 
-  const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/settings` : '';
+  const redirectUri = typeof window !== 'undefined' ? getRedirectUri() : '';
 
   return (
     <>
