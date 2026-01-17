@@ -139,28 +139,18 @@ export function CalendarIntegrationSettings() {
 
   const loadStoredCredentials = async () => {
     try {
-      const { data: secrets } = await supabase
-        .from('app_secrets')
-        .select('id, value')
-        .in('id', ['GOOGLE_CLIENT_ID', 'GOOGLE_CLIENT_SECRET', 'MICROSOFT_CLIENT_ID', 'MICROSOFT_CLIENT_SECRET']);
+      const { data, error } = await supabase.functions.invoke('save-calendar-credentials', {
+        body: { action: 'get' }
+      });
       
-      if (secrets) {
-        secrets.forEach(secret => {
-          switch (secret.id) {
-            case 'GOOGLE_CLIENT_ID':
-              setGoogleClientId(secret.value || '');
-              break;
-            case 'GOOGLE_CLIENT_SECRET':
-              setGoogleClientSecret(secret.value ? '••••••••••••' : '');
-              break;
-            case 'MICROSOFT_CLIENT_ID':
-              setMicrosoftClientId(secret.value || '');
-              break;
-            case 'MICROSOFT_CLIENT_SECRET':
-              setMicrosoftClientSecret(secret.value ? '••••••••••••' : '');
-              break;
-          }
-        });
+      if (error) throw error;
+      
+      if (data?.credentials) {
+        const creds = data.credentials;
+        setGoogleClientId(creds.GOOGLE_CLIENT_ID || '');
+        setGoogleClientSecret(creds.GOOGLE_CLIENT_SECRET || '');
+        setMicrosoftClientId(creds.MICROSOFT_CLIENT_ID || '');
+        setMicrosoftClientSecret(creds.MICROSOFT_CLIENT_SECRET || '');
       }
     } catch (error) {
       console.log('Could not load stored credentials');
@@ -179,28 +169,22 @@ export function CalendarIntegrationSettings() {
 
     setSavingGoogle(true);
     try {
-      // Save Client ID
-      const { error: idError } = await supabase
-        .from('app_secrets')
-        .upsert({ id: 'GOOGLE_CLIENT_ID', value: googleClientId.trim() }, { onConflict: 'id' });
+      const { data, error } = await supabase.functions.invoke('save-calendar-credentials', {
+        body: { 
+          action: 'save',
+          provider: 'google',
+          clientId: googleClientId.trim(),
+          clientSecret: googleClientSecret
+        }
+      });
       
-      if (idError) throw idError;
-      
-      // Only save secret if it's not the masked value
-      if (googleClientSecret && !googleClientSecret.includes('••••')) {
-        const { error: secretError } = await supabase
-          .from('app_secrets')
-          .upsert({ id: 'GOOGLE_CLIENT_SECRET', value: googleClientSecret.trim() }, { onConflict: 'id' });
-        
-        if (secretError) throw secretError;
-      }
+      if (error) throw error;
 
       toast({
         title: language === 'bn' ? 'সংরক্ষিত' : 'Saved',
         description: language === 'bn' ? 'Google credentials সংরক্ষিত হয়েছে' : 'Google credentials saved successfully'
       });
       
-      // Reload to verify
       loadStoredCredentials();
     } catch (error: any) {
       console.error('Save error:', error);
@@ -226,19 +210,16 @@ export function CalendarIntegrationSettings() {
 
     setSavingMicrosoft(true);
     try {
-      const { error: idError } = await supabase
-        .from('app_secrets')
-        .upsert({ id: 'MICROSOFT_CLIENT_ID', value: microsoftClientId.trim() }, { onConflict: 'id' });
+      const { data, error } = await supabase.functions.invoke('save-calendar-credentials', {
+        body: { 
+          action: 'save',
+          provider: 'microsoft',
+          clientId: microsoftClientId.trim(),
+          clientSecret: microsoftClientSecret
+        }
+      });
       
-      if (idError) throw idError;
-      
-      if (microsoftClientSecret && !microsoftClientSecret.includes('••••')) {
-        const { error: secretError } = await supabase
-          .from('app_secrets')
-          .upsert({ id: 'MICROSOFT_CLIENT_SECRET', value: microsoftClientSecret.trim() }, { onConflict: 'id' });
-        
-        if (secretError) throw secretError;
-      }
+      if (error) throw error;
 
       toast({
         title: language === 'bn' ? 'সংরক্ষিত' : 'Saved',
