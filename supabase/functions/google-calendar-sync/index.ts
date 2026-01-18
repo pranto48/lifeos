@@ -140,11 +140,13 @@ serve(async (req) => {
     }
 
     if (action === "sync") {
-      const { data: syncConfig } = await supabase
+      // Get Google config (calendar_id is "primary" or doesn't start with "outlook_")
+      const { data: syncConfigs } = await supabase
         .from("google_calendar_sync")
         .select("*")
-        .eq("user_id", userId)
-        .single();
+        .eq("user_id", userId);
+
+      const syncConfig = syncConfigs?.find(c => !c.calendar_id?.startsWith("outlook_"));
 
       if (!syncConfig) {
         return new Response(JSON.stringify({ error: "Google Calendar not connected" }), {
@@ -241,35 +243,30 @@ serve(async (req) => {
         }
       }
 
-      // Push local events to Google Calendar
-      const { data: localEvents } = await supabase
-        .from("family_events")
-        .select("*")
-        .eq("user_id", userId)
-        .gte("event_date", oneMonthAgo.toISOString())
-        .lte("event_date", oneMonthAhead.toISOString());
-
       let pushedCount = 0;
-      for (const localEvent of localEvents || []) {
+
+      // Helper function to push event to Google Calendar
+      const pushToGoogle = async (title: string, date: string, notes: string, localId: string, localType: string) => {
         // Check if already synced
         const { data: existingSync } = await supabase
           .from("synced_calendar_events")
-          .select("id")
-          .eq("local_event_id", localEvent.id)
+          .select("id, google_event_id")
+          .eq("local_event_id", localId)
+          .eq("local_event_type", localType)
           .eq("user_id", userId)
           .single();
 
-        if (!existingSync) {
-          // Push to Google Calendar
+        // Only push if not synced to Google (not starting with outlook_)
+        if (!existingSync || existingSync.google_event_id?.startsWith("outlook_")) {
           const googleEvent = {
-            summary: localEvent.title,
-            description: localEvent.notes || "",
+            summary: title,
+            description: notes || "",
             start: {
-              dateTime: new Date(localEvent.event_date).toISOString(),
+              dateTime: new Date(date).toISOString(),
               timeZone: "UTC",
             },
             end: {
-              dateTime: new Date(new Date(localEvent.event_date).getTime() + 60 * 60 * 1000).toISOString(),
+              dateTime: new Date(new Date(date).getTime() + 60 * 60 * 1000).toISOString(),
               timeZone: "UTC",
             },
           };
@@ -289,14 +286,93 @@ serve(async (req) => {
           const createdEvent = await createResponse.json();
           
           if (createdEvent.id) {
-            await supabase.from("synced_calendar_events").insert({
-              user_id: userId,
-              google_event_id: createdEvent.id,
-              local_event_id: localEvent.id,
-              local_event_type: "family_event",
-            });
-            pushedCount++;
+            if (existingSync) {
+              await supabase
+                .from("synced_calendar_events")
+                .update({ google_event_id: createdEvent.id })
+                .eq("id", existingSync.id);
+            } else {
+              await supabase.from("synced_calendar_events").insert({
+                user_id: userId,
+                google_event_id: createdEvent.id,
+                local_event_id: localId,
+                local_event_type: localType,
+              });
+            }
+            return true;
           }
+        }
+        return false;
+      };
+
+      // Push family_events
+      const { data: localEvents } = await supabase
+        .from("family_events")
+        .select("*")
+        .eq("user_id", userId)
+        .gte("event_date", oneMonthAgo.toISOString())
+        .lte("event_date", oneMonthAhead.toISOString());
+
+      for (const localEvent of localEvents || []) {
+        if (await pushToGoogle(localEvent.title, localEvent.event_date, localEvent.notes || "", localEvent.id, "family_event")) {
+          pushedCount++;
+        }
+      }
+
+      // Push tasks with due dates
+      const { data: tasks } = await supabase
+        .from("tasks")
+        .select("*")
+        .eq("user_id", userId)
+        .not("due_date", "is", null)
+        .gte("due_date", oneMonthAgo.toISOString().split("T")[0])
+        .lte("due_date", oneMonthAhead.toISOString().split("T")[0]);
+
+      console.log(`[Google Calendar Sync] Found ${tasks?.length || 0} tasks with due dates`);
+
+      for (const task of tasks || []) {
+        const taskDate = task.due_time 
+          ? `${task.due_date}T${task.due_time}` 
+          : `${task.due_date}T09:00:00`;
+        const notes = `[Task] ${task.description || ""}\nPriority: ${task.priority || "Normal"}\nStatus: ${task.status || "Pending"}`;
+        if (await pushToGoogle(`📋 ${task.title}`, taskDate, notes, task.id, "task")) {
+          pushedCount++;
+        }
+      }
+
+      // Push goals with target dates
+      const { data: goals } = await supabase
+        .from("goals")
+        .select("*")
+        .eq("user_id", userId)
+        .not("target_date", "is", null)
+        .gte("target_date", oneMonthAgo.toISOString().split("T")[0])
+        .lte("target_date", oneMonthAhead.toISOString().split("T")[0]);
+
+      console.log(`[Google Calendar Sync] Found ${goals?.length || 0} goals with target dates`);
+
+      for (const goal of goals || []) {
+        const notes = `[Goal] ${goal.description || ""}\nCategory: ${goal.category || "General"}\nProgress: ${goal.current_amount || 0}/${goal.target_amount || 0}`;
+        if (await pushToGoogle(`🎯 ${goal.title}`, `${goal.target_date}T09:00:00`, notes, goal.id, "goal")) {
+          pushedCount++;
+        }
+      }
+
+      // Push transactions (expenses) with dates
+      const { data: transactions } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", userId)
+        .gte("date", oneMonthAgo.toISOString().split("T")[0])
+        .lte("date", oneMonthAhead.toISOString().split("T")[0]);
+
+      console.log(`[Google Calendar Sync] Found ${transactions?.length || 0} transactions`);
+
+      for (const tx of transactions || []) {
+        const emoji = tx.type === "income" ? "💰" : "💸";
+        const notes = `[${tx.type === "income" ? "Income" : "Expense"}] Amount: ${tx.amount}\nMerchant: ${tx.merchant || "N/A"}\nAccount: ${tx.account || "N/A"}\n${tx.notes || ""}`;
+        if (await pushToGoogle(`${emoji} ${tx.merchant || tx.type}: $${tx.amount}`, `${tx.date}T12:00:00`, notes, tx.id, "transaction")) {
+          pushedCount++;
         }
       }
 
@@ -311,7 +387,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: `Synced ${googleEvents.length} events from Google, pushed ${pushedCount} local events`,
+          message: `Synced ${googleEvents.length} events from Google, pushed ${pushedCount} items (events, tasks, goals, transactions)`,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
