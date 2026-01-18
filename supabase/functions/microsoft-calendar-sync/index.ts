@@ -259,68 +259,74 @@ serve(async (req) => {
       };
 
       // Helper function to push event to Outlook
-      const pushToOutlook = async (title: string, date: string, notes: string, localId: string, localType: string) => {
+      const pushToOutlook = async (title: string, date: string, notes: string, localId: string, localType: string, userTimezone: string = "Asia/Dhaka") => {
         // Validate date before processing
         if (!isValidDate(date)) {
           console.log(`[Microsoft Calendar Sync] Skipping ${localType} "${title}" - invalid date: ${date}`);
           return false;
         }
 
-        // Check if already synced to Outlook
+        // Check if already synced to Outlook - use composite key check
         const { data: existingSync } = await supabase
           .from("synced_calendar_events")
           .select("id, google_event_id")
           .eq("local_event_id", localId)
           .eq("local_event_type", localType)
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
 
-        // Only push if not synced to Outlook
-        if (!existingSync || !existingSync.google_event_id?.startsWith("outlook_")) {
-          const parsedDate = new Date(date);
-          const outlookEvent = {
-            subject: title,
-            body: {
-              contentType: "text",
-              content: notes || "",
-            },
-            start: {
-              dateTime: parsedDate.toISOString(),
-              timeZone: "UTC",
-            },
-            end: {
-              dateTime: new Date(parsedDate.getTime() + 60 * 60 * 1000).toISOString(),
-              timeZone: "UTC",
-            },
-          };
+        // Skip if already synced to Outlook (has outlook_ prefix)
+        if (existingSync?.google_event_id?.startsWith("outlook_")) {
+          console.log(`[Microsoft Calendar Sync] Skipping ${localType} "${title}" - already synced`);
+          return false;
+        }
 
-          const createResponse = await fetch(`${GRAPH_API}/me/calendar/events`, {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(outlookEvent),
-          });
+        const parsedDate = new Date(date);
+        const outlookEvent = {
+          subject: title,
+          body: {
+            contentType: "text",
+            content: notes || "",
+          },
+          start: {
+            dateTime: parsedDate.toISOString().replace("Z", ""),
+            timeZone: userTimezone,
+          },
+          end: {
+            dateTime: new Date(parsedDate.getTime() + 60 * 60 * 1000).toISOString().replace("Z", ""),
+            timeZone: userTimezone,
+          },
+        };
 
-          const createdEvent = await createResponse.json();
-          
-          if (createdEvent.id) {
-            if (existingSync) {
-              await supabase
-                .from("synced_calendar_events")
-                .update({ google_event_id: `outlook_${createdEvent.id}` })
-                .eq("id", existingSync.id);
-            } else {
-              await supabase.from("synced_calendar_events").insert({
-                user_id: userId,
-                google_event_id: `outlook_${createdEvent.id}`,
-                local_event_id: localId,
-                local_event_type: localType,
-              });
-            }
-            return true;
+        const createResponse = await fetch(`${GRAPH_API}/me/calendar/events`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(outlookEvent),
+        });
+
+        const createdEvent = await createResponse.json();
+        
+        if (createdEvent.id) {
+          if (existingSync) {
+            await supabase
+              .from("synced_calendar_events")
+              .update({ google_event_id: `outlook_${createdEvent.id}`, last_synced_at: new Date().toISOString() })
+              .eq("id", existingSync.id);
+          } else {
+            await supabase.from("synced_calendar_events").insert({
+              user_id: userId,
+              google_event_id: `outlook_${createdEvent.id}`,
+              local_event_id: localId,
+              local_event_type: localType,
+            });
           }
+          console.log(`[Microsoft Calendar Sync] Pushed ${localType} "${title}" to Outlook`);
+          return true;
+        } else {
+          console.error(`[Microsoft Calendar Sync] Failed to create event:`, createdEvent);
         }
         return false;
       };

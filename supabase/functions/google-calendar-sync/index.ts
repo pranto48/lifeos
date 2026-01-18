@@ -255,68 +255,74 @@ serve(async (req) => {
       };
 
       // Helper function to push event to Google Calendar
-      const pushToGoogle = async (title: string, date: string, notes: string, localId: string, localType: string) => {
+      const pushToGoogle = async (title: string, date: string, notes: string, localId: string, localType: string, userTimezone: string = "Asia/Dhaka") => {
         // Validate date before processing
         if (!isValidDate(date)) {
           console.log(`[Google Calendar Sync] Skipping ${localType} "${title}" - invalid date: ${date}`);
           return false;
         }
 
-        // Check if already synced
+        // Check if already synced - use maybeSingle to avoid errors
         const { data: existingSync } = await supabase
           .from("synced_calendar_events")
           .select("id, google_event_id")
           .eq("local_event_id", localId)
           .eq("local_event_type", localType)
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
 
-        // Only push if not synced to Google (not starting with outlook_)
-        if (!existingSync || existingSync.google_event_id?.startsWith("outlook_")) {
-          const parsedDate = new Date(date);
-          const googleEvent = {
-            summary: title,
-            description: notes || "",
-            start: {
-              dateTime: parsedDate.toISOString(),
-              timeZone: "UTC",
+        // Skip if already synced to Google (has a proper Google event ID, not outlook_)
+        if (existingSync?.google_event_id && !existingSync.google_event_id.startsWith("outlook_")) {
+          console.log(`[Google Calendar Sync] Skipping ${localType} "${title}" - already synced`);
+          return false;
+        }
+
+        const parsedDate = new Date(date);
+        const googleEvent = {
+          summary: title,
+          description: notes || "",
+          start: {
+            dateTime: parsedDate.toISOString(),
+            timeZone: userTimezone,
+          },
+          end: {
+            dateTime: new Date(parsedDate.getTime() + 60 * 60 * 1000).toISOString(),
+            timeZone: userTimezone,
+          },
+        };
+
+        const createResponse = await fetch(
+          `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              "Content-Type": "application/json",
             },
-            end: {
-              dateTime: new Date(parsedDate.getTime() + 60 * 60 * 1000).toISOString(),
-              timeZone: "UTC",
-            },
-          };
-
-          const createResponse = await fetch(
-            `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events`,
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(googleEvent),
-            }
-          );
-
-          const createdEvent = await createResponse.json();
-          
-          if (createdEvent.id) {
-            if (existingSync) {
-              await supabase
-                .from("synced_calendar_events")
-                .update({ google_event_id: createdEvent.id })
-                .eq("id", existingSync.id);
-            } else {
-              await supabase.from("synced_calendar_events").insert({
-                user_id: userId,
-                google_event_id: createdEvent.id,
-                local_event_id: localId,
-                local_event_type: localType,
-              });
-            }
-            return true;
+            body: JSON.stringify(googleEvent),
           }
+        );
+
+        const createdEvent = await createResponse.json();
+        
+        if (createdEvent.id) {
+          if (existingSync) {
+            await supabase
+              .from("synced_calendar_events")
+              .update({ google_event_id: createdEvent.id, last_synced_at: new Date().toISOString() })
+              .eq("id", existingSync.id);
+          } else {
+            await supabase.from("synced_calendar_events").insert({
+              user_id: userId,
+              google_event_id: createdEvent.id,
+              local_event_id: localId,
+              local_event_type: localType,
+            });
+          }
+          console.log(`[Google Calendar Sync] Pushed ${localType} "${title}" to Google`);
+          return true;
+        } else {
+          console.error(`[Google Calendar Sync] Failed to create event:`, createdEvent);
         }
         return false;
       };
