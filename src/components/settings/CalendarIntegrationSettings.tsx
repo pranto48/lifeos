@@ -83,8 +83,7 @@ export function CalendarIntegrationSettings() {
         description: language === 'bn' ? 'Google Calendar সংযোগ করা হচ্ছে' : 'Connecting to Google Calendar'
       });
 
-      // Use the same redirect URI format that was used to generate the auth URL
-      const redirectUri = `${window.location.origin}/settings`;
+      const redirectUri = window.location.origin + window.location.pathname;
       
       const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
         body: { 
@@ -119,11 +118,7 @@ export function CalendarIntegrationSettings() {
         description: language === 'bn' ? 'Outlook Calendar সংযোগ করা হচ্ছে' : 'Connecting to Outlook Calendar'
       });
 
-      // Use the same redirect URI format that was used to generate the auth URL
-      // This MUST match exactly or Microsoft will reject the token exchange
-      const redirectUri = `${window.location.origin}/settings`;
-      
-      console.log('[Microsoft OAuth] Exchanging code with redirect_uri:', redirectUri);
+      const redirectUri = window.location.origin + window.location.pathname;
       
       const { data, error } = await supabase.functions.invoke('microsoft-calendar-sync', {
         body: { 
@@ -287,8 +282,8 @@ export function CalendarIntegrationSettings() {
   const connectGoogleCalendar = async () => {
     setConnectingGoogle(true);
     try {
-      // Always use origin + /settings for consistent redirect URI
-      const redirectUri = `${window.location.origin}/settings`;
+      // Use the custom domain that's configured in Google Cloud Console
+      const redirectUri = window.location.origin;
       
       const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
         body: { action: 'get_auth_url', redirectUri }
@@ -314,11 +309,8 @@ export function CalendarIntegrationSettings() {
   const connectMicrosoftCalendar = async () => {
     setConnectingMicrosoft(true);
     try {
-      // Always use origin + /settings for consistent redirect URI
-      // This MUST match exactly what's registered in Azure Portal
-      const redirectUri = `${window.location.origin}/settings`;
-      
-      console.log('[Microsoft OAuth] Requesting auth URL with redirect_uri:', redirectUri);
+      // Use the custom domain that's configured in Azure Portal
+      const redirectUri = window.location.origin;
       
       const { data, error } = await supabase.functions.invoke('microsoft-calendar-sync', {
         body: { action: 'get_auth_url', redirectUri }
@@ -327,7 +319,6 @@ export function CalendarIntegrationSettings() {
       if (error) throw error;
 
       if (data?.authUrl) {
-        console.log('[Microsoft OAuth] Redirecting to auth URL');
         // Open OAuth in same window for proper redirect handling
         window.location.href = data.authUrl;
       }
@@ -458,7 +449,6 @@ export function CalendarIntegrationSettings() {
     }
   };
 
-  // Always return consistent redirect URI: origin + /settings
   const redirectUri = typeof window !== 'undefined' ? `${window.location.origin}/settings` : '';
 
   return (
@@ -736,8 +726,507 @@ export function CalendarIntegrationSettings() {
         </CardContent>
       </Card>
 
-      {/* Dialog components remain the same - truncated for brevity */}
-      {/* ... rest of dialog code ... */}
+      {/* Google Setup Guide Dialog */}
+      <Dialog open={showGoogleHelp} onOpenChange={setShowGoogleHelp}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Google Calendar OAuth Setup Guide
+            </DialogTitle>
+            <DialogDescription>
+              Follow these steps to create OAuth credentials for Google Calendar integration
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6 text-sm">
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">1</span>
+                  Go to Google Cloud Console
+                </h3>
+                <p className="text-muted-foreground pl-8">
+                  Open <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">
+                    Google Cloud Console <ExternalLink className="h-3 w-3" />
+                  </a> and sign in with your Google account.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">2</span>
+                  Create a New Project
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Click on the project dropdown at the top</li>
+                  <li>Click "New Project"</li>
+                  <li>Enter a project name (e.g., "ArifOS Calendar")</li>
+                  <li>Click "Create"</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">3</span>
+                  Enable Google Calendar API
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Go to "APIs & Services" → "Library"</li>
+                  <li>Search for "Google Calendar API"</li>
+                  <li>Click on it and press "Enable"</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">4</span>
+                  Configure OAuth Consent Screen
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Go to "APIs & Services" → "OAuth consent screen"</li>
+                  <li>Select "External" user type and click "Create"</li>
+                  <li>Fill in App name, User support email, and Developer email</li>
+                  <li>Click "Save and Continue" through the remaining steps</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">5</span>
+                  Create OAuth Credentials
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Go to "APIs & Services" → "Credentials"</li>
+                  <li>Click "Create Credentials" → "OAuth client ID"</li>
+                  <li>Select "Web application" as application type</li>
+                  <li>Add a name for your OAuth client</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">6</span>
+                  Add Authorized Redirect URI
+                </h3>
+                <div className="pl-8 space-y-2">
+                  <p className="text-muted-foreground">Under "Authorized redirect URIs", add this <strong>exact</strong> URL:</p>
+                  <div className="bg-muted p-3 rounded-md font-mono text-xs break-all flex items-center justify-between gap-2">
+                    <span>{redirectUri}</span>
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="h-6 w-6 shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(redirectUri);
+                        toast({ title: 'Copied!', description: 'Redirect URI copied to clipboard' });
+                      }}
+                    >
+                      <Copy className="h-3 w-3" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    This URL must match <strong>exactly</strong> including the /settings path. Do not add trailing slashes.
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">7</span>
+                  Copy Credentials
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Click "Create" to generate your credentials</li>
+                  <li>Copy the "Client ID" and "Client Secret"</li>
+                  <li>Paste them in the fields above and save</li>
+                </ul>
+              </div>
+
+              {/* Critical: Add Test Users Section */}
+              <div className="space-y-3 bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-base flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-white text-xs">8</span>
+                  Add Test Users (Required for Testing Mode)
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  While your app is in "Testing" status (not yet published), you <strong>must</strong> add users who can access the app:
+                </p>
+                <ul className="text-muted-foreground pl-4 space-y-1 list-disc list-inside text-sm">
+                  <li>Go to "APIs & Services" → "OAuth consent screen"</li>
+                  <li>Scroll down to "Test users" section</li>
+                  <li>Click "+ ADD USERS"</li>
+                  <li>Enter the Gmail addresses of users who need access (including your own)</li>
+                  <li>Click "Save"</li>
+                </ul>
+                <div className="bg-orange-500/20 rounded p-2 mt-2">
+                  <p className="text-xs text-orange-700 dark:text-orange-300">
+                    <strong>⚠️ Without adding test users, you'll get a "403: access_denied" error</strong> saying the app hasn't completed the Google verification process.
+                  </p>
+                </div>
+              </div>
+
+              {/* Publishing Option */}
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">9</span>
+                  Optional: Publish Your App
+                </h3>
+                <p className="text-muted-foreground pl-8 text-sm">
+                  To allow any Google user to connect (without adding them as test users):
+                </p>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside text-sm">
+                  <li>Go to "OAuth consent screen"</li>
+                  <li>Click "PUBLISH APP" button</li>
+                  <li>Confirm the publishing action</li>
+                  <li>For apps accessing sensitive scopes, Google may require verification</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mt-4">
+                <p className="text-green-600 dark:text-green-400 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <strong>Quick Fix:</strong> If you see "Access blocked" error, add your email as a test user in step 8.
+                </p>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Microsoft Setup Guide Dialog */}
+      <Dialog open={showMicrosoftHelp} onOpenChange={setShowMicrosoftHelp}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-primary" />
+              Microsoft Outlook OAuth Setup Guide
+            </DialogTitle>
+            <DialogDescription>
+              Follow these steps to create OAuth credentials for Microsoft Outlook integration
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6 text-sm">
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">1</span>
+                  Go to Azure Portal
+                </h3>
+                <p className="text-muted-foreground pl-8">
+                  Open <a href="https://portal.azure.com/" target="_blank" rel="noopener noreferrer" className="text-primary underline inline-flex items-center gap-1">
+                    Azure Portal <ExternalLink className="h-3 w-3" />
+                  </a> and sign in with your Microsoft account.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">2</span>
+                  Register a New Application
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Go to "Microsoft Entra ID" (formerly Azure AD)</li>
+                  <li>Click "App registrations" → "New registration"</li>
+                  <li>Enter a name (e.g., "ArifOS Calendar")</li>
+                  <li>Select "Accounts in any organizational directory and personal Microsoft accounts"</li>
+                </ul>
+              </div>
+
+              {/* Critical: Redirect URI Configuration */}
+              <div className="space-y-3 bg-orange-500/10 border border-orange-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-base flex items-center gap-2 text-orange-600 dark:text-orange-400">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-orange-500 text-white text-xs">3</span>
+                  Add Redirect URI (Critical Step!)
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  This is the most common source of errors. The redirect URI must match <strong>exactly</strong>:
+                </p>
+                <div className="space-y-3 pl-4">
+                  <div>
+                    <p className="text-xs font-medium mb-1">Platform: Select "Web"</p>
+                    <p className="text-xs font-medium mb-1">Redirect URI (copy exactly):</p>
+                    <div className="bg-muted p-3 rounded-md font-mono text-xs break-all flex items-center justify-between gap-2">
+                      <span>{redirectUri}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-6 w-6 shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(redirectUri);
+                          toast({ title: 'Copied!', description: 'Redirect URI copied to clipboard' });
+                        }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="bg-orange-500/20 rounded p-2">
+                    <p className="text-xs text-orange-700 dark:text-orange-300">
+                      <strong>⚠️ Common mistakes:</strong>
+                      <br />• Do NOT use trailing slashes (wrong: .../settings/)
+                      <br />• Do NOT use http:// (must be https://)
+                      <br />• Include the full path with /settings
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">4</span>
+                  Copy Application (Client) ID
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>After registration, go to the app's "Overview"</li>
+                  <li>Copy the "Application (client) ID"</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">5</span>
+                  Create Client Secret
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Go to "Certificates & secrets"</li>
+                  <li>Click "New client secret"</li>
+                  <li>Add a description and select expiration</li>
+                  <li>Click "Add" and immediately copy the "Value" (you won't see it again!)</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">6</span>
+                  Add API Permissions
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Go to "API permissions"</li>
+                  <li>Click "Add a permission" → "Microsoft Graph"</li>
+                  <li>Select "Delegated permissions"</li>
+                  <li>Add: Calendars.ReadWrite, User.Read, offline_access</li>
+                  <li>Click "Grant admin consent" if available</li>
+                </ul>
+              </div>
+
+              <div className="space-y-3">
+                <h3 className="font-semibold text-base flex items-center gap-2">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">7</span>
+                  Save Credentials
+                </h3>
+                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                  <li>Paste your Application ID and Client Secret in the fields above</li>
+                  <li>Click "Save Credentials"</li>
+                  <li>Then click "Connect Outlook Calendar"</li>
+                </ul>
+              </div>
+
+              <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 mt-4">
+                <p className="text-green-600 dark:text-green-400 text-sm flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <strong>Quick Fix:</strong> If you see "AADSTS50011" error, verify the redirect URI matches exactly.
+                </p>
+              </div>
+
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mt-2">
+                <p className="text-blue-600 dark:text-blue-400 text-sm">
+                  <strong>Tip:</strong> For personal Microsoft accounts, make sure you selected "Personal Microsoft accounts" during app registration.
+                </p>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+
+      {/* Troubleshooting Dialog */}
+      <Dialog open={showTroubleshooting} onOpenChange={setShowTroubleshooting}>
+        <DialogContent className="max-w-2xl max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-orange-500" />
+              {language === 'bn' ? 'সমস্যা সমাধান গাইড' : 'Troubleshooting Guide'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'bn' 
+                ? 'সাধারণ OAuth ত্রুটি এবং তাদের সমাধান' 
+                : 'Common OAuth errors and how to fix them'}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="h-[60vh] pr-4">
+            <div className="space-y-6 text-sm">
+              {/* Google Errors Section */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-base text-foreground border-b pb-2">
+                  Google Calendar Errors
+                </h3>
+
+                {/* 403 Access Denied */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Error 403: access_denied
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "Access blocked: [app] has not completed the Google verification process"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li><strong>Add yourself as a test user:</strong> Go to Google Cloud Console → APIs & Services → OAuth consent screen → Test users → Add Users</li>
+                      <li><strong>Publish your app:</strong> If you want anyone to use it, click "PUBLISH APP" on the OAuth consent screen</li>
+                      <li><strong>Check app status:</strong> Ensure your app isn't in "Needs verification" status</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Redirect URI Mismatch */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    redirect_uri_mismatch
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "The redirect URI in the request does not match the ones authorized"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Go to Google Cloud Console → Credentials → Your OAuth client</li>
+                      <li>Add this exact URI to "Authorized redirect URIs":</li>
+                    </ul>
+                    <div className="bg-muted p-2 rounded font-mono text-xs break-all flex items-center justify-between gap-2 mt-1">
+                      <span>{redirectUri}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-5 w-5 shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(redirectUri);
+                          toast({ title: 'Copied!' });
+                        }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Invalid Client */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    invalid_client
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "The OAuth client was not found"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Verify your Client ID is correct (no extra spaces)</li>
+                      <li>Check that the Client Secret hasn't expired or been deleted</li>
+                      <li>Ensure you're using the correct Google Cloud project</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* Microsoft Errors Section */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-base text-foreground border-b pb-2">
+                  Microsoft Outlook Errors
+                </h3>
+
+                {/* AADSTS50011 */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    AADSTS50011: Redirect URI mismatch
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "The redirect URI specified in the request does not match"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Go to Azure Portal → Microsoft Entra ID → App registrations → Your app</li>
+                      <li>Click "Authentication" in the left menu</li>
+                      <li>Under "Platform configurations", add or update the redirect URI:</li>
+                    </ul>
+                    <div className="bg-muted p-2 rounded font-mono text-xs break-all flex items-center justify-between gap-2 mt-1">
+                      <span>{redirectUri}</span>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        className="h-5 w-5 shrink-0"
+                        onClick={() => {
+                          navigator.clipboard.writeText(redirectUri);
+                          toast({ title: 'Copied!' });
+                        }}
+                      >
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
+                      ⚠️ Make sure to select "Web" as the platform type, not "SPA" or "Mobile"
+                    </p>
+                  </div>
+                </div>
+
+                {/* AADSTS700016 */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    AADSTS700016: Application not found
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "Application with identifier was not found in the directory"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Verify the Application (Client) ID is correct</li>
+                      <li>Check you're using the ID from the correct Azure tenant</li>
+                      <li>Ensure the app registration hasn't been deleted</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Consent Required */}
+                <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-destructive flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    AADSTS65001: Consent required
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "The user or administrator has not consented to use the application"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium">Solutions:</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li>Go to Azure Portal → Your app → API permissions</li>
+                      <li>Click "Grant admin consent" if you're an admin</li>
+                      <li>Or remove and re-add the permissions</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* General Tips */}
+              <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 space-y-2">
+                <h4 className="font-medium text-blue-600 dark:text-blue-400">General Tips</h4>
+                <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                  <li>Always use HTTPS for redirect URIs in production</li>
+                  <li>Clear browser cookies if you're stuck in an error loop</li>
+                  <li>Try using an incognito/private window for testing</li>
+                  <li>Check that your domain matches exactly (including www or subdomain)</li>
+                  <li>Credential changes may take a few minutes to propagate</li>
+                </ul>
+              </div>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

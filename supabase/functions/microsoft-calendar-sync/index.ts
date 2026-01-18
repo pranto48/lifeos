@@ -36,17 +36,17 @@ serve(async (req) => {
     // Service client for reading app_secrets (bypasses RLS)
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    const token = authHeader.replace("Bearer ", "");
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
     
-    if (userError || !user) {
-      console.error("[Microsoft Calendar Sync] Auth error:", userError);
+    if (claimsError || !claimsData?.claims) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = user.id;
+    const userId = claimsData.claims.sub;
     const { action, code, redirectUri } = await req.json();
 
     // Get OAuth credentials from app_secrets using service role (bypasses RLS)
@@ -79,9 +79,8 @@ serve(async (req) => {
         "User.Read",
       ];
 
-      // Use the exact redirectUri from the client - frontend should send the full callback URL
-      // The redirect URI must match EXACTLY what's registered in Azure Portal
-      const callbackUrl = redirectUri || "https://my.arifmahmud.com/settings";
+      // Use the redirectUri from the client (user's domain + /settings)
+      const callbackUrl = redirectUri ? `${redirectUri}/settings` : "https://my.arifmahmud.com/settings";
 
       console.log(`[Microsoft Calendar Sync] Generated auth URL with redirect: ${callbackUrl}`);
 
@@ -94,18 +93,12 @@ serve(async (req) => {
         state: "microsoft_calendar",
       });
 
-      return new Response(JSON.stringify({ authUrl, redirectUri: callbackUrl }), {
+      return new Response(JSON.stringify({ authUrl }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (action === "exchange_code") {
-      // The redirectUri MUST match exactly what was used in get_auth_url
-      // Frontend sends window.location.origin + window.location.pathname
-      const exchangeRedirectUri = redirectUri || "https://my.arifmahmud.com/settings";
-      
-      console.log(`[Microsoft Calendar Sync] Exchanging code with redirect_uri: ${exchangeRedirectUri}`);
-
       const tokenResponse = await fetch(MICROSOFT_TOKEN_URL, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -113,7 +106,7 @@ serve(async (req) => {
           client_id: clientId,
           client_secret: clientSecret,
           code,
-          redirect_uri: exchangeRedirectUri,
+          redirect_uri: redirectUri,
           grant_type: "authorization_code",
         }),
       });
@@ -122,22 +115,16 @@ serve(async (req) => {
 
       if (tokenData.error) {
         console.error("[Microsoft Calendar Sync] Token exchange error:", tokenData);
-        return new Response(
-          JSON.stringify({ 
-            error: tokenData.error_description || tokenData.error,
-            details: `Redirect URI used: ${exchangeRedirectUri}. Make sure this matches exactly in Azure Portal.`
-          }), 
-          {
-            status: 400,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          }
-        );
+        return new Response(JSON.stringify({ error: tokenData.error_description }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
 
       // Store in google_calendar_sync table with outlook_ prefix for calendar_id
-      const { error: upsertError } = await supabase.from("google_calendar_sync").upsert({
+      await supabase.from("google_calendar_sync").upsert({
         user_id: userId,
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
@@ -145,19 +132,6 @@ serve(async (req) => {
         sync_enabled: true,
         calendar_id: "outlook_primary",
       }, { onConflict: "user_id" });
-
-      if (upsertError) {
-        console.error("[Microsoft Calendar Sync] Upsert error:", upsertError);
-        // Try insert if upsert fails
-        await supabase.from("google_calendar_sync").insert({
-          user_id: userId,
-          access_token: tokenData.access_token,
-          refresh_token: tokenData.refresh_token,
-          token_expires_at: expiresAt,
-          sync_enabled: true,
-          calendar_id: "outlook_primary",
-        });
-      }
 
       console.log("[Microsoft Calendar Sync] Tokens saved for user:", userId);
 
