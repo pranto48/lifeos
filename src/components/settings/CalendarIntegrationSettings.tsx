@@ -982,17 +982,31 @@ export function CalendarIntegrationSettings() {
                 </ul>
               </div>
 
-              <div className="space-y-3">
-                <h3 className="font-semibold text-base flex items-center gap-2">
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-primary-foreground text-xs">5</span>
-                  Create Client Secret
+              {/* Critical: Client Secret Warning */}
+              <div className="space-y-3 bg-red-500/10 border border-red-500/30 rounded-lg p-4">
+                <h3 className="font-semibold text-base flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-500 text-white text-xs">5</span>
+                  Create Client Secret (Most Common Error!)
                 </h3>
-                <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
+                <ul className="text-muted-foreground pl-4 space-y-1 list-disc list-inside text-sm">
                   <li>Go to "Certificates & secrets"</li>
                   <li>Click "New client secret"</li>
                   <li>Add a description and select expiration</li>
-                  <li>Click "Add" and immediately copy the "Value" (you won't see it again!)</li>
+                  <li>Click "Add"</li>
                 </ul>
+                <div className="bg-red-500/20 rounded p-3 mt-2">
+                  <p className="text-sm text-red-700 dark:text-red-300 font-medium">
+                    ⚠️ CRITICAL: Copy the "Value" column, NOT the "Secret ID"!
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                    After you click "Add", you'll see a table with "Secret ID" and "Value" columns. 
+                    You MUST copy the <strong>Value</strong> (the long string that starts with random characters). 
+                    The "Secret ID" (GUID format) will NOT work and causes "AADSTS7000215: Invalid client secret" error.
+                  </p>
+                  <p className="text-xs text-red-600 dark:text-red-400 mt-2">
+                    💡 The Value is only shown once! If you didn't copy it, delete the secret and create a new one.
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -1170,6 +1184,29 @@ export function CalendarIntegrationSettings() {
                     <p className="text-xs text-orange-600 dark:text-orange-400 mt-2">
                       ⚠️ Make sure to select "Web" as the platform type, not "SPA" or "Mobile"
                     </p>
+                  </div>
+                </div>
+
+                {/* AADSTS7000215 - Invalid Client Secret */}
+                <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 space-y-2">
+                  <h4 className="font-medium text-red-600 dark:text-red-400 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    AADSTS7000215: Invalid client secret
+                  </h4>
+                  <p className="text-xs text-muted-foreground">
+                    "Invalid client secret provided. Ensure the secret being sent is the client secret value, not the client secret ID"
+                  </p>
+                  <div className="bg-background/50 rounded p-3 space-y-2">
+                    <p className="text-sm font-medium text-red-600 dark:text-red-400">This is the most common error!</p>
+                    <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                      <li><strong>You copied the Secret ID instead of the Secret Value!</strong></li>
+                      <li>Go to Azure Portal → Your app → Certificates & secrets</li>
+                      <li>Look at the table - there are two columns: "Secret ID" and "Value"</li>
+                      <li>The Secret ID looks like: <code className="bg-muted px-1 rounded">xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code></li>
+                      <li>The Value looks like: <code className="bg-muted px-1 rounded">abc123~xyz789...</code></li>
+                      <li><strong>Use the VALUE, not the ID!</strong></li>
+                      <li>If you can't see the Value, create a NEW secret (values are only shown once)</li>
+                    </ul>
                   </div>
                 </div>
 
