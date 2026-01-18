@@ -332,7 +332,7 @@ serve(async (req) => {
         }
       }
 
-      // Push tasks with due dates
+      // Push ALL tasks with due dates (both Office and Personal)
       const { data: tasks } = await supabase
         .from("tasks")
         .select("*")
@@ -341,19 +341,20 @@ serve(async (req) => {
         .gte("due_date", oneMonthAgo.toISOString().split("T")[0])
         .lte("due_date", oneMonthAhead.toISOString().split("T")[0]);
 
-      console.log(`[Microsoft Calendar Sync] Found ${tasks?.length || 0} tasks with due dates`);
+      console.log(`[Microsoft Calendar Sync] Found ${tasks?.length || 0} tasks with due dates (Office + Personal)`);
 
       for (const task of tasks || []) {
         const taskDate = task.due_time 
           ? `${task.due_date}T${task.due_time}` 
           : `${task.due_date}T09:00:00`;
-        const notes = `[Task] ${task.description || ""}\nPriority: ${task.priority || "Normal"}\nStatus: ${task.status || "Pending"}`;
-        if (await pushToOutlook(`📋 ${task.title}`, taskDate, notes, task.id, "task")) {
+        const typeLabel = task.task_type === "office" ? "🏢" : "🏠";
+        const notes = `[Task - ${task.task_type || "personal"}] ${task.description || ""}\nPriority: ${task.priority || "Normal"}\nStatus: ${task.status || "Pending"}`;
+        if (await pushToOutlook(`${typeLabel}📋 ${task.title}`, taskDate, notes, task.id, "task")) {
           pushedCount++;
         }
       }
 
-      // Push goals with target dates
+      // Push ALL goals with target dates (both Office and Personal)
       const { data: goals } = await supabase
         .from("goals")
         .select("*")
@@ -362,11 +363,12 @@ serve(async (req) => {
         .gte("target_date", oneMonthAgo.toISOString().split("T")[0])
         .lte("target_date", oneMonthAhead.toISOString().split("T")[0]);
 
-      console.log(`[Microsoft Calendar Sync] Found ${goals?.length || 0} goals with target dates`);
+      console.log(`[Microsoft Calendar Sync] Found ${goals?.length || 0} goals with target dates (Office + Personal)`);
 
       for (const goal of goals || []) {
-        const notes = `[Goal] ${goal.description || ""}\nCategory: ${goal.category || "General"}\nProgress: ${goal.current_amount || 0}/${goal.target_amount || 0}`;
-        if (await pushToOutlook(`🎯 ${goal.title}`, `${goal.target_date}T09:00:00`, notes, goal.id, "goal")) {
+        const typeLabel = goal.goal_type === "office" ? "🏢" : "🏠";
+        const notes = `[Goal - ${goal.goal_type || "personal"}] ${goal.description || ""}\nCategory: ${goal.category || "General"}\nProgress: ${goal.current_amount || 0}/${goal.target_amount || 0}`;
+        if (await pushToOutlook(`${typeLabel}🎯 ${goal.title}`, `${goal.target_date}T09:00:00`, notes, goal.id, "goal")) {
           pushedCount++;
         }
       }
