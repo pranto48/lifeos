@@ -79,7 +79,9 @@ serve(async (req) => {
       ];
 
       // Use the custom domain redirect URI that matches Google Cloud Console settings
-      const callbackUrl = redirectUri || "https://my.arifmahmud.com";
+      // Append /settings to match the callback handler
+      const baseUrl = redirectUri || "https://my.arifmahmud.com";
+      const callbackUrl = baseUrl.endsWith("/settings") ? baseUrl : `${baseUrl}/settings`;
 
       const authUrl = `${GOOGLE_OAUTH_URL}?` + new URLSearchParams({
         client_id: clientId,
@@ -88,7 +90,7 @@ serve(async (req) => {
         scope: scopes.join(" "),
         access_type: "offline",
         prompt: "consent",
-        state: userId,
+        state: "google_calendar",
       });
 
       console.log("[Google Calendar Sync] Generated auth URL with redirect:", callbackUrl);
@@ -345,9 +347,11 @@ serve(async (req) => {
       console.log(`[Google Calendar Sync] Found ${tasks?.length || 0} tasks with due dates (Office + Personal)`);
 
       for (const task of tasks || []) {
+        // Extract just the date part (YYYY-MM-DD) to avoid timezone issues
+        const dueDateOnly = task.due_date?.split("T")[0] || task.due_date;
         const taskDate = task.due_time 
-          ? `${task.due_date}T${task.due_time}` 
-          : `${task.due_date}T09:00:00`;
+          ? `${dueDateOnly}T${task.due_time}` 
+          : `${dueDateOnly}T09:00:00`;
         const typeLabel = task.task_type === "office" ? "🏢" : "🏠";
         const notes = `[Task - ${task.task_type || "personal"}] ${task.description || ""}\nPriority: ${task.priority || "Normal"}\nStatus: ${task.status || "Pending"}`;
         if (await pushToGoogle(`${typeLabel}📋 ${task.title}`, taskDate, notes, task.id, "task")) {
@@ -367,9 +371,11 @@ serve(async (req) => {
       console.log(`[Google Calendar Sync] Found ${goals?.length || 0} goals with target dates (Office + Personal)`);
 
       for (const goal of goals || []) {
+        // Extract just the date part (YYYY-MM-DD) to avoid timezone issues
+        const targetDateOnly = goal.target_date?.split("T")[0] || goal.target_date;
         const typeLabel = goal.goal_type === "office" ? "🏢" : "🏠";
         const notes = `[Goal - ${goal.goal_type || "personal"}] ${goal.description || ""}\nCategory: ${goal.category || "General"}\nProgress: ${goal.current_amount || 0}/${goal.target_amount || 0}`;
-        if (await pushToGoogle(`${typeLabel}🎯 ${goal.title}`, `${goal.target_date}T09:00:00`, notes, goal.id, "goal")) {
+        if (await pushToGoogle(`${typeLabel}🎯 ${goal.title}`, `${targetDateOnly}T09:00:00`, notes, goal.id, "goal")) {
           pushedCount++;
         }
       }
@@ -385,9 +391,11 @@ serve(async (req) => {
       console.log(`[Google Calendar Sync] Found ${transactions?.length || 0} transactions`);
 
       for (const tx of transactions || []) {
+        // Extract just the date part (YYYY-MM-DD) to avoid timezone issues
+        const txDateOnly = tx.date?.split("T")[0] || tx.date;
         const emoji = tx.type === "income" ? "💰" : "💸";
         const notes = `[${tx.type === "income" ? "Income" : "Expense"}] Amount: ${tx.amount}\nMerchant: ${tx.merchant || "N/A"}\nAccount: ${tx.account || "N/A"}\n${tx.notes || ""}`;
-        if (await pushToGoogle(`${emoji} ${tx.merchant || tx.type}: $${tx.amount}`, `${tx.date}T12:00:00`, notes, tx.id, "transaction")) {
+        if (await pushToGoogle(`${emoji} ${tx.merchant || tx.type}: $${tx.amount}`, `${txDateOnly}T12:00:00`, notes, tx.id, "transaction")) {
           pushedCount++;
         }
       }

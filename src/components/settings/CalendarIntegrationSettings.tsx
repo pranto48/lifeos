@@ -67,7 +67,7 @@ export function CalendarIntegrationSettings() {
         // Exchange the code for tokens based on the provider
         if (state === 'microsoft_calendar') {
           handleMicrosoftOAuthCallback(code);
-        } else {
+        } else if (state === 'google_calendar') {
           handleOAuthCallback(code, state);
         }
         // Clean up the URL
@@ -83,7 +83,8 @@ export function CalendarIntegrationSettings() {
         description: language === 'bn' ? 'Google Calendar সংযোগ করা হচ্ছে' : 'Connecting to Google Calendar'
       });
 
-      const redirectUri = window.location.origin + window.location.pathname;
+      // Use the same redirect URI format as get_auth_url
+      const redirectUri = `${window.location.origin}/settings`;
       
       const { data, error } = await supabase.functions.invoke('google-calendar-sync', {
         body: { 
@@ -118,7 +119,8 @@ export function CalendarIntegrationSettings() {
         description: language === 'bn' ? 'Outlook Calendar সংযোগ করা হচ্ছে' : 'Connecting to Outlook Calendar'
       });
 
-      const redirectUri = window.location.origin + window.location.pathname;
+      // Use the same redirect URI format as get_auth_url
+      const redirectUri = `${window.location.origin}/settings`;
       
       const { data, error } = await supabase.functions.invoke('microsoft-calendar-sync', {
         body: { 
