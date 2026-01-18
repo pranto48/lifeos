@@ -251,8 +251,21 @@ serve(async (req) => {
 
       let pushedCount = 0;
       
+      // Helper function to validate date
+      const isValidDate = (dateStr: string): boolean => {
+        if (!dateStr) return false;
+        const parsed = new Date(dateStr);
+        return !isNaN(parsed.getTime());
+      };
+
       // Helper function to push event to Outlook
       const pushToOutlook = async (title: string, date: string, notes: string, localId: string, localType: string) => {
+        // Validate date before processing
+        if (!isValidDate(date)) {
+          console.log(`[Microsoft Calendar Sync] Skipping ${localType} "${title}" - invalid date: ${date}`);
+          return false;
+        }
+
         // Check if already synced to Outlook
         const { data: existingSync } = await supabase
           .from("synced_calendar_events")
@@ -264,6 +277,7 @@ serve(async (req) => {
 
         // Only push if not synced to Outlook
         if (!existingSync || !existingSync.google_event_id?.startsWith("outlook_")) {
+          const parsedDate = new Date(date);
           const outlookEvent = {
             subject: title,
             body: {
@@ -271,11 +285,11 @@ serve(async (req) => {
               content: notes || "",
             },
             start: {
-              dateTime: new Date(date).toISOString(),
+              dateTime: parsedDate.toISOString(),
               timeZone: "UTC",
             },
             end: {
-              dateTime: new Date(new Date(date).getTime() + 60 * 60 * 1000).toISOString(),
+              dateTime: new Date(parsedDate.getTime() + 60 * 60 * 1000).toISOString(),
               timeZone: "UTC",
             },
           };
