@@ -245,8 +245,21 @@ serve(async (req) => {
 
       let pushedCount = 0;
 
+      // Helper function to validate date
+      const isValidDate = (dateStr: string): boolean => {
+        if (!dateStr) return false;
+        const parsed = new Date(dateStr);
+        return !isNaN(parsed.getTime());
+      };
+
       // Helper function to push event to Google Calendar
       const pushToGoogle = async (title: string, date: string, notes: string, localId: string, localType: string) => {
+        // Validate date before processing
+        if (!isValidDate(date)) {
+          console.log(`[Google Calendar Sync] Skipping ${localType} "${title}" - invalid date: ${date}`);
+          return false;
+        }
+
         // Check if already synced
         const { data: existingSync } = await supabase
           .from("synced_calendar_events")
@@ -258,15 +271,16 @@ serve(async (req) => {
 
         // Only push if not synced to Google (not starting with outlook_)
         if (!existingSync || existingSync.google_event_id?.startsWith("outlook_")) {
+          const parsedDate = new Date(date);
           const googleEvent = {
             summary: title,
             description: notes || "",
             start: {
-              dateTime: new Date(date).toISOString(),
+              dateTime: parsedDate.toISOString(),
               timeZone: "UTC",
             },
             end: {
-              dateTime: new Date(new Date(date).getTime() + 60 * 60 * 1000).toISOString(),
+              dateTime: new Date(parsedDate.getTime() + 60 * 60 * 1000).toISOString(),
               timeZone: "UTC",
             },
           };
@@ -319,7 +333,7 @@ serve(async (req) => {
         }
       }
 
-      // Push tasks with due dates
+      // Push ALL tasks with due dates (both Office and Personal)
       const { data: tasks } = await supabase
         .from("tasks")
         .select("*")
@@ -328,19 +342,20 @@ serve(async (req) => {
         .gte("due_date", oneMonthAgo.toISOString().split("T")[0])
         .lte("due_date", oneMonthAhead.toISOString().split("T")[0]);
 
-      console.log(`[Google Calendar Sync] Found ${tasks?.length || 0} tasks with due dates`);
+      console.log(`[Google Calendar Sync] Found ${tasks?.length || 0} tasks with due dates (Office + Personal)`);
 
       for (const task of tasks || []) {
         const taskDate = task.due_time 
           ? `${task.due_date}T${task.due_time}` 
           : `${task.due_date}T09:00:00`;
-        const notes = `[Task] ${task.description || ""}\nPriority: ${task.priority || "Normal"}\nStatus: ${task.status || "Pending"}`;
-        if (await pushToGoogle(`📋 ${task.title}`, taskDate, notes, task.id, "task")) {
+        const typeLabel = task.task_type === "office" ? "🏢" : "🏠";
+        const notes = `[Task - ${task.task_type || "personal"}] ${task.description || ""}\nPriority: ${task.priority || "Normal"}\nStatus: ${task.status || "Pending"}`;
+        if (await pushToGoogle(`${typeLabel}📋 ${task.title}`, taskDate, notes, task.id, "task")) {
           pushedCount++;
         }
       }
 
-      // Push goals with target dates
+      // Push ALL goals with target dates (both Office and Personal)
       const { data: goals } = await supabase
         .from("goals")
         .select("*")
@@ -349,11 +364,12 @@ serve(async (req) => {
         .gte("target_date", oneMonthAgo.toISOString().split("T")[0])
         .lte("target_date", oneMonthAhead.toISOString().split("T")[0]);
 
-      console.log(`[Google Calendar Sync] Found ${goals?.length || 0} goals with target dates`);
+      console.log(`[Google Calendar Sync] Found ${goals?.length || 0} goals with target dates (Office + Personal)`);
 
       for (const goal of goals || []) {
-        const notes = `[Goal] ${goal.description || ""}\nCategory: ${goal.category || "General"}\nProgress: ${goal.current_amount || 0}/${goal.target_amount || 0}`;
-        if (await pushToGoogle(`🎯 ${goal.title}`, `${goal.target_date}T09:00:00`, notes, goal.id, "goal")) {
+        const typeLabel = goal.goal_type === "office" ? "🏢" : "🏠";
+        const notes = `[Goal - ${goal.goal_type || "personal"}] ${goal.description || ""}\nCategory: ${goal.category || "General"}\nProgress: ${goal.current_amount || 0}/${goal.target_amount || 0}`;
+        if (await pushToGoogle(`${typeLabel}🎯 ${goal.title}`, `${goal.target_date}T09:00:00`, notes, goal.id, "goal")) {
           pushedCount++;
         }
       }
