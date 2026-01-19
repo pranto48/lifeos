@@ -1,5 +1,5 @@
-import { useState, useRef } from 'react';
-import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History, ListTodo } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,7 @@ import { useSupportData, SupportUnit, SupportDepartment, SupportUser } from '@/h
 import { useLanguage } from '@/contexts/LanguageContext';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
+import { supabase } from '@/integrations/supabase/client';
 
 export default function SupportUsers() {
   const { t, language } = useLanguage();
@@ -67,14 +68,40 @@ export default function SupportUsers() {
     is_active: true,
   });
 
+  // Task counts per support user
+  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
+
+  // Load task counts for support users
+  useEffect(() => {
+    const loadTaskCounts = async () => {
+      const { data } = await supabase
+        .from('tasks')
+        .select('support_user_id')
+        .not('support_user_id', 'is', null);
+      
+      if (data) {
+        const counts: Record<string, number> = {};
+        data.forEach(task => {
+          if (task.support_user_id) {
+            counts[task.support_user_id] = (counts[task.support_user_id] || 0) + 1;
+          }
+        });
+        setTaskCounts(counts);
+      }
+    };
+    loadTaskCounts();
+  }, [supportUsers]);
+
   // Filter support users based on search and filters
   const filteredSupportUsers = supportUsers.filter(user => {
-    // Search filter
+    // Search filter - now includes device_info and ip_address
     const query = searchQuery.toLowerCase();
     const matchesSearch = !query || 
       user.name.toLowerCase().includes(query) ||
       (user.email?.toLowerCase().includes(query)) ||
-      (user.designation?.toLowerCase().includes(query));
+      (user.designation?.toLowerCase().includes(query)) ||
+      (user.device_info?.toLowerCase().includes(query)) ||
+      (user.ip_address?.toLowerCase().includes(query));
 
     if (!matchesSearch) return false;
 
@@ -599,7 +626,7 @@ export default function SupportUsers() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder={language === 'bn' ? 'নাম বা ইমেইল দিয়ে খুঁজুন...' : 'Search by name or email...'}
+                placeholder={language === 'bn' ? 'নাম, ইমেইল, ডিভাইস, IP...' : 'Search name, email, device, IP...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -740,9 +767,15 @@ export default function SupportUsers() {
                         <span>{user.ip_address}</span>
                       </div>
                     )}
-                    {!user.is_active && (
-                      <Badge variant="secondary" className="text-xs">Inactive</Badge>
-                    )}
+                    <div className="flex items-center gap-2 pt-1 border-t mt-2">
+                      <div className="flex items-center gap-1 text-primary">
+                        <ListTodo className="h-3 w-3" />
+                        <span className="text-xs font-medium">{taskCounts[user.id] || 0} {language === 'bn' ? 'টাস্ক' : 'tasks'}</span>
+                      </div>
+                      {!user.is_active && (
+                        <Badge variant="secondary" className="text-xs ml-auto">Inactive</Badge>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
               );
