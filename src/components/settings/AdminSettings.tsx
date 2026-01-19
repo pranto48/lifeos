@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Shield, Users, Key, Calendar, Settings, Loader2, Crown, AlertTriangle, UserPlus, Trash2, Search } from 'lucide-react';
+import { Shield, Users, Key, Loader2, Crown, UserPlus, Trash2, Search, Briefcase, Home, Settings, Calendar, AlertTriangle } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -9,9 +10,10 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +43,15 @@ interface OAuthCredential {
   hasClientId: boolean;
   hasClientSecret: boolean;
   lastUpdated?: string;
+}
+
+interface WorkspacePermission {
+  id: string;
+  user_id: string;
+  office_enabled: boolean;
+  personal_enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 interface AdminSettingsProps {
@@ -73,6 +84,19 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
   
   // User email cache for displaying in role list
   const [userEmails, setUserEmails] = useState<Record<string, string>>({});
+  
+  // Workspace permissions state
+  const [workspacePermissions, setWorkspacePermissions] = useState<WorkspacePermission[]>([]);
+  const [permSearchQuery, setPermSearchQuery] = useState('');
+  const [permEmailSearch, setPermEmailSearch] = useState('');
+  const [permSearchResults, setPermSearchResults] = useState<UserSearchResult[]>([]);
+  const [searchingPermEmail, setSearchingPermEmail] = useState(false);
+  const [showPermSearchResults, setShowPermSearchResults] = useState(false);
+  const [newPermUserId, setNewPermUserId] = useState('');
+  const [newOfficeEnabled, setNewOfficeEnabled] = useState(true);
+  const [newPersonalEnabled, setNewPersonalEnabled] = useState(true);
+  const [addingPermission, setAddingPermission] = useState(false);
+  const [updatingPermission, setUpdatingPermission] = useState<string | null>(null);
 
   useEffect(() => {
     checkAdminStatus();
@@ -101,6 +125,7 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
       if (data) {
         await loadUserRoles();
         await loadOAuthCredentials();
+        await loadWorkspacePermissions();
       }
     } catch (error) {
       console.error('Failed to check admin status:', error);
@@ -171,6 +196,204 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
     setEmailSearch(result.email || result.full_name || result.user_id);
     setShowSearchResults(false);
   };
+
+  const loadWorkspacePermissions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('user_workspace_permissions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (data) {
+        setWorkspacePermissions(data as WorkspacePermission[]);
+        // Load emails for all user IDs
+        const userIds = data.map(r => r.user_id);
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, email, full_name')
+            .in('user_id', userIds);
+          
+          if (profiles) {
+            const emailMap: Record<string, string> = { ...userEmails };
+            profiles.forEach(p => {
+              emailMap[p.user_id] = p.email || p.full_name || '';
+            });
+            setUserEmails(emailMap);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load workspace permissions:', error);
+    }
+  };
+
+  const searchByEmailForPerm = async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setPermSearchResults([]);
+      setShowPermSearchResults(false);
+      return;
+    }
+
+    setSearchingPermEmail(true);
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('user_id, email, full_name')
+        .or(`email.ilike.%${query}%,full_name.ilike.%${query}%`)
+        .limit(10);
+
+      if (data) {
+        setPermSearchResults(data);
+        setShowPermSearchResults(true);
+      }
+    } catch (error) {
+      console.error('Failed to search users:', error);
+    } finally {
+      setSearchingPermEmail(false);
+    }
+  };
+
+  const selectUserForPerm = (result: UserSearchResult) => {
+    setNewPermUserId(result.user_id);
+    setPermEmailSearch(result.email || result.full_name || result.user_id);
+    setShowPermSearchResults(false);
+  };
+
+  const addWorkspacePermission = async () => {
+    if (!newPermUserId.trim()) {
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: language === 'bn' ? 'ইউজার আইডি প্রয়োজন।' : 'User ID is required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(newPermUserId.trim())) {
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: language === 'bn' ? 'অবৈধ ইউজার আইডি ফরম্যাট।' : 'Invalid User ID format.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setAddingPermission(true);
+    try {
+      // Check if permission already exists
+      const existingPerm = workspacePermissions.find(p => p.user_id === newPermUserId.trim());
+
+      if (existingPerm) {
+        // Update existing
+        const { error } = await supabase
+          .from('user_workspace_permissions')
+          .update({
+            office_enabled: newOfficeEnabled,
+            personal_enabled: newPersonalEnabled,
+          })
+          .eq('id', existingPerm.id);
+
+        if (error) throw error;
+
+        toast({
+          title: language === 'bn' ? 'সফল' : 'Success',
+          description: language === 'bn' ? 'অনুমতি আপডেট হয়েছে।' : 'Permissions updated.',
+        });
+      } else {
+        // Insert new
+        const { error } = await supabase
+          .from('user_workspace_permissions')
+          .insert({
+            user_id: newPermUserId.trim(),
+            office_enabled: newOfficeEnabled,
+            personal_enabled: newPersonalEnabled,
+          });
+
+        if (error) throw error;
+
+        toast({
+          title: language === 'bn' ? 'সফল' : 'Success',
+          description: language === 'bn' ? 'অনুমতি যোগ করা হয়েছে।' : 'Permissions added.',
+        });
+      }
+
+      setNewPermUserId('');
+      setPermEmailSearch('');
+      setNewOfficeEnabled(true);
+      setNewPersonalEnabled(true);
+      await loadWorkspacePermissions();
+    } catch (error: any) {
+      console.error('Failed to add permission:', error);
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: error.message || (language === 'bn' ? 'অনুমতি যোগ করতে ব্যর্থ।' : 'Failed to add permissions.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingPermission(false);
+    }
+  };
+
+  const updateWorkspacePermission = async (perm: WorkspacePermission, field: 'office_enabled' | 'personal_enabled', value: boolean) => {
+    setUpdatingPermission(perm.id);
+    try {
+      const { error } = await supabase
+        .from('user_workspace_permissions')
+        .update({ [field]: value })
+        .eq('id', perm.id);
+
+      if (error) throw error;
+
+      toast({
+        title: language === 'bn' ? 'সফল' : 'Success',
+        description: language === 'bn' ? 'অনুমতি আপডেট হয়েছে।' : 'Permission updated.',
+      });
+
+      await loadWorkspacePermissions();
+    } catch (error: any) {
+      console.error('Failed to update permission:', error);
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: error.message || (language === 'bn' ? 'অনুমতি আপডেট ব্যর্থ।' : 'Failed to update permission.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setUpdatingPermission(null);
+    }
+  };
+
+  const deleteWorkspacePermission = async (permId: string) => {
+    try {
+      const { error } = await supabase
+        .from('user_workspace_permissions')
+        .delete()
+        .eq('id', permId);
+
+      if (error) throw error;
+
+      toast({
+        title: language === 'bn' ? 'সফল' : 'Success',
+        description: language === 'bn' ? 'অনুমতি মুছে ফেলা হয়েছে।' : 'Permission removed.',
+      });
+
+      await loadWorkspacePermissions();
+    } catch (error: any) {
+      console.error('Failed to delete permission:', error);
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: error.message || (language === 'bn' ? 'অনুমতি মুছতে ব্যর্থ।' : 'Failed to remove permission.'),
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const filteredPermissions = workspacePermissions.filter(perm => 
+    perm.user_id.toLowerCase().includes(permSearchQuery.toLowerCase()) ||
+    (userEmails[perm.user_id] || '').toLowerCase().includes(permSearchQuery.toLowerCase())
+  );
 
   const loadOAuthCredentials = async () => {
     setLoadingCredentials(true);
@@ -354,10 +577,14 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="users" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ইউজার' : 'Users'}</span>
+              </TabsTrigger>
+              <TabsTrigger value="workspaces" className="flex items-center gap-2">
+                <Briefcase className="h-4 w-4" />
+                <span className="hidden sm:inline">{language === 'bn' ? 'ওয়ার্কস্পেস' : 'Workspaces'}</span>
               </TabsTrigger>
               <TabsTrigger value="security" className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
@@ -551,6 +778,202 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                       {searchQuery 
                         ? (language === 'bn' ? 'কোনো মিল পাওয়া যায়নি।' : 'No matches found.')
                         : (language === 'bn' ? 'কোনো রোল পাওয়া যায়নি।' : 'No roles found.')
+                      }
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Workspace Permissions */}
+            <TabsContent value="workspaces" className="space-y-4 mt-4">
+              {/* Add Permission Section */}
+              <div className="p-4 rounded-lg border border-border bg-muted/30">
+                <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  {language === 'bn' ? 'ওয়ার্কস্পেস অনুমতি সেট করুন' : 'Set Workspace Permissions'}
+                </h4>
+                <div className="space-y-3">
+                  {/* Email Search */}
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder={language === 'bn' ? 'ইমেইল বা নাম দিয়ে খুঁজুন...' : 'Search by email or name...'}
+                        value={permEmailSearch}
+                        onChange={(e) => {
+                          setPermEmailSearch(e.target.value);
+                          searchByEmailForPerm(e.target.value);
+                        }}
+                        onFocus={() => permSearchResults.length > 0 && setShowPermSearchResults(true)}
+                        className="pl-9 bg-background"
+                      />
+                      {searchingPermEmail && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                    
+                    {/* Search Results Dropdown */}
+                    {showPermSearchResults && permSearchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-auto">
+                        {permSearchResults.map((result) => (
+                          <button
+                            key={result.user_id}
+                            type="button"
+                            className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                            onClick={() => selectUserForPerm(result)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Users className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {result.email || result.full_name || 'No email'}
+                              </p>
+                              <p className="text-xs text-muted-foreground font-mono truncate">
+                                {result.user_id}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showPermSearchResults && permSearchResults.length === 0 && permEmailSearch.length >= 2 && !searchingPermEmail && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg p-3 text-center text-sm text-muted-foreground">
+                        {language === 'bn' ? 'কোনো ইউজার পাওয়া যায়নি' : 'No users found'}
+                      </div>
+                    )}
+                  </div>
+
+                  <Input
+                    placeholder={language === 'bn' ? 'ইউজার আইডি (UUID)' : 'User ID (UUID)'}
+                    value={newPermUserId}
+                    onChange={(e) => setNewPermUserId(e.target.value)}
+                    className="bg-background font-mono text-sm"
+                  />
+
+                  <div className="flex flex-col sm:flex-row gap-4 p-3 bg-background rounded-lg border border-border">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id="new-office"
+                        checked={newOfficeEnabled}
+                        onCheckedChange={setNewOfficeEnabled}
+                      />
+                      <Label htmlFor="new-office" className="flex items-center gap-2 cursor-pointer">
+                        <Briefcase className="h-4 w-4" />
+                        {language === 'bn' ? 'অফিস মোড' : 'Office Mode'}
+                      </Label>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id="new-personal"
+                        checked={newPersonalEnabled}
+                        onCheckedChange={setNewPersonalEnabled}
+                      />
+                      <Label htmlFor="new-personal" className="flex items-center gap-2 cursor-pointer">
+                        <Home className="h-4 w-4" />
+                        {language === 'bn' ? 'পার্সোনাল মোড' : 'Personal Mode'}
+                      </Label>
+                    </div>
+                  </div>
+
+                  <Button onClick={addWorkspacePermission} disabled={addingPermission || !newPermUserId.trim()}>
+                    {addingPermission ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <UserPlus className="h-4 w-4" />
+                    )}
+                    <span className="ml-2">{language === 'bn' ? 'সেট করুন' : 'Set Permissions'}</span>
+                  </Button>
+
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'bn' 
+                      ? 'ইউজারের জন্য কোন ওয়ার্কস্পেস মোড সক্রিয় থাকবে তা নির্ধারণ করুন। ডিফল্টভাবে সব মোড সক্রিয়।'
+                      : 'Set which workspace modes are enabled for a user. All modes are enabled by default.'
+                    }
+                  </p>
+                </div>
+              </div>
+
+              {/* Existing Permissions */}
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-foreground">
+                  {language === 'bn' ? 'বর্তমান অনুমতিসমূহ' : 'Current Permissions'}
+                </h4>
+                <Badge variant="outline">
+                  {workspacePermissions.length} {language === 'bn' ? 'ইউজার' : 'users'}
+                </Badge>
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={language === 'bn' ? 'অনুমতি খুঁজুন...' : 'Search permissions...'}
+                  value={permSearchQuery}
+                  onChange={(e) => setPermSearchQuery(e.target.value)}
+                  className="pl-9 bg-muted/50"
+                />
+              </div>
+
+              <ScrollArea className="h-[250px] rounded-lg border border-border">
+                <div className="p-3 space-y-2">
+                  {filteredPermissions.map((perm) => (
+                    <div key={perm.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <Users className="h-4 w-4 text-primary" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-foreground truncate max-w-[150px] sm:max-w-[200px]">
+                            {userEmails[perm.user_id] || (
+                              <span className="text-muted-foreground italic">
+                                {language === 'bn' ? 'ইমেইল নেই' : 'No email'}
+                              </span>
+                            )}
+                            {perm.user_id === user?.id && (
+                              <span className="ml-2 text-primary text-xs">(you)</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-muted-foreground font-mono truncate max-w-[150px] sm:max-w-[180px]">
+                            {perm.user_id}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <Switch
+                              checked={perm.office_enabled}
+                              onCheckedChange={(checked) => updateWorkspacePermission(perm, 'office_enabled', checked)}
+                              disabled={updatingPermission === perm.id}
+                            />
+                            <Briefcase className={`h-3 w-3 ${perm.office_enabled ? 'text-foreground' : 'text-muted-foreground'}`} />
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Switch
+                              checked={perm.personal_enabled}
+                              onCheckedChange={(checked) => updateWorkspacePermission(perm, 'personal_enabled', checked)}
+                              disabled={updatingPermission === perm.id}
+                            />
+                            <Home className={`h-3 w-3 ${perm.personal_enabled ? 'text-foreground' : 'text-muted-foreground'}`} />
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => deleteWorkspacePermission(perm.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {filteredPermissions.length === 0 && (
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      {permSearchQuery 
+                        ? (language === 'bn' ? 'কোনো মিল পাওয়া যায়নি।' : 'No matches found.')
+                        : (language === 'bn' ? 'কোনো কাস্টম অনুমতি নেই। সব ইউজারের সব মোড সক্রিয়।' : 'No custom permissions. All users have all modes enabled.')
                       }
                     </div>
                   )}
