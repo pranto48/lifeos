@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  lifeos:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: lifeos-app
+    ports:
+      - "8080:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Add a reverse proxy with SSL
+  # nginx-proxy:
+  #   image: jwilder/nginx-proxy
+  #   container_name: nginx-proxy
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - /var/run/docker.sock:/tmp/docker.sock:ro
+  #     - ./certs:/etc/nginx/certs
+  #   restart: unless-stopped
+
+networks:
+  default:
+    name: lifeos-network
