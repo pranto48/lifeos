@@ -17,6 +17,7 @@ import { PushNotificationSettings } from '@/components/settings/PushNotification
 import { TrustedDevicesManagement } from '@/components/settings/TrustedDevicesManagement';
 import { DataExport } from '@/components/settings/DataExport';
 import { CalendarIntegrationSettings } from '@/components/settings/CalendarIntegrationSettings';
+import { AdminSettings } from '@/components/settings/AdminSettings';
 export default function Settings() {
   const { user, signOut } = useAuth();
   const { language, setLanguage, t } = useLanguage();
@@ -176,6 +177,8 @@ export default function Settings() {
       </Card>
 
       <DataExport />
+
+      <AdminSettings />
 
       <Card className="bg-card border-border">
         <CardHeader>
