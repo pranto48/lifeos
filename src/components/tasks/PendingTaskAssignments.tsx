@@ -16,6 +16,7 @@ interface TaskAssignment {
   assigned_to: string;
   status: string;
   assigned_at: string;
+  message: string | null;
   task: {
     id: string;
     title: string;
@@ -137,32 +138,29 @@ export function PendingTaskAssignments({ onAccepted }: PendingTaskAssignmentsPro
 
       if (accept) {
         // Create a copy of the task for the accepting user
-        const { data: originalTask } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('id', assignment.task_id)
-          .single();
-
-        if (originalTask) {
+        // The task data should be available now thanks to RLS policy for assignees
+        const taskData = assignment.task;
+        
+        if (taskData && taskData.title !== 'Unknown Task') {
           const { error: insertError } = await supabase
             .from('tasks')
             .insert({
               user_id: user.id,
-              title: originalTask.title,
-              description: originalTask.description 
-                ? `${originalTask.description}\n\n[Assigned by: ${assignment.assigner?.full_name || assignment.assigner?.email || 'Unknown'}]`
-                : `[Assigned by: ${assignment.assigner?.full_name || assignment.assigner?.email || 'Unknown'}]`,
-              priority: originalTask.priority,
+              title: taskData.title,
+              description: taskData.description 
+                ? `${taskData.description}\n\n[Assigned by: ${assignment.assigner?.full_name || assignment.assigner?.email || 'Unknown'}]${assignment.message ? `\n[Message: ${assignment.message}]` : ''}`
+                : `[Assigned by: ${assignment.assigner?.full_name || assignment.assigner?.email || 'Unknown'}]${assignment.message ? `\n[Message: ${assignment.message}]` : ''}`,
+              priority: taskData.priority,
               status: 'todo',
-              due_date: originalTask.due_date,
-              task_type: originalTask.task_type,
-              is_recurring: originalTask.is_recurring,
-              recurring_pattern: originalTask.recurring_pattern,
+              due_date: taskData.due_date,
+              task_type: taskData.task_type,
               category_id: null, // User can assign their own category
-              tags: originalTask.tags
             });
 
           if (insertError) throw insertError;
+        } else {
+          toast.error('Could not find task details');
+          return;
         }
 
         toast.success('Task accepted and added to your list');
@@ -261,6 +259,12 @@ export function PendingTaskAssignments({ onAccepted }: PendingTaskAssignmentsPro
               {assignment.task.description && (
                 <p className="text-sm text-muted-foreground line-clamp-2">
                   {assignment.task.description}
+                </p>
+              )}
+
+              {assignment.message && (
+                <p className="text-sm text-primary/80 italic border-l-2 border-primary/40 pl-2">
+                  "{assignment.message}"
                 </p>
               )}
 
