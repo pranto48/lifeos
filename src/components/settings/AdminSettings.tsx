@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Shield, Users, Key, Loader2, Crown, UserPlus, Trash2, Search, Briefcase, Home, Settings, Calendar, AlertTriangle } from 'lucide-react';
+import { Shield, Users, Key, Loader2, Crown, UserPlus, Trash2, Search, Briefcase, Home, Settings, Calendar, AlertTriangle, Mail } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -24,6 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { SmtpSettings } from './SmtpSettings';
 
 interface UserRole {
   id: string;
@@ -578,7 +579,7 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="users" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="users" className="flex items-center gap-2">
                 <Users className="h-4 w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ইউজার' : 'Users'}</span>
@@ -586,6 +587,10 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
               <TabsTrigger value="workspaces" className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ওয়ার্কস্পেস' : 'Workspaces'}</span>
+              </TabsTrigger>
+              <TabsTrigger value="email" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                <span className="hidden sm:inline">{language === 'bn' ? 'ইমেইল' : 'Email'}</span>
               </TabsTrigger>
               <TabsTrigger value="security" className="flex items-center gap-2">
                 <Shield className="h-4 w-4" />
@@ -980,6 +985,11 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                   )}
                 </div>
               </ScrollArea>
+            </TabsContent>
+
+            {/* Email/SMTP Settings */}
+            <TabsContent value="email" className="space-y-4 mt-4">
+              <SmtpSettings />
             </TabsContent>
 
             {/* Security Settings */}
