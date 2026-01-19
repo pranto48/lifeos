@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Download, FileJson, FileSpreadsheet, FileText, Upload, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Download, FileJson, FileSpreadsheet, FileText, Upload, Loader2, Calendar, Clock, Database, CheckCircle2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -8,15 +8,165 @@ import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { format, addDays, addWeeks, addMonths, startOfDay } from 'date-fns';
+
+interface BackupSchedule {
+  id: string;
+  frequency: string;
+  day_of_week: number | null;
+  day_of_month: number | null;
+  last_backup_at: string | null;
+  next_backup_at: string;
+  is_active: boolean;
+}
 
 export function DataExport() {
   const { user } = useAuth();
   const { language } = useLanguage();
   const [exporting, setExporting] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [schedule, setSchedule] = useState<BackupSchedule | null>(null);
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [frequency, setFrequency] = useState<string>('weekly');
+  const [dayOfWeek, setDayOfWeek] = useState<number>(0); // Sunday
+  const [dayOfMonth, setDayOfMonth] = useState<number>(1);
+  const [isActive, setIsActive] = useState(false);
+
+  useEffect(() => {
+    loadBackupSchedule();
+  }, [user]);
+
+  const loadBackupSchedule = async () => {
+    if (!user) return;
+    setLoadingSchedule(true);
+    try {
+      const { data, error } = await supabase
+        .from('backup_schedules')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (data) {
+        setSchedule(data);
+        setFrequency(data.frequency);
+        setDayOfWeek(data.day_of_week ?? 0);
+        setDayOfMonth(data.day_of_month ?? 1);
+        setIsActive(data.is_active);
+      }
+    } catch (error) {
+      console.error('Failed to load backup schedule:', error);
+    } finally {
+      setLoadingSchedule(false);
+    }
+  };
+
+  const calculateNextBackup = (freq: string, dow: number, dom: number): Date => {
+    const now = new Date();
+    const today = startOfDay(now);
+    
+    if (freq === 'daily') {
+      return addDays(today, 1);
+    } else if (freq === 'weekly') {
+      const currentDay = today.getDay();
+      const daysUntil = dow >= currentDay ? dow - currentDay : 7 - (currentDay - dow);
+      return addDays(today, daysUntil === 0 ? 7 : daysUntil);
+    } else if (freq === 'monthly') {
+      const nextMonth = addMonths(today, today.getDate() >= dom ? 1 : 0);
+      return new Date(nextMonth.getFullYear(), nextMonth.getMonth(), dom);
+    }
+    return addWeeks(today, 1);
+  };
+
+  const saveBackupSchedule = async () => {
+    if (!user) return;
+    setSavingSchedule(true);
+    try {
+      const nextBackup = calculateNextBackup(frequency, dayOfWeek, dayOfMonth);
+      
+      const scheduleData = {
+        user_id: user.id,
+        frequency,
+        day_of_week: frequency === 'weekly' ? dayOfWeek : null,
+        day_of_month: frequency === 'monthly' ? dayOfMonth : null,
+        next_backup_at: nextBackup.toISOString(),
+        is_active: isActive,
+      };
+
+      if (schedule?.id) {
+        const { error } = await supabase
+          .from('backup_schedules')
+          .update(scheduleData)
+          .eq('id', schedule.id);
+        
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('backup_schedules')
+          .insert(scheduleData);
+        
+        if (error) throw error;
+      }
+
+      await loadBackupSchedule();
+      toast({
+        title: language === 'bn' ? 'সেটিংস সেভ হয়েছে' : 'Settings Saved',
+        description: language === 'bn' 
+          ? 'ব্যাকআপ শিডিউল আপডেট হয়েছে।'
+          : 'Backup schedule has been updated.',
+      });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setSavingSchedule(false);
+    }
+  };
+
+  const runManualBackup = async () => {
+    setExporting('manual');
+    try {
+      const data = await fetchAllData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lifeos-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      // Update last backup timestamp if schedule exists
+      if (schedule?.id) {
+        const nextBackup = calculateNextBackup(frequency, dayOfWeek, dayOfMonth);
+        await supabase
+          .from('backup_schedules')
+          .update({ 
+            last_backup_at: new Date().toISOString(),
+            next_backup_at: nextBackup.toISOString()
+          })
+          .eq('id', schedule.id);
+        await loadBackupSchedule();
+      }
+
+      toast({ 
+        title: language === 'bn' ? 'ব্যাকআপ সম্পন্ন' : 'Backup Complete',
+        description: language === 'bn' ? 'ডাটাবেস ব্যাকআপ ডাউনলোড হয়েছে।' : 'Database backup has been downloaded.'
+      });
+    } catch (error: any) {
+      toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } finally {
+      setExporting(null);
+    }
+  };
 
   const fetchAllData = async () => {
-    const [tasks, notes, transactions, goals, investments, projects, salaries, habits, family, familyEvents] = await Promise.all([
+    const [
+      tasks, notes, transactions, goals, investments, projects, 
+      salaries, habits, family, familyEvents, budgets, budgetCategories,
+      taskCategories, habitCompletions, goalMilestones, projectMilestones
+    ] = await Promise.all([
       supabase.from('tasks').select('*').eq('user_id', user?.id),
       supabase.from('notes').select('id, title, content, tags, is_pinned, is_favorite, is_vault, note_type, created_at, updated_at').eq('user_id', user?.id),
       supabase.from('transactions').select('*').eq('user_id', user?.id),
@@ -27,6 +177,12 @@ export function DataExport() {
       supabase.from('habits').select('*').eq('user_id', user?.id),
       supabase.from('family_members').select('*').eq('user_id', user?.id),
       supabase.from('family_events').select('*').eq('user_id', user?.id),
+      supabase.from('budgets').select('*').eq('user_id', user?.id),
+      supabase.from('budget_categories').select('*').eq('user_id', user?.id),
+      supabase.from('task_categories').select('*').eq('user_id', user?.id),
+      supabase.from('habit_completions').select('*').eq('user_id', user?.id),
+      supabase.from('goal_milestones').select('*').eq('user_id', user?.id),
+      supabase.from('project_milestones').select('*').eq('user_id', user?.id),
     ]);
 
     return {
@@ -40,7 +196,14 @@ export function DataExport() {
       habits: habits.data || [],
       family: family.data || [],
       familyEvents: familyEvents.data || [],
+      budgets: budgets.data || [],
+      budgetCategories: budgetCategories.data || [],
+      taskCategories: taskCategories.data || [],
+      habitCompletions: habitCompletions.data || [],
+      goalMilestones: goalMilestones.data || [],
+      projectMilestones: projectMilestones.data || [],
       exportedAt: new Date().toISOString(),
+      version: '2.0',
     };
   };
 
@@ -97,6 +260,9 @@ export function DataExport() {
       csvContent += arrayToCSV(data.habits, 'Habits');
       csvContent += arrayToCSV(data.family, 'Family Members');
       csvContent += arrayToCSV(data.familyEvents, 'Family Events');
+      csvContent += arrayToCSV(data.budgets, 'Budgets');
+      csvContent += arrayToCSV(data.budgetCategories, 'Budget Categories');
+      csvContent += arrayToCSV(data.taskCategories, 'Task Categories');
 
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = URL.createObjectURL(blob);
@@ -180,7 +346,7 @@ export function DataExport() {
           <h2>Habits (${data.habits.length})</h2>
           <table>
             <tr><th>Name</th><th>Frequency</th><th>Created</th></tr>
-            ${data.habits.map((h: any) => `<tr><td>${h.name}</td><td>${h.frequency || 'daily'}</td><td>${new Date(h.created_at).toLocaleDateString()}</td></tr>`).join('')}
+            ${data.habits.map((h: any) => `<tr><td>${h.title}</td><td>${h.frequency || 'daily'}</td><td>${new Date(h.created_at).toLocaleDateString()}</td></tr>`).join('')}
           </table>
 
           <h2>Family Members (${data.family.length})</h2>
@@ -288,87 +454,258 @@ export function DataExport() {
     }
   };
 
+  const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const dayNamesBn = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+
   return (
-    <Card className="bg-card border-border">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <Download className="h-5 w-5" /> 
-          {language === 'bn' ? 'ডেটা এক্সপোর্ট ও ইমপোর্ট' : 'Data Export & Import'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
-          {language === 'bn' 
-            ? 'আপনার সমস্ত ডেটা বিভিন্ন ফরম্যাটে এক্সপোর্ট করুন বা পূর্বের ব্যাকআপ থেকে ইমপোর্ট করুন।'
-            : 'Export all your data in various formats or import from a previous backup.'
-          }
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Button 
-            variant="outline" 
-            onClick={exportJSON} 
-            disabled={exporting !== null}
-            className="flex items-center gap-2"
-          >
-            {exporting === 'json' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileJson className="h-4 w-4" />
-            )}
-            JSON
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={exportCSV} 
-            disabled={exporting !== null}
-            className="flex items-center gap-2"
-          >
-            {exporting === 'csv' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="h-4 w-4" />
-            )}
-            CSV
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={exportPDF} 
-            disabled={exporting !== null}
-            className="flex items-center gap-2"
-          >
-            {exporting === 'pdf' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4" />
-            )}
-            PDF
-          </Button>
-        </div>
-
-        <div className="pt-4 border-t border-border">
-          <Label htmlFor="import-file" className="text-sm font-medium">
-            {language === 'bn' ? 'JSON ব্যাকআপ ইমপোর্ট করুন' : 'Import JSON Backup'}
-          </Label>
-          <div className="flex items-center gap-2 mt-2">
-            <Input
-              id="import-file"
-              type="file"
-              accept=".json"
-              onChange={importJSON}
-              disabled={importing}
-              className="flex-1"
-            />
-            {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+    <div className="space-y-6">
+      {/* Database Backup Section */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <Database className="h-5 w-5" /> 
+            {language === 'bn' ? 'ডাটাবেস ব্যাকআপ' : 'Database Backup'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Quick Backup */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg">
+            <div className="space-y-1">
+              <h4 className="font-medium text-foreground">
+                {language === 'bn' ? 'সম্পূর্ণ ব্যাকআপ নিন' : 'Create Full Backup'}
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                {language === 'bn' 
+                  ? 'সমস্ত ডেটা সহ একটি সম্পূর্ণ ব্যাকআপ ফাইল ডাউনলোড করুন।'
+                  : 'Download a complete backup file with all your data.'
+                }
+              </p>
+            </div>
+            <Button 
+              onClick={runManualBackup} 
+              disabled={exporting === 'manual'}
+              className="flex items-center gap-2"
+            >
+              {exporting === 'manual' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {language === 'bn' ? 'ব্যাকআপ নিন' : 'Backup Now'}
+            </Button>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
+
+          {/* Backup Status */}
+          {schedule && (
+            <div className="p-4 border border-border rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-foreground flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  {language === 'bn' ? 'ব্যাকআপ স্ট্যাটাস' : 'Backup Status'}
+                </h4>
+                <Badge variant={schedule.is_active ? 'default' : 'secondary'}>
+                  {schedule.is_active 
+                    ? (language === 'bn' ? 'সক্রিয়' : 'Active') 
+                    : (language === 'bn' ? 'বন্ধ' : 'Inactive')
+                  }
+                </Badge>
+              </div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">{language === 'bn' ? 'শেষ ব্যাকআপ:' : 'Last Backup:'}</span>
+                  <p className="font-medium">
+                    {schedule.last_backup_at 
+                      ? format(new Date(schedule.last_backup_at), 'PPp')
+                      : (language === 'bn' ? 'এখনো হয়নি' : 'Never')
+                    }
+                  </p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">{language === 'bn' ? 'পরবর্তী ব্যাকআপ:' : 'Next Backup:'}</span>
+                  <p className="font-medium">
+                    {format(new Date(schedule.next_backup_at), 'PPp')}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Schedule Configuration */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h4 className="font-medium text-foreground flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                {language === 'bn' ? 'স্বয়ংক্রিয় ব্যাকআপ শিডিউল' : 'Automatic Backup Schedule'}
+              </h4>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="backup-active" className="text-sm">
+                  {language === 'bn' ? 'সক্রিয়' : 'Enabled'}
+                </Label>
+                <Switch
+                  id="backup-active"
+                  checked={isActive}
+                  onCheckedChange={setIsActive}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{language === 'bn' ? 'ফ্রিকোয়েন্সি' : 'Frequency'}</Label>
+                <Select value={frequency} onValueChange={setFrequency}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">{language === 'bn' ? 'প্রতিদিন' : 'Daily'}</SelectItem>
+                    <SelectItem value="weekly">{language === 'bn' ? 'সাপ্তাহিক' : 'Weekly'}</SelectItem>
+                    <SelectItem value="monthly">{language === 'bn' ? 'মাসিক' : 'Monthly'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {frequency === 'weekly' && (
+                <div className="space-y-2">
+                  <Label>{language === 'bn' ? 'দিন' : 'Day'}</Label>
+                  <Select value={String(dayOfWeek)} onValueChange={(v) => setDayOfWeek(Number(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {dayNames.map((day, i) => (
+                        <SelectItem key={i} value={String(i)}>
+                          {language === 'bn' ? dayNamesBn[i] : day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {frequency === 'monthly' && (
+                <div className="space-y-2">
+                  <Label>{language === 'bn' ? 'তারিখ' : 'Day of Month'}</Label>
+                  <Select value={String(dayOfMonth)} onValueChange={(v) => setDayOfMonth(Number(v))}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Array.from({ length: 28 }, (_, i) => i + 1).map((day) => (
+                        <SelectItem key={day} value={String(day)}>
+                          {day}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <Button 
+              onClick={saveBackupSchedule} 
+              disabled={savingSchedule || loadingSchedule}
+              className="w-full sm:w-auto"
+            >
+              {savingSchedule ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4 mr-2" />
+              )}
+              {language === 'bn' ? 'শিডিউল সেভ করুন' : 'Save Schedule'}
+            </Button>
+
+            <p className="text-xs text-muted-foreground">
+              {language === 'bn' 
+                ? 'দ্রষ্টব্য: স্বয়ংক্রিয় ব্যাকআপ শুধুমাত্র অ্যাপ খোলা থাকলে কাজ করবে। নির্ধারিত সময়ে ব্যাকআপ রিমাইন্ডার পাবেন।'
+                : 'Note: Automatic backups will remind you when the app is open at the scheduled time.'
+              }
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Export & Import Section */}
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <Download className="h-5 w-5" /> 
+            {language === 'bn' ? 'ডেটা এক্সপোর্ট ও ইমপোর্ট' : 'Data Export & Import'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-muted-foreground">
             {language === 'bn' 
-              ? 'দ্রষ্টব্য: ইমপোর্ট করা ডেটা বিদ্যমান ডেটার সাথে যুক্ত হবে, প্রতিস্থাপিত হবে না।'
-              : 'Note: Imported data will be added to existing data, not replaced.'
+              ? 'আপনার সমস্ত ডেটা বিভিন্ন ফরম্যাটে এক্সপোর্ট করুন বা পূর্বের ব্যাকআপ থেকে ইমপোর্ট করুন।'
+              : 'Export all your data in various formats or import from a previous backup.'
             }
           </p>
-        </div>
-      </CardContent>
-    </Card>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Button 
+              variant="outline" 
+              onClick={exportJSON} 
+              disabled={exporting !== null}
+              className="flex items-center gap-2"
+            >
+              {exporting === 'json' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileJson className="h-4 w-4" />
+              )}
+              JSON
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={exportCSV} 
+              disabled={exporting !== null}
+              className="flex items-center gap-2"
+            >
+              {exporting === 'csv' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4" />
+              )}
+              CSV
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={exportPDF} 
+              disabled={exporting !== null}
+              className="flex items-center gap-2"
+            >
+              {exporting === 'pdf' ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              PDF
+            </Button>
+          </div>
+
+          <div className="pt-4 border-t border-border">
+            <Label htmlFor="import-file" className="text-sm font-medium">
+              {language === 'bn' ? 'JSON ব্যাকআপ ইমপোর্ট করুন' : 'Import JSON Backup'}
+            </Label>
+            <div className="flex items-center gap-2 mt-2">
+              <Input
+                id="import-file"
+                type="file"
+                accept=".json"
+                onChange={importJSON}
+                disabled={importing}
+                className="flex-1"
+              />
+              {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {language === 'bn' 
+                ? 'দ্রষ্টব্য: ইমপোর্ট করা ডেটা বিদ্যমান ডেটার সাথে যুক্ত হবে, প্রতিস্থাপিত হবে না।'
+                : 'Note: Imported data will be added to existing data, not replaced.'
+              }
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   );
 }
