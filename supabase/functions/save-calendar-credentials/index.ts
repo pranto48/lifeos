@@ -47,6 +47,24 @@ serve(async (req) => {
 
     console.log(`[Save Calendar Credentials] Action: ${action}, Provider: ${provider}, User: ${userId}`);
 
+    // Check if user has admin role for write operations
+    if (action === "save") {
+      const { data: roleData, error: roleError } = await supabaseAdmin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("role", "admin")
+        .maybeSingle();
+
+      if (roleError || !roleData) {
+        console.log(`[Save Calendar Credentials] User ${userId} is not an admin, denying access`);
+        return new Response(JSON.stringify({ error: "Only administrators can modify OAuth credentials" }), {
+          status: 403,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
+
     if (action === "save") {
       if (!provider || !clientId) {
         return new Response(JSON.stringify({ error: "Provider and clientId are required" }), {
