@@ -13,6 +13,7 @@ export const translations = {
   'nav.salary': { bn: 'বেতন', en: 'Salary' },
   'nav.investments': { bn: 'বিনিয়োগ', en: 'Investments' },
   'nav.family': { bn: 'পরিবার', en: 'Family' },
+  'nav.supportUsers': { bn: 'সাপোর্ট ইউজার', en: 'Support Users' },
   'nav.settings': { bn: 'সেটিংস', en: 'Settings' },
 
   // Common
