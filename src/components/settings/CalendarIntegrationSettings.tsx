@@ -762,7 +762,7 @@ export function CalendarIntegrationSettings() {
                 <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
                   <li>Click on the project dropdown at the top</li>
                   <li>Click "New Project"</li>
-                  <li>Enter a project name (e.g., "ArifOS Calendar")</li>
+                  <li>Enter a project name (e.g., "LifeOS Calendar")</li>
                   <li>Click "Create"</li>
                 </ul>
               </div>
@@ -929,7 +929,7 @@ export function CalendarIntegrationSettings() {
                 <ul className="text-muted-foreground pl-8 space-y-1 list-disc list-inside">
                   <li>Go to "Microsoft Entra ID" (formerly Azure AD)</li>
                   <li>Click "App registrations" → "New registration"</li>
-                  <li>Enter a name (e.g., "ArifOS Calendar")</li>
+                  <li>Enter a name (e.g., "LifeOS Calendar")</li>
                   <li>Select "Accounts in any organizational directory and personal Microsoft accounts"</li>
                 </ul>
               </div>

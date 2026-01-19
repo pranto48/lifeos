@@ -565,39 +565,39 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
   return (
     <>
       <Card className="bg-card border-border">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-foreground">
-            <Crown className="h-5 w-5 text-yellow-500" />
+        <CardHeader className="p-4 md:p-6">
+          <CardTitle className="flex items-center gap-2 text-foreground text-base md:text-lg">
+            <Crown className="h-4 w-4 md:h-5 md:w-5 text-yellow-500" />
             {language === 'bn' ? 'এডমিন সেটিংস' : 'Admin Settings'}
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs md:text-sm">
             {language === 'bn' 
               ? 'অ্যাডমিনিস্ট্রেটর-শুধুমাত্র কনফিগারেশন এবং সেটিংস পরিচালনা করুন।'
               : 'Manage administrator-only configurations and settings.'
             }
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
           <Tabs defaultValue="users" className="w-full">
             <TabsList className="grid w-full grid-cols-5">
-              <TabsTrigger value="users" className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
+              <TabsTrigger value="users" className="flex items-center gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3">
+                <Users className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ইউজার' : 'Users'}</span>
               </TabsTrigger>
-              <TabsTrigger value="workspaces" className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4" />
+              <TabsTrigger value="workspaces" className="flex items-center gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3">
+                <Briefcase className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ওয়ার্কস্পেস' : 'Workspaces'}</span>
               </TabsTrigger>
-              <TabsTrigger value="email" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
+              <TabsTrigger value="email" className="flex items-center gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3">
+                <Mail className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ইমেইল' : 'Email'}</span>
               </TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
+              <TabsTrigger value="security" className="flex items-center gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3">
+                <Shield className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'সিকিউরিটি' : 'Security'}</span>
               </TabsTrigger>
-              <TabsTrigger value="integrations" className="flex items-center gap-2">
-                <Key className="h-4 w-4" />
+              <TabsTrigger value="integrations" className="flex items-center gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3">
+                <Key className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ইন্টিগ্রেশন' : 'Integrations'}</span>
               </TabsTrigger>
             </TabsList>
@@ -605,9 +605,9 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
             {/* Users & Role Management */}
             <TabsContent value="users" className="space-y-4 mt-4">
               {/* Add Role Section */}
-              <div className="p-4 rounded-lg border border-border bg-muted/30">
-                <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
-                  <UserPlus className="h-4 w-4" />
+              <div className="p-3 md:p-4 rounded-lg border border-border bg-muted/30">
+                <h4 className="font-medium text-foreground mb-3 flex items-center gap-2 text-sm md:text-base">
+                  <UserPlus className="h-3 w-3 md:h-4 md:w-4" />
                   {language === 'bn' ? 'নতুন রোল যোগ করুন' : 'Assign New Role'}
                 </h4>
                 <div className="space-y-3">

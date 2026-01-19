@@ -92,7 +92,7 @@ async function sendEmailNotification(
             </div>
             
             <div style="text-align: center;">
-              <a href="https://arifos.lovable.app/tasks" style="display: inline-block; background-color: ${actionColor}; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 14px;">
+              <a href="https://lifeos.lovable.app/tasks" style="display: inline-block; background-color: ${actionColor}; color: white; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 500; font-size: 14px;">
                 View Tasks
               </a>
             </div>

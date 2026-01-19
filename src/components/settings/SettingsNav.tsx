@@ -39,24 +39,24 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   // Account Group
-  { id: 'profile', labelEn: 'Profile', labelBn: 'প্রোফাইল', icon: <User className="h-4 w-4" />, group: 'account' },
-  { id: 'language', labelEn: 'Language', labelBn: 'ভাষা', icon: <Languages className="h-4 w-4" />, group: 'account' },
-  { id: 'preferences', labelEn: 'Preferences', labelBn: 'পছন্দসমূহ', icon: <Settings className="h-4 w-4" />, group: 'account' },
+  { id: 'profile', labelEn: 'Profile', labelBn: 'প্রোফাইল', icon: <User className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'account' },
+  { id: 'language', labelEn: 'Language', labelBn: 'ভাষা', icon: <Languages className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'account' },
+  { id: 'preferences', labelEn: 'Preferences', labelBn: 'পছন্দসমূহ', icon: <Settings className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'account' },
   
   // Security Group
-  { id: 'password', labelEn: 'Password', labelBn: 'পাসওয়ার্ড', icon: <KeyRound className="h-4 w-4" />, group: 'security' },
-  { id: '2fa', labelEn: 'Two-Factor Auth', labelBn: 'টু-ফ্যাক্টর অথ', icon: <Lock className="h-4 w-4" />, group: 'security' },
-  { id: 'sessions', labelEn: 'Sessions', labelBn: 'সেশন', icon: <Shield className="h-4 w-4" />, group: 'security' },
-  { id: 'devices', labelEn: 'Trusted Devices', labelBn: 'বিশ্বস্ত ডিভাইস', icon: <Smartphone className="h-4 w-4" />, group: 'security' },
-  { id: 'biometric', labelEn: 'Biometrics', labelBn: 'বায়োমেট্রিক', icon: <Fingerprint className="h-4 w-4" />, group: 'security' },
+  { id: 'password', labelEn: 'Password', labelBn: 'পাসওয়ার্ড', icon: <KeyRound className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'security' },
+  { id: '2fa', labelEn: 'Two-Factor Auth', labelBn: 'টু-ফ্যাক্টর অথ', icon: <Lock className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'security' },
+  { id: 'sessions', labelEn: 'Sessions', labelBn: 'সেশন', icon: <Shield className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'security' },
+  { id: 'devices', labelEn: 'Trusted Devices', labelBn: 'বিশ্বস্ত ডিভাইস', icon: <Smartphone className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'security' },
+  { id: 'biometric', labelEn: 'Biometrics', labelBn: 'বায়োমেট্রিক', icon: <Fingerprint className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'security' },
   
   // App Group
-  { id: 'notifications', labelEn: 'Notifications', labelBn: 'নোটিফিকেশন', icon: <Bell className="h-4 w-4" />, group: 'app' },
-  { id: 'calendar', labelEn: 'Calendar Sync', labelBn: 'ক্যালেন্ডার সিঙ্ক', icon: <Calendar className="h-4 w-4" />, group: 'app' },
-  { id: 'backup', labelEn: 'Backup & Restore', labelBn: 'ব্যাকআপ ও রিস্টোর', icon: <Database className="h-4 w-4" />, group: 'app' },
+  { id: 'notifications', labelEn: 'Notifications', labelBn: 'নোটিফিকেশন', icon: <Bell className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'app' },
+  { id: 'calendar', labelEn: 'Calendar Sync', labelBn: 'ক্যালেন্ডার সিঙ্ক', icon: <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'app' },
+  { id: 'backup', labelEn: 'Backup & Restore', labelBn: 'ব্যাকআপ ও রিস্টোর', icon: <Database className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'app' },
   
   // Admin Group
-  { id: 'admin', labelEn: 'Admin Panel', labelBn: 'এডমিন প্যানেল', icon: <Crown className="h-4 w-4" />, group: 'admin' },
+  { id: 'admin', labelEn: 'Admin Panel', labelBn: 'এডমিন প্যানেল', icon: <Crown className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'admin' },
 ];
 
 const groupLabels = {
@@ -78,14 +78,14 @@ export function SettingsNav({ activeCategory, onCategoryChange, isAdmin }: Setti
 
   return (
     <ScrollArea className="h-full">
-      <div className="space-y-6 p-4">
+      <div className="space-y-4 md:space-y-6 p-3 md:p-4">
         {groups.map(group => {
           const groupItems = filteredItems.filter(item => item.group === group);
           if (groupItems.length === 0) return null;
 
           return (
             <div key={group} className="space-y-1">
-              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-3 mb-2">
+              <h3 className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider px-2 md:px-3 mb-1.5 md:mb-2">
                 {language === 'bn' ? groupLabels[group].bn : groupLabels[group].en}
               </h3>
               {groupItems.map(item => (
@@ -93,17 +93,17 @@ export function SettingsNav({ activeCategory, onCategoryChange, isAdmin }: Setti
                   key={item.id}
                   variant="ghost"
                   className={cn(
-                    "w-full justify-start gap-3 h-10 px-3",
+                    "w-full justify-start gap-2 md:gap-3 h-9 md:h-10 px-2 md:px-3",
                     activeCategory === item.id && "bg-primary/10 text-primary hover:bg-primary/15"
                   )}
                   onClick={() => onCategoryChange(item.id)}
                 >
                   {item.icon}
-                  <span className="flex-1 text-left text-sm">
+                  <span className="flex-1 text-left text-xs md:text-sm">
                     {language === 'bn' ? item.labelBn : item.labelEn}
                   </span>
                   <ChevronRight className={cn(
-                    "h-4 w-4 text-muted-foreground transition-transform",
+                    "h-3 w-3 md:h-4 md:w-4 text-muted-foreground transition-transform",
                     activeCategory === item.id && "text-primary"
                   )} />
                 </Button>

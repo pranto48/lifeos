@@ -33,8 +33,8 @@ interface OnboardingSlide {
 const slides: OnboardingSlide[] = [
   {
     icon: <Sparkles className="w-16 h-16" />,
-    titleEn: "Welcome to Arifos",
-    titleBn: "আরিফস-এ স্বাগতম",
+    titleEn: "Welcome to LifeOS",
+    titleBn: "LifeOS-এ স্বাগতম",
     descriptionEn: "Your personal command center for managing life, work, and everything in between.",
     descriptionBn: "জীবন, কাজ এবং মাঝখানের সবকিছু পরিচালনার জন্য আপনার ব্যক্তিগত কমান্ড সেন্টার।",
     color: "from-primary/20 to-primary/5"
