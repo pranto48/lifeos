@@ -30,6 +30,12 @@ interface UserRole {
   created_at: string;
 }
 
+interface UserSearchResult {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+}
+
 interface OAuthCredential {
   provider: string;
   hasClientId: boolean;
@@ -58,6 +64,15 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState<UserRole | null>(null);
   const [deletingRole, setDeletingRole] = useState(false);
+  
+  // Email lookup state
+  const [emailSearch, setEmailSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
+  const [searchingEmail, setSearchingEmail] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
+  
+  // User email cache for displaying in role list
+  const [userEmails, setUserEmails] = useState<Record<string, string>>({});
 
   useEffect(() => {
     checkAdminStatus();
@@ -103,10 +118,58 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
 
       if (data) {
         setUserRoles(data);
+        // Load emails for all user IDs
+        const userIds = data.map(r => r.user_id);
+        if (userIds.length > 0) {
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('user_id, email, full_name')
+            .in('user_id', userIds);
+          
+          if (profiles) {
+            const emailMap: Record<string, string> = {};
+            profiles.forEach(p => {
+              emailMap[p.user_id] = p.email || p.full_name || '';
+            });
+            setUserEmails(emailMap);
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to load user roles:', error);
     }
+  };
+
+  const searchByEmail = async (query: string) => {
+    if (!query.trim() || query.length < 2) {
+      setSearchResults([]);
+      setShowSearchResults(false);
+      return;
+    }
+
+    setSearchingEmail(true);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_id, email, full_name')
+        .or(`email.ilike.%${query}%,full_name.ilike.%${query}%`)
+        .limit(10);
+
+      if (data) {
+        setSearchResults(data);
+        setShowSearchResults(true);
+      }
+    } catch (error) {
+      console.error('Failed to search users:', error);
+    } finally {
+      setSearchingEmail(false);
+    }
+  };
+
+  const selectUser = (result: UserSearchResult) => {
+    setNewUserId(result.user_id);
+    setEmailSearch(result.email || result.full_name || result.user_id);
+    setShowSearchResults(false);
   };
 
   const loadOAuthCredentials = async () => {
@@ -315,12 +378,63 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                   {language === 'bn' ? 'নতুন রোল যোগ করুন' : 'Assign New Role'}
                 </h4>
                 <div className="space-y-3">
+                  {/* Email Search */}
+                  <div className="relative">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder={language === 'bn' ? 'ইমেইল বা নাম দিয়ে খুঁজুন...' : 'Search by email or name...'}
+                        value={emailSearch}
+                        onChange={(e) => {
+                          setEmailSearch(e.target.value);
+                          searchByEmail(e.target.value);
+                        }}
+                        onFocus={() => searchResults.length > 0 && setShowSearchResults(true)}
+                        className="pl-9 bg-background"
+                      />
+                      {searchingEmail && (
+                        <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                    
+                    {/* Search Results Dropdown */}
+                    {showSearchResults && searchResults.length > 0 && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg max-h-48 overflow-auto">
+                        {searchResults.map((result) => (
+                          <button
+                            key={result.user_id}
+                            type="button"
+                            className="w-full px-3 py-2 text-left hover:bg-muted flex items-center gap-3 transition-colors"
+                            onClick={() => selectUser(result)}
+                          >
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <Users className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {result.email || result.full_name || 'No email'}
+                              </p>
+                              <p className="text-xs text-muted-foreground font-mono truncate">
+                                {result.user_id}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {showSearchResults && searchResults.length === 0 && emailSearch.length >= 2 && !searchingEmail && (
+                      <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-lg shadow-lg p-3 text-center text-sm text-muted-foreground">
+                        {language === 'bn' ? 'কোনো ইউজার পাওয়া যায়নি' : 'No users found'}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex flex-col sm:flex-row gap-3">
                     <Input
                       placeholder={language === 'bn' ? 'ইউজার আইডি (UUID)' : 'User ID (UUID)'}
                       value={newUserId}
                       onChange={(e) => setNewUserId(e.target.value)}
-                      className="flex-1 bg-background"
+                      className="flex-1 bg-background font-mono text-sm"
                     />
                     <Select value={newRole} onValueChange={(v: 'admin' | 'user') => setNewRole(v)}>
                       <SelectTrigger className="w-full sm:w-32 bg-background">
@@ -341,7 +455,7 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                         </SelectItem>
                       </SelectContent>
                     </Select>
-                    <Button onClick={assignRole} disabled={addingRole}>
+                    <Button onClick={assignRole} disabled={addingRole || !newUserId.trim()}>
                       {addingRole ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
@@ -352,8 +466,8 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                   </div>
                   <p className="text-xs text-muted-foreground">
                     {language === 'bn' 
-                      ? 'ইউজারের UUID দিয়ে তাদের একটি রোল বরাদ্দ করুন।'
-                      : 'Enter the user\'s UUID to assign them a role.'
+                      ? 'ইমেইল দিয়ে ইউজার খুঁজুন অথবা সরাসরি UUID দিন।'
+                      : 'Search users by email or enter UUID directly.'
                     }
                   </p>
                 </div>
@@ -394,12 +508,21 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                           )}
                         </div>
                         <div>
-                          <p className="text-xs text-muted-foreground font-mono truncate max-w-[150px] sm:max-w-[250px]">
-                            {role.user_id}
-                            {role.user_id === user?.id && (
-                              <span className="ml-2 text-primary">(you)</span>
-                            )}
-                          </p>
+                          <div>
+                            <p className="text-sm font-medium text-foreground truncate max-w-[150px] sm:max-w-[250px]">
+                              {userEmails[role.user_id] || (
+                                <span className="text-muted-foreground italic">
+                                  {language === 'bn' ? 'ইমেইল নেই' : 'No email'}
+                                </span>
+                              )}
+                              {role.user_id === user?.id && (
+                                <span className="ml-2 text-primary text-xs">(you)</span>
+                              )}
+                            </p>
+                            <p className="text-xs text-muted-foreground font-mono truncate max-w-[150px] sm:max-w-[200px]">
+                              {role.user_id}
+                            </p>
+                          </div>
                           <p className="text-xs text-muted-foreground">
                             {new Date(role.created_at).toLocaleDateString()}
                           </p>
