@@ -25,6 +25,7 @@ import { TaskCategoryManager } from '@/components/tasks/TaskCategoryManager';
 import { BulkCategoryAssign } from '@/components/tasks/BulkCategoryAssign';
 import { TaskAssignDialog } from '@/components/tasks/TaskAssignDialog';
 import { PendingTaskAssignments } from '@/components/tasks/PendingTaskAssignments';
+import { OutgoingTaskAssignments } from '@/components/tasks/OutgoingTaskAssignments';
 import {
   DndContext,
   closestCenter,
@@ -508,6 +509,9 @@ export default function Tasks() {
 
       {/* Pending Task Assignments */}
       <PendingTaskAssignments onAccepted={() => loadData(0, true)} />
+
+      {/* Outgoing Task Assignments */}
+      <OutgoingTaskAssignments />
 
       <div className="space-y-2">
         {filteredTasks.length === 0 ? (

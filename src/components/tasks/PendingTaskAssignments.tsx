@@ -171,6 +171,29 @@ export function PendingTaskAssignments({ onAccepted }: PendingTaskAssignmentsPro
         toast.success('Task assignment declined');
       }
 
+      // Send notification to assigner
+      try {
+        const { data: myProfile } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('user_id', user.id)
+          .single();
+
+        const myName = myProfile?.full_name || myProfile?.email || 'Someone';
+
+        await supabase.functions.invoke('send-task-assignment-notification', {
+          body: {
+            type: accept ? 'accepted' : 'rejected',
+            assignment_id: assignmentId,
+            recipient_user_id: assignment.assigned_by,
+            task_title: assignment.task.title,
+            sender_name: myName,
+          },
+        });
+      } catch (notifError) {
+        console.error('Failed to send notification:', notifError);
+      }
+
       // Remove from local state
       setAssignments(prev => prev.filter(a => a.id !== assignmentId));
     } catch (error) {
