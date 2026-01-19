@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Download, FileJson, FileSpreadsheet, FileText, Upload, Loader2, Calendar, Clock, Database, CheckCircle2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Download, FileJson, FileSpreadsheet, FileText, Upload, Loader2, Calendar, Clock, Database, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { format, addDays, addWeeks, addMonths, startOfDay } from 'date-fns';
 
 interface BackupSchedule {
@@ -28,12 +29,16 @@ export function DataExport() {
   const { language } = useLanguage();
   const [exporting, setExporting] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [restoring, setRestoring] = useState(false);
   const [schedule, setSchedule] = useState<BackupSchedule | null>(null);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [savingSchedule, setSavingSchedule] = useState(false);
   const [frequency, setFrequency] = useState<string>('weekly');
   const [dayOfWeek, setDayOfWeek] = useState<number>(0); // Sunday
   const [dayOfMonth, setDayOfMonth] = useState<number>(1);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [pendingRestoreData, setPendingRestoreData] = useState<any>(null);
+  const restoreInputRef = useRef<HTMLInputElement>(null);
   const [isActive, setIsActive] = useState(false);
 
   useEffect(() => {
@@ -454,6 +459,257 @@ export function DataExport() {
     }
   };
 
+  const handleRestoreFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+
+      // Validate structure
+      if (!data.exportedAt) {
+        throw new Error('Invalid backup file format');
+      }
+
+      setPendingRestoreData(data);
+      setRestoreDialogOpen(true);
+    } catch (error: any) {
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to read backup file', 
+        variant: 'destructive' 
+      });
+    } finally {
+      // Reset input
+      e.target.value = '';
+    }
+  };
+
+  const executeRestore = async () => {
+    if (!pendingRestoreData || !user) return;
+
+    setRestoring(true);
+    setRestoreDialogOpen(false);
+    
+    try {
+      const data = pendingRestoreData;
+      
+      // Delete all existing data first (in order to avoid foreign key issues)
+      // Delete dependent tables first
+      await Promise.all([
+        supabase.from('task_checklists').delete().eq('user_id', user.id),
+        supabase.from('habit_completions').delete().eq('user_id', user.id),
+        supabase.from('goal_milestones').delete().eq('user_id', user.id),
+        supabase.from('project_milestones').delete().eq('user_id', user.id),
+      ]);
+
+      // Delete main tables
+      await Promise.all([
+        supabase.from('tasks').delete().eq('user_id', user.id),
+        supabase.from('notes').delete().eq('user_id', user.id),
+        supabase.from('transactions').delete().eq('user_id', user.id),
+        supabase.from('goals').delete().eq('user_id', user.id),
+        supabase.from('investments').delete().eq('user_id', user.id),
+        supabase.from('projects').delete().eq('user_id', user.id),
+        supabase.from('salary_entries').delete().eq('user_id', user.id),
+        supabase.from('habits').delete().eq('user_id', user.id),
+        supabase.from('family_events').delete().eq('user_id', user.id),
+        supabase.from('budgets').delete().eq('user_id', user.id),
+      ]);
+
+      // Delete categories after budgets/tasks that reference them
+      await Promise.all([
+        supabase.from('budget_categories').delete().eq('user_id', user.id),
+        supabase.from('task_categories').delete().eq('user_id', user.id),
+        supabase.from('family_members').delete().eq('user_id', user.id),
+      ]);
+
+      let restored = 0;
+
+      // Restore budget categories first (needed for transactions and budgets)
+      if (data.budgetCategories?.length) {
+        const { error } = await supabase.from('budget_categories').insert(
+          data.budgetCategories.map((c: any) => ({
+            ...c,
+            user_id: user.id,
+          }))
+        );
+        if (!error) restored += data.budgetCategories.length;
+      }
+
+      // Restore task categories (needed for tasks)
+      if (data.taskCategories?.length) {
+        const { error } = await supabase.from('task_categories').insert(
+          data.taskCategories.map((c: any) => ({
+            ...c,
+            user_id: user.id,
+          }))
+        );
+        if (!error) restored += data.taskCategories.length;
+      }
+
+      // Restore family members (needed for family events)
+      if (data.family?.length) {
+        const { error } = await supabase.from('family_members').insert(
+          data.family.map((f: any) => ({
+            ...f,
+            user_id: user.id,
+          }))
+        );
+        if (!error) restored += data.family.length;
+      }
+
+      // Restore goals (needed for milestones)
+      if (data.goals?.length) {
+        const { error } = await supabase.from('goals').insert(
+          data.goals.map((g: any) => ({
+            ...g,
+            user_id: user.id,
+          }))
+        );
+        if (!error) restored += data.goals.length;
+      }
+
+      // Restore projects (needed for milestones and tasks)
+      if (data.projects?.length) {
+        const { error } = await supabase.from('projects').insert(
+          data.projects.map((p: any) => ({
+            ...p,
+            user_id: user.id,
+          }))
+        );
+        if (!error) restored += data.projects.length;
+      }
+
+      // Restore habits (needed for completions)
+      if (data.habits?.length) {
+        const { error } = await supabase.from('habits').insert(
+          data.habits.map((h: any) => ({
+            ...h,
+            user_id: user.id,
+          }))
+        );
+        if (!error) restored += data.habits.length;
+      }
+
+      // Restore tasks
+      if (data.tasks?.length) {
+        const { error } = await supabase.from('tasks').insert(
+          data.tasks.map((t: any) => ({
+            ...t,
+            user_id: user.id,
+          }))
+        );
+        if (!error) restored += data.tasks.length;
+      }
+
+      // Restore notes (excluding encrypted content for vault notes)
+      if (data.notes?.length) {
+        const { error } = await supabase.from('notes').insert(
+          data.notes.map((n: any) => ({
+            ...n,
+            user_id: user.id,
+            content: n.is_vault ? null : n.content,
+          }))
+        );
+        if (!error) restored += data.notes.length;
+      }
+
+      // Restore remaining main data
+      const restorePromises = [];
+
+      if (data.transactions?.length) {
+        restorePromises.push(
+          supabase.from('transactions').insert(
+            data.transactions.map((t: any) => ({ ...t, user_id: user.id }))
+          ).then(({ error }) => { if (!error) restored += data.transactions.length; })
+        );
+      }
+
+      if (data.investments?.length) {
+        restorePromises.push(
+          supabase.from('investments').insert(
+            data.investments.map((i: any) => ({ ...i, user_id: user.id }))
+          ).then(({ error }) => { if (!error) restored += data.investments.length; })
+        );
+      }
+
+      if (data.salaries?.length) {
+        restorePromises.push(
+          supabase.from('salary_entries').insert(
+            data.salaries.map((s: any) => ({ ...s, user_id: user.id }))
+          ).then(({ error }) => { if (!error) restored += data.salaries.length; })
+        );
+      }
+
+      if (data.familyEvents?.length) {
+        restorePromises.push(
+          supabase.from('family_events').insert(
+            data.familyEvents.map((e: any) => ({ ...e, user_id: user.id }))
+          ).then(({ error }) => { if (!error) restored += data.familyEvents.length; })
+        );
+      }
+
+      if (data.budgets?.length) {
+        restorePromises.push(
+          supabase.from('budgets').insert(
+            data.budgets.map((b: any) => ({ ...b, user_id: user.id }))
+          ).then(({ error }) => { if (!error) restored += data.budgets.length; })
+        );
+      }
+
+      // Restore dependent data (milestones, completions)
+      if (data.goalMilestones?.length) {
+        restorePromises.push(
+          supabase.from('goal_milestones').insert(
+            data.goalMilestones.map((m: any) => ({ ...m, user_id: user.id }))
+          ).then(({ error }) => { if (!error) restored += data.goalMilestones.length; })
+        );
+      }
+
+      if (data.projectMilestones?.length) {
+        restorePromises.push(
+          supabase.from('project_milestones').insert(
+            data.projectMilestones.map((m: any) => ({ ...m, user_id: user.id }))
+          ).then(({ error }) => { if (!error) restored += data.projectMilestones.length; })
+        );
+      }
+
+      if (data.habitCompletions?.length) {
+        restorePromises.push(
+          supabase.from('habit_completions').insert(
+            data.habitCompletions.map((c: any) => ({ ...c, user_id: user.id }))
+          ).then(({ error }) => { if (!error) restored += data.habitCompletions.length; })
+        );
+      }
+
+      await Promise.all(restorePromises);
+
+      toast({ 
+        title: language === 'bn' ? 'পুনরুদ্ধার সম্পন্ন' : 'Restore Complete',
+        description: language === 'bn' 
+          ? `${restored} আইটেম পুনরুদ্ধার হয়েছে। পেজ রিফ্রেশ করুন।`
+          : `${restored} items restored. Please refresh the page.`
+      });
+
+      // Reload the page after a short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
+
+    } catch (error: any) {
+      toast({ 
+        title: 'Error', 
+        description: error.message || 'Failed to restore data', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setRestoring(false);
+      setPendingRestoreData(null);
+    }
+  };
+
   const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const dayNamesBn = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
 
@@ -682,30 +938,115 @@ export function DataExport() {
             </Button>
           </div>
 
-          <div className="pt-4 border-t border-border">
-            <Label htmlFor="import-file" className="text-sm font-medium">
-              {language === 'bn' ? 'JSON ব্যাকআপ ইমপোর্ট করুন' : 'Import JSON Backup'}
-            </Label>
-            <div className="flex items-center gap-2 mt-2">
-              <Input
-                id="import-file"
-                type="file"
-                accept=".json"
-                onChange={importJSON}
-                disabled={importing}
-                className="flex-1"
-              />
-              {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+          <div className="pt-4 border-t border-border space-y-4">
+            {/* Additive Import */}
+            <div>
+              <Label htmlFor="import-file" className="text-sm font-medium flex items-center gap-2">
+                <Upload className="h-4 w-4" />
+                {language === 'bn' ? 'JSON ব্যাকআপ ইমপোর্ট করুন (যোগ করুন)' : 'Import JSON Backup (Add)'}
+              </Label>
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  id="import-file"
+                  type="file"
+                  accept=".json"
+                  onChange={importJSON}
+                  disabled={importing || restoring}
+                  className="flex-1"
+                />
+                {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {language === 'bn' 
+                  ? 'ইমপোর্ট করা ডেটা বিদ্যমান ডেটার সাথে যুক্ত হবে।'
+                  : 'Imported data will be added to existing data.'
+                }
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              {language === 'bn' 
-                ? 'দ্রষ্টব্য: ইমপোর্ট করা ডেটা বিদ্যমান ডেটার সাথে যুক্ত হবে, প্রতিস্থাপিত হবে না।'
-                : 'Note: Imported data will be added to existing data, not replaced.'
-              }
-            </p>
+
+            {/* Full Restore */}
+            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <Label htmlFor="restore-file" className="text-sm font-medium flex items-center gap-2 text-destructive">
+                <RotateCcw className="h-4 w-4" />
+                {language === 'bn' ? 'সম্পূর্ণ পুনরুদ্ধার (সবকিছু প্রতিস্থাপন করুন)' : 'Full Restore (Replace All Data)'}
+              </Label>
+              <div className="flex items-center gap-2 mt-2">
+                <Input
+                  id="restore-file"
+                  ref={restoreInputRef}
+                  type="file"
+                  accept=".json"
+                  onChange={handleRestoreFileSelect}
+                  disabled={importing || restoring}
+                  className="flex-1"
+                />
+                {restoring && <Loader2 className="h-4 w-4 animate-spin" />}
+              </div>
+              <p className="text-xs text-destructive/80 mt-1 flex items-start gap-1">
+                <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                {language === 'bn' 
+                  ? 'সতর্কতা: এটি আপনার সমস্ত বিদ্যমান ডেটা মুছে ফেলবে এবং ব্যাকআপ থেকে প্রতিস্থাপন করবে!'
+                  : 'Warning: This will DELETE all your existing data and replace with backup!'
+                }
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Restore Confirmation Dialog */}
+      <AlertDialog open={restoreDialogOpen} onOpenChange={setRestoreDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              {language === 'bn' ? 'সম্পূর্ণ পুনরুদ্ধার নিশ্চিত করুন' : 'Confirm Full Restore'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                {language === 'bn' 
+                  ? 'এই অপারেশন আপনার সমস্ত বিদ্যমান ডেটা স্থায়ীভাবে মুছে ফেলবে এবং নির্বাচিত ব্যাকআপ ফাইল থেকে প্রতিস্থাপন করবে।'
+                  : 'This operation will permanently DELETE all your existing data and replace it with the selected backup file.'
+                }
+              </p>
+              {pendingRestoreData && (
+                <div className="bg-muted p-3 rounded-lg text-sm">
+                  <p className="font-medium mb-2">
+                    {language === 'bn' ? 'ব্যাকআপ তথ্য:' : 'Backup Info:'}
+                  </p>
+                  <ul className="space-y-1 text-muted-foreground">
+                    <li>{language === 'bn' ? 'তারিখ' : 'Date'}: {new Date(pendingRestoreData.exportedAt).toLocaleString()}</li>
+                    <li>{language === 'bn' ? 'কাজ' : 'Tasks'}: {pendingRestoreData.tasks?.length || 0}</li>
+                    <li>{language === 'bn' ? 'নোট' : 'Notes'}: {pendingRestoreData.notes?.length || 0}</li>
+                    <li>{language === 'bn' ? 'গোল' : 'Goals'}: {pendingRestoreData.goals?.length || 0}</li>
+                    <li>{language === 'bn' ? 'প্রজেক্ট' : 'Projects'}: {pendingRestoreData.projects?.length || 0}</li>
+                    <li>{language === 'bn' ? 'লেনদেন' : 'Transactions'}: {pendingRestoreData.transactions?.length || 0}</li>
+                    <li>{language === 'bn' ? 'অভ্যাস' : 'Habits'}: {pendingRestoreData.habits?.length || 0}</li>
+                  </ul>
+                </div>
+              )}
+              <p className="font-semibold text-destructive">
+                {language === 'bn' 
+                  ? 'এই অপারেশন পূর্বাবস্থায় ফেরানো যাবে না!'
+                  : 'This action cannot be undone!'
+                }
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>
+              {language === 'bn' ? 'বাতিল' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeRestore}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              {language === 'bn' ? 'হ্যাঁ, সম্পূর্ণ পুনরুদ্ধার করুন' : 'Yes, Full Restore'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
