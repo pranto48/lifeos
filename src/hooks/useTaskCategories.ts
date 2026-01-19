@@ -8,6 +8,7 @@ export interface TaskCategory {
   color: string;
   icon: string | null;
   user_id: string;
+  is_admin_category?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -16,21 +17,35 @@ export function useTaskCategories() {
   const { user } = useAuth();
   const [categories, setCategories] = useState<TaskCategory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadCategories();
+      checkAdminStatus();
     }
   }, [user]);
+
+  const checkAdminStatus = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('role', 'admin')
+      .maybeSingle();
+    setIsAdmin(!!data);
+  };
 
   const loadCategories = async () => {
     if (!user) return;
     
     setLoading(true);
+    // Load both user's own categories and admin categories
     const { data, error } = await supabase
       .from('task_categories')
       .select('*')
-      .eq('user_id', user.id)
+      .or(`user_id.eq.${user.id},is_admin_category.eq.true`)
       .order('name', { ascending: true });
 
     if (!error && data) {
@@ -49,6 +64,7 @@ export function useTaskCategories() {
         name,
         color,
         icon: icon || 'Folder',
+        is_admin_category: isAdmin,
       })
       .select()
       .single();
@@ -86,12 +102,20 @@ export function useTaskCategories() {
     return false;
   };
 
+  // Check if user can edit a category (admin can edit all, users can only edit their own non-admin categories)
+  const canEditCategory = (category: TaskCategory) => {
+    if (isAdmin) return true;
+    return category.user_id === user?.id && !category.is_admin_category;
+  };
+
   return {
     categories,
     loading,
+    isAdmin,
     addCategory,
     updateCategory,
     deleteCategory,
+    canEditCategory,
     reload: loadCategories,
   };
 }
