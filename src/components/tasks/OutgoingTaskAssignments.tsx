@@ -124,28 +124,15 @@ export function OutgoingTaskAssignments() {
   };
 
   const handleReassign = (assignment: OutgoingAssignment) => {
-    // Delete the old declined assignment first
-    handleDeleteAndReassign(assignment);
+    // For declined assignments, offer direct reassign without deleting first
+    setReassigningTask({ id: assignment.task_id, title: assignment.task.title });
+    setReassignDialogOpen(true);
   };
 
-  const handleDeleteAndReassign = async (assignment: OutgoingAssignment) => {
-    try {
-      // Delete the declined assignment
-      await supabase
-        .from('task_assignments')
-        .delete()
-        .eq('id', assignment.id);
-
-      // Remove from local state
-      setAssignments(prev => prev.filter(a => a.id !== assignment.id));
-
-      // Open reassign dialog
-      setReassigningTask({ id: assignment.task_id, title: assignment.task.title });
-      setReassignDialogOpen(true);
-    } catch (error) {
-      console.error('Failed to prepare reassignment:', error);
-      toast.error('Failed to prepare reassignment');
-    }
+  const handleReassignComplete = async () => {
+    // Reload assignments to show new assignment
+    await loadAssignments();
+    toast.success('Task reassigned successfully');
   };
 
   const getInitials = (name: string | null, email: string | null) => {
@@ -297,11 +284,8 @@ export function OutgoingTaskAssignments() {
           onOpenChange={setReassignDialogOpen}
           taskId={reassigningTask.id}
           taskTitle={reassigningTask.title}
-          onAssigned={() => {
-            loadAssignments();
-            toast.success('Task reassigned successfully');
-          }}
-        />
+        onAssigned={handleReassignComplete}
+      />
       )}
     </>
   );
