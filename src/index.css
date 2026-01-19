@@ -306,6 +306,17 @@
   padding-bottom: calc(env(safe-area-inset-bottom, 0) + 1rem);
 }
 
+/* Ensure dropdowns and sheets render above everything on mobile */
+@media (max-width: 768px) {
+  [data-radix-popper-content-wrapper] {
+    z-index: 9999 !important;
+  }
+  
+  [data-state="open"][role="dialog"] {
+    z-index: 60 !important;
+  }
+}
+
 /* Touch-friendly targets */
 @media (max-width: 768px) {
   button, 

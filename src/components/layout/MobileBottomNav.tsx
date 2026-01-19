@@ -11,7 +11,7 @@ import {
   Repeat,
   Users as UsersIcon
 } from 'lucide-react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { cn } from '@/lib/utils';
@@ -53,6 +53,7 @@ export function MobileBottomNav() {
   const { t } = useLanguage();
   const { mode } = useDashboardMode();
   const location = useLocation();
+  const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isActive = (path: string) => {
@@ -68,14 +69,14 @@ export function MobileBottomNav() {
   });
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-sidebar/95 backdrop-blur-xl border-t border-sidebar-border safe-area-pb">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-sidebar/95 backdrop-blur-xl border-t border-sidebar-border safe-area-pb">
       <div className="flex items-center justify-around h-16 px-2">
         {primaryNavItems.map(item => (
           <NavLink
             key={item.url}
             to={item.url}
             className={cn(
-              'flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-lg transition-all active:scale-95',
+              'flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-lg transition-all active:scale-95 relative',
               isActive(item.url)
                 ? 'text-primary'
                 : 'text-muted-foreground'
@@ -102,23 +103,25 @@ export function MobileBottomNav() {
               )}
             >
               <Menu className="h-5 w-5" />
-              <span className="text-[10px] font-medium">More</span>
+              <span className="text-[10px] font-medium">{t('nav.more') || 'More'}</span>
             </button>
           </SheetTrigger>
-          <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl bg-sidebar border-sidebar-border">
+          <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl bg-sidebar border-sidebar-border z-[60]">
             <SheetHeader className="pb-4">
               <SheetTitle className="text-sidebar-foreground text-left">
-                All Features
+                {t('nav.allFeatures') || 'All Features'}
               </SheetTitle>
             </SheetHeader>
-            <div className="grid grid-cols-4 gap-4 pb-safe">
+            <div className="grid grid-cols-4 gap-3 pb-safe overflow-y-auto max-h-[calc(70vh-100px)]">
               {filteredAllNavItems.map(item => (
-                <NavLink
+                <button
                   key={item.url}
-                  to={item.url}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    navigate(item.url);
+                  }}
                   className={cn(
-                    'flex flex-col items-center justify-center gap-2 p-4 rounded-2xl transition-all active:scale-95',
+                    'flex flex-col items-center justify-center gap-2 p-3 rounded-2xl transition-all active:scale-95',
                     isActive(item.url)
                       ? 'bg-primary/20 text-primary'
                       : 'bg-secondary/50 text-sidebar-foreground hover:bg-secondary'
@@ -128,7 +131,7 @@ export function MobileBottomNav() {
                   <span className="text-xs font-medium text-center leading-tight">
                     {t(item.titleKey)}
                   </span>
-                </NavLink>
+                </button>
               ))}
             </div>
           </SheetContent>
