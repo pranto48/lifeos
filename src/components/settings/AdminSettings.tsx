@@ -1,16 +1,27 @@
 import { useState, useEffect } from 'react';
-import { Shield, Users, Key, Calendar, Settings, Loader2, Crown, AlertTriangle } from 'lucide-react';
+import { Shield, Users, Key, Calendar, Settings, Loader2, Crown, AlertTriangle, UserPlus, Trash2, Search } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface UserRole {
   id: string;
@@ -26,7 +37,11 @@ interface OAuthCredential {
   lastUpdated?: string;
 }
 
-export function AdminSettings() {
+interface AdminSettingsProps {
+  onAdminStatusChange?: (isAdmin: boolean) => void;
+}
+
+export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
   const { user } = useAuth();
   const { language } = useLanguage();
   const [isAdmin, setIsAdmin] = useState(false);
@@ -34,10 +49,23 @@ export function AdminSettings() {
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [oauthCredentials, setOAuthCredentials] = useState<OAuthCredential[]>([]);
   const [loadingCredentials, setLoadingCredentials] = useState(false);
+  
+  // Role management state
+  const [newUserId, setNewUserId] = useState('');
+  const [newRole, setNewRole] = useState<'admin' | 'user'>('user');
+  const [addingRole, setAddingRole] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [roleToDelete, setRoleToDelete] = useState<UserRole | null>(null);
+  const [deletingRole, setDeletingRole] = useState(false);
 
   useEffect(() => {
     checkAdminStatus();
   }, [user]);
+
+  useEffect(() => {
+    onAdminStatusChange?.(isAdmin);
+  }, [isAdmin, onAdminStatusChange]);
 
   const checkAdminStatus = async () => {
     if (!user) {
@@ -116,6 +144,122 @@ export function AdminSettings() {
     }
   };
 
+  const assignRole = async () => {
+    if (!newUserId.trim()) {
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: language === 'bn' ? 'ইউজার আইডি প্রয়োজন।' : 'User ID is required.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Validate UUID format
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(newUserId.trim())) {
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: language === 'bn' ? 'অবৈধ ইউজার আইডি ফরম্যাট।' : 'Invalid User ID format.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setAddingRole(true);
+    try {
+      // Check if role already exists
+      const existingRole = userRoles.find(
+        r => r.user_id === newUserId.trim() && r.role === newRole
+      );
+
+      if (existingRole) {
+        toast({
+          title: language === 'bn' ? 'ত্রুটি' : 'Error',
+          description: language === 'bn' ? 'এই রোল ইতিমধ্যে বিদ্যমান।' : 'This role already exists.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      const { error } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: newUserId.trim(),
+          role: newRole,
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: language === 'bn' ? 'সফল' : 'Success',
+        description: language === 'bn' ? 'রোল সফলভাবে যোগ করা হয়েছে।' : 'Role assigned successfully.',
+      });
+
+      setNewUserId('');
+      await loadUserRoles();
+    } catch (error: any) {
+      console.error('Failed to assign role:', error);
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: error.message || (language === 'bn' ? 'রোল যোগ করতে ব্যর্থ।' : 'Failed to assign role.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setAddingRole(false);
+    }
+  };
+
+  const confirmDeleteRole = (role: UserRole) => {
+    // Prevent deleting own admin role
+    if (role.user_id === user?.id && role.role === 'admin') {
+      toast({
+        title: language === 'bn' ? 'নিষেধ' : 'Not Allowed',
+        description: language === 'bn' ? 'আপনি নিজের এডমিন রোল মুছতে পারবেন না।' : 'You cannot revoke your own admin role.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setRoleToDelete(role);
+    setDeleteDialogOpen(true);
+  };
+
+  const deleteRole = async () => {
+    if (!roleToDelete) return;
+
+    setDeletingRole(true);
+    try {
+      const { error } = await supabase
+        .from('user_roles')
+        .delete()
+        .eq('id', roleToDelete.id);
+
+      if (error) throw error;
+
+      toast({
+        title: language === 'bn' ? 'সফল' : 'Success',
+        description: language === 'bn' ? 'রোল সফলভাবে মুছে ফেলা হয়েছে।' : 'Role revoked successfully.',
+      });
+
+      await loadUserRoles();
+    } catch (error: any) {
+      console.error('Failed to delete role:', error);
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: error.message || (language === 'bn' ? 'রোল মুছতে ব্যর্থ।' : 'Failed to revoke role.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setDeletingRole(false);
+      setDeleteDialogOpen(false);
+      setRoleToDelete(null);
+    }
+  };
+
+  const filteredRoles = userRoles.filter(role => 
+    role.user_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    role.role.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading) {
     return (
       <Card className="bg-card border-border">
@@ -127,234 +271,346 @@ export function AdminSettings() {
   }
 
   if (!isAdmin) {
-    return null; // Don't show admin settings to non-admins
+    return null;
   }
 
   return (
-    <Card className="bg-card border-border">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-foreground">
-          <Crown className="h-5 w-5 text-yellow-500" />
-          {language === 'bn' ? 'এডমিন সেটিংস' : 'Admin Settings'}
-        </CardTitle>
-        <CardDescription>
-          {language === 'bn' 
-            ? 'অ্যাডমিনিস্ট্রেটর-শুধুমাত্র কনফিগারেশন এবং সেটিংস পরিচালনা করুন।'
-            : 'Manage administrator-only configurations and settings.'
-          }
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="security" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="security" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              <span className="hidden sm:inline">{language === 'bn' ? 'সিকিউরিটি' : 'Security'}</span>
-            </TabsTrigger>
-            <TabsTrigger value="integrations" className="flex items-center gap-2">
-              <Key className="h-4 w-4" />
-              <span className="hidden sm:inline">{language === 'bn' ? 'ইন্টিগ্রেশন' : 'Integrations'}</span>
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">{language === 'bn' ? 'ইউজার' : 'Users'}</span>
-            </TabsTrigger>
-          </TabsList>
+    <>
+      <Card className="bg-card border-border">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-foreground">
+            <Crown className="h-5 w-5 text-yellow-500" />
+            {language === 'bn' ? 'এডমিন সেটিংস' : 'Admin Settings'}
+          </CardTitle>
+          <CardDescription>
+            {language === 'bn' 
+              ? 'অ্যাডমিনিস্ট্রেটর-শুধুমাত্র কনফিগারেশন এবং সেটিংস পরিচালনা করুন।'
+              : 'Manage administrator-only configurations and settings.'
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="users" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="users" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                <span className="hidden sm:inline">{language === 'bn' ? 'ইউজার' : 'Users'}</span>
+              </TabsTrigger>
+              <TabsTrigger value="security" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                <span className="hidden sm:inline">{language === 'bn' ? 'সিকিউরিটি' : 'Security'}</span>
+              </TabsTrigger>
+              <TabsTrigger value="integrations" className="flex items-center gap-2">
+                <Key className="h-4 w-4" />
+                <span className="hidden sm:inline">{language === 'bn' ? 'ইন্টিগ্রেশন' : 'Integrations'}</span>
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Security Settings */}
-          <TabsContent value="security" className="space-y-4 mt-4">
-            <div className="space-y-4">
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                  <Shield className="h-5 w-5 text-green-500" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-foreground">
-                    {language === 'bn' ? 'রো লেভেল সিকিউরিটি (RLS)' : 'Row Level Security (RLS)'}
-                  </h4>
-                  <p className="text-sm text-muted-foreground mt-1">
+            {/* Users & Role Management */}
+            <TabsContent value="users" className="space-y-4 mt-4">
+              {/* Add Role Section */}
+              <div className="p-4 rounded-lg border border-border bg-muted/30">
+                <h4 className="font-medium text-foreground mb-3 flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  {language === 'bn' ? 'নতুন রোল যোগ করুন' : 'Assign New Role'}
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <Input
+                      placeholder={language === 'bn' ? 'ইউজার আইডি (UUID)' : 'User ID (UUID)'}
+                      value={newUserId}
+                      onChange={(e) => setNewUserId(e.target.value)}
+                      className="flex-1 bg-background"
+                    />
+                    <Select value={newRole} onValueChange={(v: 'admin' | 'user') => setNewRole(v)}>
+                      <SelectTrigger className="w-full sm:w-32 bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="admin">
+                          <span className="flex items-center gap-2">
+                            <Crown className="h-3 w-3 text-yellow-500" />
+                            Admin
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="user">
+                          <span className="flex items-center gap-2">
+                            <Users className="h-3 w-3 text-blue-500" />
+                            User
+                          </span>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button onClick={assignRole} disabled={addingRole}>
+                      {addingRole ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-4 w-4" />
+                      )}
+                      <span className="ml-2">{language === 'bn' ? 'যোগ করুন' : 'Assign'}</span>
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
                     {language === 'bn' 
-                      ? 'সমস্ত টেবিলে RLS সক্রিয় আছে। ব্যবহারকারীরা শুধুমাত্র তাদের নিজস্ব ডেটা অ্যাক্সেস করতে পারেন।'
-                      : 'RLS is enabled on all tables. Users can only access their own data.'
+                      ? 'ইউজারের UUID দিয়ে তাদের একটি রোল বরাদ্দ করুন।'
+                      : 'Enter the user\'s UUID to assign them a role.'
                     }
                   </p>
-                  <Badge variant="outline" className="mt-2 text-green-500 border-green-500/30">
-                    {language === 'bn' ? 'সুরক্ষিত' : 'Secured'}
-                  </Badge>
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                  <Key className="h-5 w-5 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-foreground">
-                    {language === 'bn' ? 'এনক্রিপশন' : 'Encryption'}
-                  </h4>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {language === 'bn' 
-                      ? 'ভল্ট নোটে AES-256-GCM এনক্রিপশন ব্যবহার করা হয়। পাসফ্রেজ ব্রাউজারে থাকে।'
-                      : 'Vault notes use AES-256-GCM encryption. Passphrase stays in browser.'
-                    }
-                  </p>
-                  <Badge variant="outline" className="mt-2 text-primary border-primary/30">
-                    {language === 'bn' ? 'সক্রিয়' : 'Active'}
-                  </Badge>
-                </div>
+              {/* Existing Roles */}
+              <div className="flex items-center justify-between">
+                <h4 className="font-medium text-foreground">
+                  {language === 'bn' ? 'বর্তমান রোলসমূহ' : 'Current Roles'}
+                </h4>
+                <Badge variant="outline">
+                  {userRoles.length} {language === 'bn' ? 'রোল' : 'roles'}
+                </Badge>
               </div>
 
-              <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
-                <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                  <Settings className="h-5 w-5 text-blue-500" />
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-medium text-foreground">
-                    {language === 'bn' ? 'অডিট লগিং' : 'Audit Logging'}
-                  </h4>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {language === 'bn' 
-                      ? 'সমস্ত সংবেদনশীল ক্রিয়াকলাপ অডিট লগে রেকর্ড করা হয়।'
-                      : 'All sensitive operations are recorded in audit logs.'
-                    }
-                  </p>
-                  <Badge variant="outline" className="mt-2 text-blue-500 border-blue-500/30">
-                    {language === 'bn' ? 'সক্রিয়' : 'Enabled'}
-                  </Badge>
-                </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder={language === 'bn' ? 'রোল খুঁজুন...' : 'Search roles...'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 bg-muted/50"
+                />
               </div>
-            </div>
-          </TabsContent>
 
-          {/* Integrations Settings */}
-          <TabsContent value="integrations" className="space-y-4 mt-4">
-            <Alert>
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                {language === 'bn' 
-                  ? 'OAuth ক্রেডেনশিয়াল শুধুমাত্র অ্যাডমিন দ্বারা পরিবর্তন করা যাবে।'
-                  : 'OAuth credentials can only be modified by administrators.'
-                }
-              </AlertDescription>
-            </Alert>
-
-            <div className="space-y-3">
-              <h4 className="font-medium text-foreground flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                {language === 'bn' ? 'ক্যালেন্ডার ইন্টিগ্রেশন' : 'Calendar Integrations'}
-              </h4>
-
-              {loadingCredentials ? (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                </div>
-              ) : oauthCredentials.length > 0 ? (
-                <div className="space-y-2">
-                  {oauthCredentials.map((cred) => (
-                    <div key={cred.provider} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <ScrollArea className="h-[250px] rounded-lg border border-border">
+                <div className="p-3 space-y-2">
+                  {filteredRoles.map((role) => (
+                    <div key={role.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
                       <div className="flex items-center gap-3">
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          cred.provider === 'Google' ? 'bg-red-500/20' : 'bg-blue-500/20'
+                          role.role === 'admin' ? 'bg-yellow-500/20' : 'bg-blue-500/20'
                         }`}>
-                          <span className="text-sm font-bold">
-                            {cred.provider === 'Google' ? 'G' : 'M'}
-                          </span>
+                          {role.role === 'admin' ? (
+                            <Crown className="h-4 w-4 text-yellow-500" />
+                          ) : (
+                            <Users className="h-4 w-4 text-blue-500" />
+                          )}
                         </div>
                         <div>
-                          <p className="font-medium text-sm">{cred.provider} Calendar</p>
+                          <p className="text-xs text-muted-foreground font-mono truncate max-w-[150px] sm:max-w-[250px]">
+                            {role.user_id}
+                            {role.user_id === user?.id && (
+                              <span className="ml-2 text-primary">(you)</span>
+                            )}
+                          </p>
                           <p className="text-xs text-muted-foreground">
-                            OAuth 2.0 {language === 'bn' ? 'ক্রেডেনশিয়াল' : 'Credentials'}
+                            {new Date(role.created_at).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {cred.hasClientId && cred.hasClientSecret ? (
-                          <Badge variant="default" className="bg-green-500/20 text-green-500 hover:bg-green-500/30">
-                            {language === 'bn' ? 'কনফিগার করা হয়েছে' : 'Configured'}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">
-                            {language === 'bn' ? 'সেটআপ প্রয়োজন' : 'Needs Setup'}
-                          </Badge>
-                        )}
+                        <Badge variant={role.role === 'admin' ? 'default' : 'secondary'}>
+                          {role.role === 'admin' 
+                            ? (language === 'bn' ? 'এডমিন' : 'Admin') 
+                            : (language === 'bn' ? 'ইউজার' : 'User')
+                          }
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => confirmDeleteRole(role)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   ))}
-                </div>
-              ) : (
-                <div className="text-center py-4 text-muted-foreground text-sm">
-                  {language === 'bn' ? 'কোনো OAuth ক্রেডেনশিয়াল কনফিগার করা হয়নি।' : 'No OAuth credentials configured.'}
-                </div>
-              )}
-
-              <p className="text-xs text-muted-foreground">
-                {language === 'bn' 
-                  ? 'ক্যালেন্ডার সিঙ্ক সেটিংসে OAuth ক্রেডেনশিয়াল কনফিগার করুন।'
-                  : 'Configure OAuth credentials in Calendar Sync settings.'
-                }
-              </p>
-            </div>
-          </TabsContent>
-
-          {/* Users Settings */}
-          <TabsContent value="users" className="space-y-4 mt-4">
-            <div className="flex items-center justify-between">
-              <h4 className="font-medium text-foreground">
-                {language === 'bn' ? 'ইউজার রোল ম্যানেজমেন্ট' : 'User Role Management'}
-              </h4>
-              <Badge variant="outline">
-                {userRoles.length} {language === 'bn' ? 'রোল' : 'roles'}
-              </Badge>
-            </div>
-
-            <ScrollArea className="h-[200px] rounded-lg border border-border">
-              <div className="p-3 space-y-2">
-                {userRoles.map((role) => (
-                  <div key={role.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        role.role === 'admin' ? 'bg-yellow-500/20' : 'bg-blue-500/20'
-                      }`}>
-                        {role.role === 'admin' ? (
-                          <Crown className="h-4 w-4 text-yellow-500" />
-                        ) : (
-                          <Users className="h-4 w-4 text-blue-500" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-xs text-muted-foreground font-mono truncate max-w-[150px] sm:max-w-none">
-                          {role.user_id}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {new Date(role.created_at).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <Badge variant={role.role === 'admin' ? 'default' : 'secondary'}>
-                      {role.role === 'admin' 
-                        ? (language === 'bn' ? 'এডমিন' : 'Admin') 
-                        : (language === 'bn' ? 'ইউজার' : 'User')
+                  {filteredRoles.length === 0 && (
+                    <div className="text-center py-4 text-muted-foreground text-sm">
+                      {searchQuery 
+                        ? (language === 'bn' ? 'কোনো মিল পাওয়া যায়নি।' : 'No matches found.')
+                        : (language === 'bn' ? 'কোনো রোল পাওয়া যায়নি।' : 'No roles found.')
                       }
+                    </div>
+                  )}
+                </div>
+              </ScrollArea>
+            </TabsContent>
+
+            {/* Security Settings */}
+            <TabsContent value="security" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                    <Shield className="h-5 w-5 text-green-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-foreground">
+                      {language === 'bn' ? 'রো লেভেল সিকিউরিটি (RLS)' : 'Row Level Security (RLS)'}
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {language === 'bn' 
+                        ? 'সমস্ত টেবিলে RLS সক্রিয় আছে। ব্যবহারকারীরা শুধুমাত্র তাদের নিজস্ব ডেটা অ্যাক্সেস করতে পারেন।'
+                        : 'RLS is enabled on all tables. Users can only access their own data.'
+                      }
+                    </p>
+                    <Badge variant="outline" className="mt-2 text-green-500 border-green-500/30">
+                      {language === 'bn' ? 'সুরক্ষিত' : 'Secured'}
                     </Badge>
                   </div>
-                ))}
-                {userRoles.length === 0 && (
+                </div>
+
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                    <Key className="h-5 w-5 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-foreground">
+                      {language === 'bn' ? 'এনক্রিপশন' : 'Encryption'}
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {language === 'bn' 
+                        ? 'ভল্ট নোটে AES-256-GCM এনক্রিপশন ব্যবহার করা হয়। পাসফ্রেজ ব্রাউজারে থাকে।'
+                        : 'Vault notes use AES-256-GCM encryption. Passphrase stays in browser.'
+                      }
+                    </p>
+                    <Badge variant="outline" className="mt-2 text-primary border-primary/30">
+                      {language === 'bn' ? 'সক্রিয়' : 'Active'}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="flex items-start gap-3 p-4 rounded-lg bg-muted/50">
+                  <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+                    <Settings className="h-5 w-5 text-blue-500" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-medium text-foreground">
+                      {language === 'bn' ? 'অডিট লগিং' : 'Audit Logging'}
+                    </h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {language === 'bn' 
+                        ? 'সমস্ত সংবেদনশীল ক্রিয়াকলাপ অডিট লগে রেকর্ড করা হয়।'
+                        : 'All sensitive operations are recorded in audit logs.'
+                      }
+                    </p>
+                    <Badge variant="outline" className="mt-2 text-blue-500 border-blue-500/30">
+                      {language === 'bn' ? 'সক্রিয়' : 'Enabled'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            {/* Integrations Settings */}
+            <TabsContent value="integrations" className="space-y-4 mt-4">
+              <Alert>
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  {language === 'bn' 
+                    ? 'OAuth ক্রেডেনশিয়াল শুধুমাত্র অ্যাডমিন দ্বারা পরিবর্তন করা যাবে।'
+                    : 'OAuth credentials can only be modified by administrators.'
+                  }
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-3">
+                <h4 className="font-medium text-foreground flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  {language === 'bn' ? 'ক্যালেন্ডার ইন্টিগ্রেশন' : 'Calendar Integrations'}
+                </h4>
+
+                {loadingCredentials ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  </div>
+                ) : oauthCredentials.length > 0 ? (
+                  <div className="space-y-2">
+                    {oauthCredentials.map((cred) => (
+                      <div key={cred.provider} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                            cred.provider === 'Google' ? 'bg-red-500/20' : 'bg-blue-500/20'
+                          }`}>
+                            <span className="text-sm font-bold">
+                              {cred.provider === 'Google' ? 'G' : 'M'}
+                            </span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{cred.provider} Calendar</p>
+                            <p className="text-xs text-muted-foreground">
+                              OAuth 2.0 {language === 'bn' ? 'ক্রেডেনশিয়াল' : 'Credentials'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {cred.hasClientId && cred.hasClientSecret ? (
+                            <Badge variant="default" className="bg-green-500/20 text-green-500 hover:bg-green-500/30">
+                              {language === 'bn' ? 'কনফিগার করা হয়েছে' : 'Configured'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">
+                              {language === 'bn' ? 'সেটআপ প্রয়োজন' : 'Needs Setup'}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
                   <div className="text-center py-4 text-muted-foreground text-sm">
-                    {language === 'bn' ? 'কোনো রোল পাওয়া যায়নি।' : 'No roles found.'}
+                    {language === 'bn' ? 'কোনো OAuth ক্রেডেনশিয়াল কনফিগার করা হয়নি।' : 'No OAuth credentials configured.'}
                   </div>
                 )}
-              </div>
-            </ScrollArea>
 
-            <p className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground">
+                  {language === 'bn' 
+                    ? 'ক্যালেন্ডার সিঙ্ক সেটিংসে OAuth ক্রেডেনশিয়াল কনফিগার করুন।'
+                    : 'Configure OAuth credentials in Calendar Sync settings.'
+                  }
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive" />
+              {language === 'bn' ? 'রোল মুছুন' : 'Revoke Role'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
               {language === 'bn' 
-                ? 'নতুন এডমিন যোগ করতে ডাটাবেসে সরাসরি user_roles টেবিলে রোল যোগ করুন।'
-                : 'To add new admins, directly insert roles into the user_roles table in the database.'
+                ? `আপনি কি নিশ্চিত যে আপনি এই ইউজারের "${roleToDelete?.role}" রোল মুছতে চান?`
+                : `Are you sure you want to revoke the "${roleToDelete?.role}" role from this user?`
               }
-            </p>
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </Card>
+              <br />
+              <span className="font-mono text-xs mt-2 block">
+                {roleToDelete?.user_id}
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingRole}>
+              {language === 'bn' ? 'বাতিল' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteRole}
+              disabled={deletingRole}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deletingRole ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 mr-2" />
+              )}
+              {language === 'bn' ? 'মুছুন' : 'Revoke'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
