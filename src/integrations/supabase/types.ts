@@ -976,6 +976,127 @@ export type Database = {
         }
         Relationships: []
       }
+      support_departments: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          unit_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          unit_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          unit_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_departments_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "support_units"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      support_units: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      support_users: {
+        Row: {
+          created_at: string
+          department_id: string
+          designation: string | null
+          device_info: string | null
+          email: string | null
+          id: string
+          ip_address: string | null
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          department_id: string
+          designation?: string | null
+          device_info?: string | null
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          department_id?: string
+          designation?: string | null
+          device_info?: string | null
+          email?: string | null
+          id?: string
+          ip_address?: string | null
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_users_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "support_departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       synced_calendar_events: {
         Row: {
           created_at: string
@@ -1140,6 +1261,7 @@ export type Database = {
           recurring_pattern: string | null
           sort_order: number | null
           status: string | null
+          support_user_id: string | null
           tags: string[] | null
           task_type: string
           title: string
@@ -1161,6 +1283,7 @@ export type Database = {
           recurring_pattern?: string | null
           sort_order?: number | null
           status?: string | null
+          support_user_id?: string | null
           tags?: string[] | null
           task_type?: string
           title: string
@@ -1182,6 +1305,7 @@ export type Database = {
           recurring_pattern?: string | null
           sort_order?: number | null
           status?: string | null
+          support_user_id?: string | null
           tags?: string[] | null
           task_type?: string
           title?: string
@@ -1201,6 +1325,13 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_support_user_id_fkey"
+            columns: ["support_user_id"]
+            isOneToOne: false
+            referencedRelation: "support_users"
             referencedColumns: ["id"]
           },
         ]
