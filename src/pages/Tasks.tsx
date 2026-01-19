@@ -269,7 +269,11 @@ export default function Tasks() {
     is_recurring: false,
     recurring_pattern: 'weekly',
     category_id: '',
+    support_user_id: '',
   });
+  
+  // Support users for office mode task editing
+  const [allSupportUsers, setAllSupportUsers] = useState<{ id: string; name: string; department_name: string; unit_name: string }[]>([]);
 
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -284,8 +288,46 @@ export default function Tasks() {
       setPage(0);
       setHasMore(true);
       loadData(0, true);
+      
+      // Load support users for office mode
+      if (mode === 'office') {
+        loadAllSupportUsers();
+      }
     }
   }, [user, mode]);
+
+  const loadAllSupportUsers = async () => {
+    const { data: usersData } = await supabase
+      .from('support_users')
+      .select('id, name, department_id')
+      .eq('is_active', true);
+    
+    if (usersData && usersData.length > 0) {
+      const deptIds = [...new Set(usersData.map(u => u.department_id))];
+      const { data: deptsData } = await supabase
+        .from('support_departments')
+        .select('id, name, unit_id')
+        .in('id', deptIds);
+      
+      const unitIds = deptsData ? [...new Set(deptsData.map(d => d.unit_id))] : [];
+      const { data: unitsData } = await supabase
+        .from('support_units')
+        .select('id, name')
+        .in('id', unitIds);
+      
+      const users = usersData.map(sUser => {
+        const dept = deptsData?.find(d => d.id === sUser.department_id);
+        const unit = dept ? unitsData?.find(u => u.id === dept.unit_id) : null;
+        return {
+          id: sUser.id,
+          name: sUser.name,
+          department_name: dept?.name || 'N/A',
+          unit_name: unit?.name || 'N/A',
+        };
+      });
+      setAllSupportUsers(users);
+    }
+  };
 
   const loadData = async (pageNum: number = page, reset: boolean = false) => {
     if (loading) return;
@@ -397,6 +439,7 @@ export default function Tasks() {
       is_recurring: task.is_recurring || false,
       recurring_pattern: task.recurring_pattern || 'weekly',
       category_id: task.category_id || '',
+      support_user_id: task.support_user_id || '',
     });
     setEditDialogOpen(true);
   };
@@ -413,6 +456,7 @@ export default function Tasks() {
       is_recurring: formData.is_recurring,
       recurring_pattern: formData.is_recurring ? formData.recurring_pattern : null,
       category_id: formData.category_id || null,
+      support_user_id: mode === 'office' ? (formData.support_user_id || null) : null,
     };
 
     const { error } = await supabase.from('tasks').update(updatedData).eq('id', editingTask.id);
@@ -425,6 +469,17 @@ export default function Tasks() {
       setEditingTask(null);
       // Update local state
       setTasks(prev => prev.map(t => t.id === editingTask.id ? { ...t, ...updatedData } : t));
+      
+      // Update support user info map if changed
+      if (updatedData.support_user_id) {
+        const sUser = allSupportUsers.find(u => u.id === updatedData.support_user_id);
+        if (sUser) {
+          setSupportUserInfoMap(prev => ({
+            ...prev,
+            [updatedData.support_user_id!]: sUser,
+          }));
+        }
+      }
     }
   };
 
@@ -722,6 +777,30 @@ export default function Tasks() {
                 </Select>
               </div>
             </div>
+            {mode === 'office' && (
+              <div className="space-y-2">
+                <Label>Support User</Label>
+                <Select
+                  value={formData.support_user_id}
+                  onValueChange={(v) => setFormData((f) => ({ ...f, support_user_id: v === 'none' ? '' : v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select support user" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">No Support User</SelectItem>
+                    {allSupportUsers.map((sUser) => (
+                      <SelectItem key={sUser.id} value={sUser.id}>
+                        <div className="flex flex-col">
+                          <span>{sUser.name}</span>
+                          <span className="text-xs text-muted-foreground">{sUser.unit_name} → {sUser.department_name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Due Date</Label>
               <Input
