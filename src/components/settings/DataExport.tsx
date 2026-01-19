@@ -618,7 +618,8 @@ export function DataExport() {
 
   return (
     <div className="space-y-6">
-      {/* Database Backup Section */}
+      {/* Database Backup Section - Admin Only */}
+      {isAdmin && (
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
@@ -782,6 +783,7 @@ export function DataExport() {
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* Export & Import Section */}
       <Card className="bg-card border-border">

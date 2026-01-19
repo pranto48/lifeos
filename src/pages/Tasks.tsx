@@ -26,6 +26,7 @@ import { BulkCategoryAssign } from '@/components/tasks/BulkCategoryAssign';
 import { TaskAssignDialog } from '@/components/tasks/TaskAssignDialog';
 import { PendingTaskAssignments } from '@/components/tasks/PendingTaskAssignments';
 import { OutgoingTaskAssignments } from '@/components/tasks/OutgoingTaskAssignments';
+import { TaskAssignmentHistory } from '@/components/tasks/TaskAssignmentHistory';
 import {
   DndContext,
   closestCenter,
@@ -512,6 +513,9 @@ export default function Tasks() {
 
       {/* Outgoing Task Assignments */}
       <OutgoingTaskAssignments />
+
+      {/* Assignment History */}
+      <TaskAssignmentHistory />
 
       <div className="space-y-2">
         {filteredTasks.length === 0 ? (
