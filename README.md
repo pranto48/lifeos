@@ -1,5 +1,9 @@
 # LifeOS - Personal Life Management System
 
+[![CI/CD Pipeline](https://github.com/YOUR_USERNAME/lifeos/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/YOUR_USERNAME/lifeos/actions/workflows/ci-cd.yaml)
+[![Docker Image](https://img.shields.io/badge/docker-ghcr.io-blue)](https://ghcr.io)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A comprehensive personal life management application built with React, TypeScript, and Supabase.
 
 ## Features
@@ -213,19 +217,144 @@ If you want to self-host the backend as well:
 ├── supabase/
 │   ├── functions/      # Edge functions
 │   └── migrations/     # Database migrations
+├── k8s/                # Kubernetes manifests
+│   ├── deployment.yaml # Deployment configuration
+│   ├── service.yaml    # Service definitions
+│   ├── ingress.yaml    # Ingress rules
+│   ├── configmap.yaml  # ConfigMaps and Secrets
+│   ├── hpa.yaml        # Horizontal Pod Autoscaler
+│   └── kustomization.yaml
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yaml  # GitHub Actions CI/CD
 ├── public/             # Static assets
 ├── Dockerfile          # Docker configuration
 ├── docker-compose.yml  # Docker Compose configuration
 └── nginx.conf          # Nginx configuration
 ```
 
+## Kubernetes Deployment
+
+### Prerequisites
+
+- Kubernetes cluster (1.21+)
+- kubectl configured
+- Ingress controller (nginx-ingress recommended)
+- cert-manager (for TLS certificates)
+
+### Quick Deploy
+
+```bash
+# Create namespace
+kubectl create namespace lifeos
+
+# Apply all manifests
+kubectl apply -k k8s/ -n lifeos
+
+# Check deployment status
+kubectl get pods -n lifeos -l app=lifeos
+kubectl get svc -n lifeos
+kubectl get ingress -n lifeos
+```
+
+### Custom Configuration
+
+1. **Update Ingress Host**: Edit `k8s/ingress.yaml` and replace `lifeos.example.com` with your domain.
+
+2. **Configure Environment Variables**: Edit `k8s/configmap.yaml` with your Supabase credentials.
+
+3. **TLS Certificates**: The ingress is configured for cert-manager with Let's Encrypt. Ensure cert-manager is installed:
+   ```bash
+   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
+   ```
+
+4. **Scaling**: The HPA will automatically scale pods based on CPU/memory usage. Adjust `k8s/hpa.yaml` as needed.
+
+### Production Checklist
+
+- [ ] Update ingress hostname
+- [ ] Configure TLS certificates
+- [ ] Set resource limits appropriately
+- [ ] Configure pod disruption budgets
+- [ ] Set up monitoring (Prometheus/Grafana)
+- [ ] Configure log aggregation
+
+## CI/CD Pipeline
+
+The project includes a comprehensive GitHub Actions CI/CD pipeline.
+
+### Pipeline Stages
+
+1. **Lint & Type Check** - ESLint and TypeScript validation
+2. **Test** - Run test suite
+3. **Build** - Build the application
+4. **Docker** - Build and push Docker image to GHCR
+5. **Security Scan** - Trivy vulnerability scanning
+6. **Deploy Staging** - Auto-deploy to staging (develop branch)
+7. **Deploy Production** - Auto-deploy to production (main branch)
+
+### Required GitHub Secrets
+
+Configure these secrets in your repository settings:
+
+| Secret | Description |
+|--------|-------------|
+| `VITE_SUPABASE_URL` | Your Supabase project URL |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Your Supabase anon key |
+| `KUBE_CONFIG_STAGING` | Base64-encoded kubeconfig for staging |
+| `KUBE_CONFIG_PRODUCTION` | Base64-encoded kubeconfig for production |
+
+### Generating Kubeconfig Secret
+
+```bash
+# Encode your kubeconfig
+cat ~/.kube/config | base64 -w 0
+
+# Add to GitHub Secrets as KUBE_CONFIG_STAGING or KUBE_CONFIG_PRODUCTION
+```
+
+### Manual Deployment
+
+You can also manually trigger deployments from the Actions tab or use:
+
+```bash
+# Deploy specific tag
+kubectl set image deployment/lifeos lifeos=ghcr.io/YOUR_USERNAME/lifeos:v1.0.0 -n lifeos
+```
+
+## Monitoring & Observability
+
+### Health Checks
+
+The application exposes health endpoints:
+
+- **Liveness**: `GET /` - Returns 200 if app is running
+- **Readiness**: `GET /` - Returns 200 if app is ready to serve traffic
+
+### Prometheus Metrics (Optional)
+
+Add Prometheus annotations to the deployment for metric scraping:
+
+```yaml
+annotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "80"
+  prometheus.io/path: "/metrics"
+```
+
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
+
+### Development Workflow
+
+- **main** - Production-ready code
+- **develop** - Integration branch for features
+- **feature/** - Feature branches
 
 ## License
 

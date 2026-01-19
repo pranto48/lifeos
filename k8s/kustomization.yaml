@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: lifeos
+
+namespace: lifeos
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - configmap.yaml
+  - hpa.yaml
+
+commonLabels:
+  app: lifeos
+  managed-by: kustomize
+
+images:
+  - name: ghcr.io/${GITHUB_REPOSITORY}
+    newTag: latest

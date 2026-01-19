@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lifeos-ingress
+  labels:
+    app: lifeos
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - lifeos.example.com
+      secretName: lifeos-tls
+  rules:
+    - host: lifeos.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lifeos-service
+                port:
+                  number: 80
+---
+# Optional: Ingress without TLS for local development
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: lifeos-ingress-dev
+  labels:
+    app: lifeos
+    environment: development
+  annotations:
+    kubernetes.io/ingress.class: nginx
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: lifeos.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: lifeos-service
+                port:
+                  number: 80
