@@ -12,6 +12,9 @@ import { PersonalPageGuard } from "@/components/layout/PersonalPageGuard";
 import { PWAInstallPrompt } from "@/components/pwa/PWAInstallPrompt";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { Skeleton } from "@/components/ui/skeleton";
+import { OnboardingFlow } from "@/components/onboarding/OnboardingFlow";
+import { useOnboarding } from "@/hooks/useOnboarding";
+import { AnimatePresence } from "framer-motion";
 
 // Lazy load pages for code splitting
 const Auth = lazy(() => import("./pages/Auth"));
@@ -51,6 +54,46 @@ const PageLoader = () => (
   </div>
 );
 
+// App content with onboarding
+const AppContent = () => {
+  const { showOnboarding, isLoading, completeOnboarding } = useOnboarding();
+
+  if (isLoading) {
+    return <PageLoader />;
+  }
+
+  return (
+    <>
+      <AnimatePresence mode="wait">
+        {showOnboarding && (
+          <OnboardingFlow onComplete={completeOnboarding} />
+        )}
+      </AnimatePresence>
+      {!showOnboarding && (
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
+            <Route path="/tasks" element={<AppLayout><Tasks /></AppLayout>} />
+            <Route path="/notes" element={<AppLayout><Notes /></AppLayout>} />
+            <Route path="/habits" element={<AppLayout><PersonalPageGuard><Habits /></PersonalPageGuard></AppLayout>} />
+            <Route path="/family" element={<AppLayout><PersonalPageGuard><Family /></PersonalPageGuard></AppLayout>} />
+            <Route path="/budget" element={<AppLayout><PersonalPageGuard><Budget /></PersonalPageGuard></AppLayout>} />
+            <Route path="/salary" element={<AppLayout><PersonalPageGuard><Salary /></PersonalPageGuard></AppLayout>} />
+            <Route path="/investments" element={<AppLayout><PersonalPageGuard><Investments /></PersonalPageGuard></AppLayout>} />
+            <Route path="/goals" element={<AppLayout><Goals /></AppLayout>} />
+            <Route path="/projects" element={<AppLayout><Projects /></AppLayout>} />
+            <Route path="/calendar" element={<AppLayout><Calendar /></AppLayout>} />
+            <Route path="/support-users" element={<AppLayout><SupportUsers /></AppLayout>} />
+            <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
+      )}
+    </>
+  );
+};
+
 const App = () => (
   <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
@@ -62,25 +105,7 @@ const App = () => (
               <Sonner />
               <PWAInstallPrompt />
               <BrowserRouter>
-                <Suspense fallback={<PageLoader />}>
-                  <Routes>
-                    <Route path="/auth" element={<Auth />} />
-                    <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
-                    <Route path="/tasks" element={<AppLayout><Tasks /></AppLayout>} />
-                    <Route path="/notes" element={<AppLayout><Notes /></AppLayout>} />
-                    <Route path="/habits" element={<AppLayout><PersonalPageGuard><Habits /></PersonalPageGuard></AppLayout>} />
-                    <Route path="/family" element={<AppLayout><PersonalPageGuard><Family /></PersonalPageGuard></AppLayout>} />
-                    <Route path="/budget" element={<AppLayout><PersonalPageGuard><Budget /></PersonalPageGuard></AppLayout>} />
-                    <Route path="/salary" element={<AppLayout><PersonalPageGuard><Salary /></PersonalPageGuard></AppLayout>} />
-                    <Route path="/investments" element={<AppLayout><PersonalPageGuard><Investments /></PersonalPageGuard></AppLayout>} />
-                    <Route path="/goals" element={<AppLayout><Goals /></AppLayout>} />
-                    <Route path="/projects" element={<AppLayout><Projects /></AppLayout>} />
-                    <Route path="/calendar" element={<AppLayout><Calendar /></AppLayout>} />
-                    <Route path="/support-users" element={<AppLayout><SupportUsers /></AppLayout>} />
-                    <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
+                <AppContent />
               </BrowserRouter>
             </TooltipProvider>
           </DashboardModeProvider>
