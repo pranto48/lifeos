@@ -40,7 +40,7 @@ export function MobileHeader() {
                 </div>
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="w-[280px] bg-sidebar border-sidebar-border">
+            <SheetContent side="right" className="w-[280px] bg-sidebar border-sidebar-border z-[60]">
               <SheetHeader>
                 <SheetTitle className="text-sidebar-foreground">
                   {t('settings.profile') || 'Profile'}
