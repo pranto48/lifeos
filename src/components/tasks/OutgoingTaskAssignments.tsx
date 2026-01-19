@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Send, Clock, Check, X, ChevronDown, ChevronUp, Trash2, Loader2 } from 'lucide-react';
+import { Send, Clock, Check, X, ChevronDown, ChevronUp, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { TaskAssignDialog } from './TaskAssignDialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 
@@ -36,6 +37,8 @@ export function OutgoingTaskAssignments() {
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
+  const [reassigningTask, setReassigningTask] = useState<{ id: string; title: string } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -120,6 +123,31 @@ export function OutgoingTaskAssignments() {
     }
   };
 
+  const handleReassign = (assignment: OutgoingAssignment) => {
+    // Delete the old declined assignment first
+    handleDeleteAndReassign(assignment);
+  };
+
+  const handleDeleteAndReassign = async (assignment: OutgoingAssignment) => {
+    try {
+      // Delete the declined assignment
+      await supabase
+        .from('task_assignments')
+        .delete()
+        .eq('id', assignment.id);
+
+      // Remove from local state
+      setAssignments(prev => prev.filter(a => a.id !== assignment.id));
+
+      // Open reassign dialog
+      setReassigningTask({ id: assignment.task_id, title: assignment.task.title });
+      setReassignDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to prepare reassignment:', error);
+      toast.error('Failed to prepare reassignment');
+    }
+  };
+
   const getInitials = (name: string | null, email: string | null) => {
     if (name) {
       return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -152,100 +180,129 @@ export function OutgoingTaskAssignments() {
   const rejectedCount = assignments.filter(a => a.status === 'rejected').length;
 
   return (
-    <Card className="bg-card border-border mb-6">
-      <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-        <CollapsibleTrigger asChild>
-          <CardHeader className="pb-3 cursor-pointer hover:bg-muted/30 transition-colors">
-            <CardTitle className="text-lg flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Send className="h-5 w-5 text-muted-foreground" />
-                Tasks I've Assigned
-                <Badge variant="secondary" className="ml-2">
-                  {assignments.length}
-                </Badge>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex gap-2 text-sm">
-                  {pendingCount > 0 && (
-                    <span className="text-yellow-500">{pendingCount} pending</span>
-                  )}
-                  {acceptedCount > 0 && (
-                    <span className="text-green-500">{acceptedCount} accepted</span>
-                  )}
-                  {rejectedCount > 0 && (
-                    <span className="text-red-500">{rejectedCount} declined</span>
-                  )}
+    <>
+      <Card className="bg-card border-border mb-6">
+        <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="pb-3 cursor-pointer hover:bg-muted/30 transition-colors">
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Send className="h-5 w-5 text-muted-foreground" />
+                  Tasks I've Assigned
+                  <Badge variant="secondary" className="ml-2">
+                    {assignments.length}
+                  </Badge>
                 </div>
-                {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-              </div>
-            </CardTitle>
-          </CardHeader>
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <CardContent className="space-y-3 pt-0">
-            {assignments.map((assignment) => (
-              <div
-                key={assignment.id}
-                className="flex items-start justify-between p-4 rounded-lg border border-border bg-muted/20"
-              >
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-foreground">
-                      {assignment.task.title}
-                    </p>
-                    {getStatusBadge(assignment.status)}
+                <div className="flex items-center gap-3">
+                  <div className="flex gap-2 text-sm">
+                    {pendingCount > 0 && (
+                      <span className="text-yellow-500">{pendingCount} pending</span>
+                    )}
+                    {acceptedCount > 0 && (
+                      <span className="text-green-500">{acceptedCount} accepted</span>
+                    )}
+                    {rejectedCount > 0 && (
+                      <span className="text-red-500">{rejectedCount} declined</span>
+                    )}
                   </div>
-
-                  {assignment.message && (
-                    <p className="text-sm text-muted-foreground italic">
-                      "{assignment.message}"
-                    </p>
-                  )}
-
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <span>To:</span>
-                      <Avatar className="h-5 w-5">
-                        <AvatarImage src={assignment.assignee?.avatar_url || undefined} />
-                        <AvatarFallback className="text-xs">
-                          {getInitials(assignment.assignee?.full_name || null, assignment.assignee?.email || null)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <span>
-                        {assignment.assignee?.full_name || assignment.assignee?.email || 'Unknown'}
-                      </span>
+                  {isExpanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                </div>
+              </CardTitle>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent className="space-y-3 pt-0">
+              {assignments.map((assignment) => (
+                <div
+                  key={assignment.id}
+                  className="flex items-start justify-between p-4 rounded-lg border border-border bg-muted/20"
+                >
+                  <div className="flex-1 min-w-0 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-foreground">
+                        {assignment.task.title}
+                      </p>
+                      {getStatusBadge(assignment.status)}
                     </div>
-                    <span>
-                      {format(new Date(assignment.assigned_at), 'MMM d, yyyy')}
-                    </span>
-                    {assignment.responded_at && (
+
+                    {assignment.message && (
+                      <p className="text-sm text-muted-foreground italic">
+                        "{assignment.message}"
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <span>To:</span>
+                        <Avatar className="h-5 w-5">
+                          <AvatarImage src={assignment.assignee?.avatar_url || undefined} />
+                          <AvatarFallback className="text-xs">
+                            {getInitials(assignment.assignee?.full_name || null, assignment.assignee?.email || null)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span>
+                          {assignment.assignee?.full_name || assignment.assignee?.email || 'Unknown'}
+                        </span>
+                      </div>
                       <span>
-                        Responded: {format(new Date(assignment.responded_at), 'MMM d, yyyy')}
+                        {format(new Date(assignment.assigned_at), 'MMM d, yyyy')}
                       </span>
+                      {assignment.responded_at && (
+                        <span>
+                          Responded: {format(new Date(assignment.responded_at), 'MMM d, yyyy')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 ml-4">
+                    {assignment.status === 'rejected' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleReassign(assignment)}
+                        className="gap-1"
+                      >
+                        <RefreshCw className="h-4 w-4" />
+                        Reassign
+                      </Button>
+                    )}
+                    {assignment.status === 'pending' && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDelete(assignment.id)}
+                        disabled={deleting === assignment.id}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        {deleting === assignment.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
                     )}
                   </div>
                 </div>
+              ))}
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
 
-                {assignment.status === 'pending' && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleDelete(assignment.id)}
-                    disabled={deleting === assignment.id}
-                    className="text-destructive hover:text-destructive ml-4"
-                  >
-                    {deleting === assignment.id ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                )}
-              </div>
-            ))}
-          </CardContent>
-        </CollapsibleContent>
-      </Collapsible>
-    </Card>
+      {/* Reassign Dialog */}
+      {reassigningTask && (
+        <TaskAssignDialog
+          open={reassignDialogOpen}
+          onOpenChange={setReassignDialogOpen}
+          taskId={reassigningTask.id}
+          taskTitle={reassigningTask.title}
+          onAssigned={() => {
+            loadAssignments();
+            toast.success('Task reassigned successfully');
+          }}
+        />
+      )}
+    </>
   );
 }
