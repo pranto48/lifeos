@@ -1,9 +1,15 @@
 import { createContext, useContext, useState, useEffect, useRef, useCallback, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 type DashboardMode = 'office' | 'personal';
 
 const AUTO_LOCK_TIMEOUT = 5 * 60 * 1000; // 5 minutes of inactivity
+
+interface WorkspacePermissions {
+  office_enabled: boolean;
+  personal_enabled: boolean;
+}
 
 interface DashboardModeContextType {
   mode: DashboardMode;
@@ -12,6 +18,9 @@ interface DashboardModeContextType {
   unlockPersonal: (password: string) => Promise<boolean>;
   lockPersonal: () => void;
   resetAutoLockTimer: () => void;
+  permissions: WorkspacePermissions;
+  permissionsLoading: boolean;
+  refreshPermissions: () => Promise<void>;
 }
 
 const DashboardModeContext = createContext<DashboardModeContextType | undefined>(undefined);
@@ -21,15 +30,67 @@ export function DashboardModeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<DashboardMode>('office');
   const [isPersonalUnlocked, setIsPersonalUnlocked] = useState(false);
   const autoLockTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [permissions, setPermissions] = useState<WorkspacePermissions>({
+    office_enabled: true,
+    personal_enabled: true,
+  });
+  const [permissionsLoading, setPermissionsLoading] = useState(true);
+
+  const loadPermissions = useCallback(async () => {
+    if (!user) {
+      setPermissionsLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_workspace_permissions')
+        .select('office_enabled, personal_enabled')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (data) {
+        setPermissions({
+          office_enabled: data.office_enabled,
+          personal_enabled: data.personal_enabled,
+        });
+        
+        // If current mode is disabled, switch to enabled mode
+        if (!data.office_enabled && mode === 'office' && data.personal_enabled) {
+          setModeState('personal');
+        } else if (!data.personal_enabled && mode === 'personal' && data.office_enabled) {
+          setModeState('office');
+          setIsPersonalUnlocked(false);
+        }
+      } else {
+        // No permissions record = all enabled (default)
+        setPermissions({ office_enabled: true, personal_enabled: true });
+      }
+    } catch (error) {
+      console.error('Failed to load workspace permissions:', error);
+    } finally {
+      setPermissionsLoading(false);
+    }
+  }, [user, mode]);
+
+  useEffect(() => {
+    loadPermissions();
+  }, [user]);
+
+  const refreshPermissions = async () => {
+    await loadPermissions();
+  };
 
   const lockPersonal = useCallback(() => {
     setIsPersonalUnlocked(false);
-    setModeState('office');
+    if (permissions.office_enabled) {
+      setModeState('office');
+    }
     if (autoLockTimerRef.current) {
       clearTimeout(autoLockTimerRef.current);
       autoLockTimerRef.current = null;
     }
-  }, []);
+  }, [permissions.office_enabled]);
 
   const resetAutoLockTimer = useCallback(() => {
     if (!isPersonalUnlocked || mode !== 'personal') return;
@@ -74,6 +135,10 @@ export function DashboardModeProvider({ children }: { children: ReactNode }) {
   }, [isPersonalUnlocked, mode, resetAutoLockTimer]);
 
   const setMode = (newMode: DashboardMode) => {
+    // Check permissions
+    if (newMode === 'office' && !permissions.office_enabled) return;
+    if (newMode === 'personal' && !permissions.personal_enabled) return;
+    
     if (newMode === 'personal' && !isPersonalUnlocked) {
       // Don't allow switching to personal mode if not unlocked
       return;
@@ -83,10 +148,10 @@ export function DashboardModeProvider({ children }: { children: ReactNode }) {
 
   const unlockPersonal = async (password: string): Promise<boolean> => {
     if (!user?.email) return false;
+    if (!permissions.personal_enabled) return false;
     
     try {
       // Use reauthenticate to verify password without creating a new session
-      const { supabase } = await import('@/integrations/supabase/client');
       const { error } = await supabase.auth.reauthenticate();
       
       // Reauthenticate sends a nonce, so we verify with signInWithPassword
@@ -116,6 +181,9 @@ export function DashboardModeProvider({ children }: { children: ReactNode }) {
       unlockPersonal, 
       lockPersonal,
       resetAutoLockTimer,
+      permissions,
+      permissionsLoading,
+      refreshPermissions,
     }}>
       {children}
     </DashboardModeContext.Provider>
