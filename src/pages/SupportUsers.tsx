@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer } from 'lucide-react';
+import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,8 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { useSupportData, SupportUnit, SupportDepartment, SupportUser } from '@/hooks/useSupportData';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { format } from 'date-fns';
 
 export default function SupportUsers() {
   const { t, language } = useLanguage();
@@ -20,6 +22,7 @@ export default function SupportUsers() {
     units,
     departments,
     supportUsers,
+    activityLogs,
     loading,
     addUnit,
     updateUnit,
@@ -563,21 +566,29 @@ export default function SupportUsers() {
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             <span className="hidden sm:inline">{language === 'bn' ? 'ইউজার' : 'Users'}</span>
-            <Badge variant="secondary" className="ml-1">{supportUsers.length}</Badge>
+            <Badge variant="secondary" className="ml-1 hidden md:inline">{supportUsers.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="departments" className="flex items-center gap-2">
             <Briefcase className="h-4 w-4" />
-            <span className="hidden sm:inline">{language === 'bn' ? 'বিভাগ' : 'Departments'}</span>
-            <Badge variant="secondary" className="ml-1">{departments.length}</Badge>
+            <span className="hidden sm:inline">{language === 'bn' ? 'বিভাগ' : 'Depts'}</span>
+            <Badge variant="secondary" className="ml-1 hidden md:inline">{departments.length}</Badge>
           </TabsTrigger>
           <TabsTrigger value="units" className="flex items-center gap-2">
             <Building2 className="h-4 w-4" />
             <span className="hidden sm:inline">{language === 'bn' ? 'ইউনিট' : 'Units'}</span>
-            <Badge variant="secondary" className="ml-1">{units.length}</Badge>
+            <Badge variant="secondary" className="ml-1 hidden md:inline">{units.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="stats" className="flex items-center gap-2">
+            <BarChart3 className="h-4 w-4" />
+            <span className="hidden sm:inline">{language === 'bn' ? 'পরিসংখ্যান' : 'Stats'}</span>
+          </TabsTrigger>
+          <TabsTrigger value="activity" className="flex items-center gap-2">
+            <History className="h-4 w-4" />
+            <span className="hidden sm:inline">{language === 'bn' ? 'কার্যকলাপ' : 'Activity'}</span>
           </TabsTrigger>
         </TabsList>
 
@@ -848,6 +859,245 @@ export default function SupportUsers() {
               </CardContent>
             </Card>
           )}
+        </TabsContent>
+
+        {/* Statistics Tab */}
+        <TabsContent value="stats" className="space-y-4">
+          {/* Summary Cards */}
+          <div className="grid gap-4 md:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {language === 'bn' ? 'মোট ইউজার' : 'Total Users'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{supportUsers.length}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {language === 'bn' ? 'সক্রিয়' : 'Active'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-500">
+                  {supportUsers.filter(u => u.is_active).length}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {language === 'bn' ? 'নিষ্ক্রিয়' : 'Inactive'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-500">
+                  {supportUsers.filter(u => !u.is_active).length}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {language === 'bn' ? 'ইউনিট / বিভাগ' : 'Units / Depts'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{units.length} / {departments.length}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Charts */}
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Users by Status Pie Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {language === 'bn' ? 'স্ট্যাটাস অনুযায়ী ইউজার' : 'Users by Status'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {supportUsers.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: language === 'bn' ? 'সক্রিয়' : 'Active', value: supportUsers.filter(u => u.is_active).length, fill: 'hsl(var(--chart-1))' },
+                          { name: language === 'bn' ? 'নিষ্ক্রিয়' : 'Inactive', value: supportUsers.filter(u => !u.is_active).length, fill: 'hsl(var(--chart-2))' },
+                        ].filter(d => d.value > 0)}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={80}
+                        paddingAngle={5}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                    {language === 'bn' ? 'কোন ডেটা নেই' : 'No data'}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Users by Unit Bar Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {language === 'bn' ? 'ইউনিট অনুযায়ী ইউজার' : 'Users by Unit'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {units.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart 
+                      data={units.map(unit => {
+                        const depts = getDepartmentsByUnit(unit.id);
+                        const userCount = depts.reduce((sum, dept) => sum + getUsersByDepartment(dept.id).length, 0);
+                        return { name: unit.name.length > 10 ? unit.name.substring(0, 10) + '...' : unit.name, users: userCount };
+                      })}
+                      layout="vertical"
+                    >
+                      <XAxis type="number" />
+                      <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
+                      <Tooltip />
+                      <Bar dataKey="users" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[200px] flex items-center justify-center text-muted-foreground">
+                    {language === 'bn' ? 'কোন ডেটা নেই' : 'No data'}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Users by Department */}
+            <Card className="md:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-base">
+                  {language === 'bn' ? 'বিভাগ অনুযায়ী ইউজার' : 'Users by Department'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {departments.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <BarChart 
+                      data={departments.map(dept => {
+                        const unit = units.find(u => u.id === dept.unit_id);
+                        return { 
+                          name: dept.name.length > 15 ? dept.name.substring(0, 15) + '...' : dept.name, 
+                          users: getUsersByDepartment(dept.id).length,
+                          unit: unit?.name || ''
+                        };
+                      }).sort((a, b) => b.users - a.users).slice(0, 10)}
+                    >
+                      <XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                      <YAxis />
+                      <Tooltip content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-background border rounded-md p-2 shadow-md text-xs">
+                              <p className="font-medium">{data.name}</p>
+                              <p className="text-muted-foreground">{data.unit}</p>
+                              <p>{language === 'bn' ? 'ইউজার' : 'Users'}: {data.users}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }} />
+                      <Bar dataKey="users" fill="hsl(var(--chart-3))" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                    {language === 'bn' ? 'কোন ডেটা নেই' : 'No data'}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* Activity Log Tab */}
+        <TabsContent value="activity" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <History className="h-5 w-5" />
+                {language === 'bn' ? 'সাম্প্রতিক কার্যকলাপ' : 'Recent Activity'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {activityLogs.length > 0 ? (
+                <div className="space-y-3 max-h-[500px] overflow-y-auto">
+                  {activityLogs.map(log => {
+                    const actionColors: Record<string, string> = {
+                      create: 'bg-green-500/20 text-green-600',
+                      update: 'bg-blue-500/20 text-blue-600',
+                      delete: 'bg-red-500/20 text-red-600',
+                    };
+                    const actionLabels: Record<string, string> = {
+                      create: language === 'bn' ? 'তৈরি' : 'Created',
+                      update: language === 'bn' ? 'আপডেট' : 'Updated',
+                      delete: language === 'bn' ? 'মুছে ফেলা' : 'Deleted',
+                    };
+                    const entityLabels: Record<string, string> = {
+                      support_unit: language === 'bn' ? 'ইউনিট' : 'Unit',
+                      support_department: language === 'bn' ? 'বিভাগ' : 'Department',
+                      support_user: language === 'bn' ? 'ইউজার' : 'User',
+                    };
+                    
+                    const newData = log.new_data as Record<string, unknown> | null;
+                    const oldData = log.old_data as Record<string, unknown> | null;
+                    const entityName = newData?.name || oldData?.name || 'Unknown';
+                    
+                    return (
+                      <div key={log.id} className="flex items-start gap-3 p-3 rounded-lg bg-muted/30">
+                        <div className={`px-2 py-1 rounded text-xs font-medium ${actionColors[log.action] || 'bg-muted'}`}>
+                          {actionLabels[log.action] || log.action}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">
+                              {entityLabels[log.entity_type] || log.entity_type}
+                            </Badge>
+                            <span className="font-medium truncate">{entityName as string}</span>
+                          </div>
+                          {log.action === 'update' && newData && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {Object.entries(newData)
+                                .filter(([key]) => key !== 'name' && key !== 'department_name')
+                                .map(([key, value]) => `${key}: ${value}`)
+                                .join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          {format(new Date(log.created_at), 'MMM d, HH:mm')}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="py-8 text-center text-muted-foreground">
+                  {language === 'bn' ? 'কোন কার্যকলাপ নেই' : 'No activity yet'}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
