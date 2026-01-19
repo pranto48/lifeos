@@ -223,6 +223,168 @@ export type Database = {
           },
         ]
       }
+      device_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      device_inventory: {
+        Row: {
+          bill_details: string | null
+          bod_number: string | null
+          category_id: string | null
+          created_at: string
+          delivery_date: string | null
+          device_name: string
+          id: string
+          notes: string | null
+          price: number | null
+          purchase_date: string | null
+          requisition_number: string | null
+          serial_number: string | null
+          status: string
+          supplier_name: string | null
+          support_user_id: string | null
+          updated_at: string
+          user_id: string
+          warranty_date: string | null
+        }
+        Insert: {
+          bill_details?: string | null
+          bod_number?: string | null
+          category_id?: string | null
+          created_at?: string
+          delivery_date?: string | null
+          device_name: string
+          id?: string
+          notes?: string | null
+          price?: number | null
+          purchase_date?: string | null
+          requisition_number?: string | null
+          serial_number?: string | null
+          status?: string
+          supplier_name?: string | null
+          support_user_id?: string | null
+          updated_at?: string
+          user_id: string
+          warranty_date?: string | null
+        }
+        Update: {
+          bill_details?: string | null
+          bod_number?: string | null
+          category_id?: string | null
+          created_at?: string
+          delivery_date?: string | null
+          device_name?: string
+          id?: string
+          notes?: string | null
+          price?: number | null
+          purchase_date?: string | null
+          requisition_number?: string | null
+          serial_number?: string | null
+          status?: string
+          supplier_name?: string | null
+          support_user_id?: string | null
+          updated_at?: string
+          user_id?: string
+          warranty_date?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_inventory_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "device_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_inventory_support_user_id_fkey"
+            columns: ["support_user_id"]
+            isOneToOne: false
+            referencedRelation: "support_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      device_service_history: {
+        Row: {
+          cost: number | null
+          created_at: string
+          description: string | null
+          device_id: string
+          id: string
+          service_date: string
+          service_type: string
+          task_id: string | null
+          technician_name: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          device_id: string
+          id?: string
+          service_date: string
+          service_type: string
+          task_id?: string | null
+          technician_name?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          device_id?: string
+          id?: string
+          service_date?: string
+          service_type?: string
+          task_id?: string | null
+          technician_name?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_service_history_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_service_history_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       family_documents: {
         Row: {
           category: string | null
@@ -1245,6 +1407,7 @@ export type Database = {
           created_at: string
           icon: string | null
           id: string
+          is_admin_category: boolean
           name: string
           updated_at: string
           user_id: string
@@ -1254,6 +1417,7 @@ export type Database = {
           created_at?: string
           icon?: string | null
           id?: string
+          is_admin_category?: boolean
           name: string
           updated_at?: string
           user_id: string
@@ -1263,6 +1427,7 @@ export type Database = {
           created_at?: string
           icon?: string | null
           id?: string
+          is_admin_category?: boolean
           name?: string
           updated_at?: string
           user_id?: string
