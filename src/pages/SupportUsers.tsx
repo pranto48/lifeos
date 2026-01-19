@@ -1,11 +1,11 @@
-import { useState } from 'react';
-import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +43,11 @@ export default function SupportUsers() {
   const [unitDialog, setUnitDialog] = useState<{ open: boolean; editing: SupportUnit | null }>({ open: false, editing: null });
   const [deptDialog, setDeptDialog] = useState<{ open: boolean; editing: SupportDepartment | null }>({ open: false, editing: null });
   const [userDialog, setUserDialog] = useState<{ open: boolean; editing: SupportUser | null }>({ open: false, editing: null });
+  const [importDialog, setImportDialog] = useState(false);
+  const [importData, setImportData] = useState<Array<Record<string, string>>>([]);
+  const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form states
   const [unitForm, setUnitForm] = useState({ name: '', description: '' });
@@ -318,6 +323,229 @@ export default function SupportUsers() {
     toast.success(language === 'bn' ? 'Excel ডাউনলোড হয়েছে' : 'Excel downloaded');
   };
 
+  // Print function
+  const handlePrint = () => {
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Support Users Report</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { text-align: center; margin-bottom: 10px; font-size: 24px; }
+          .date { text-align: center; color: #666; margin-bottom: 20px; font-size: 12px; }
+          .filters { text-align: center; color: #666; margin-bottom: 20px; font-size: 11px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 11px; }
+          th, td { border: 1px solid #333; padding: 6px 8px; text-align: left; }
+          th { background-color: #f0f0f0; font-weight: bold; }
+          tr:nth-child(even) { background-color: #f9f9f9; }
+          .inactive { color: #999; }
+          .footer { margin-top: 20px; text-align: center; font-size: 10px; color: #666; }
+          @media print {
+            body { padding: 0; }
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; }
+          }
+        </style>
+      </head>
+      <body>
+        <h1>${language === 'bn' ? 'সাপোর্ট ইউজার রিপোর্ট' : 'Support Users Report'}</h1>
+        <p class="date">${language === 'bn' ? 'তারিখ' : 'Generated on'}: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}</p>
+        ${(filterUnit !== 'all' || filterDepartment !== 'all' || searchQuery) ? `
+        <p class="filters">
+          ${language === 'bn' ? 'ফিল্টার' : 'Filters'}: 
+          ${filterUnit !== 'all' ? `Unit: ${units.find(u => u.id === filterUnit)?.name || 'Unknown'}` : ''}
+          ${filterDepartment !== 'all' ? ` | Department: ${departments.find(d => d.id === filterDepartment)?.name || 'Unknown'}` : ''}
+          ${searchQuery ? ` | Search: "${searchQuery}"` : ''}
+        </p>
+        ` : ''}
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>${language === 'bn' ? 'নাম' : 'Name'}</th>
+              <th>${language === 'bn' ? 'পদবী' : 'Designation'}</th>
+              <th>${language === 'bn' ? 'ইউনিট' : 'Unit'}</th>
+              <th>${language === 'bn' ? 'বিভাগ' : 'Department'}</th>
+              <th>${language === 'bn' ? 'ইমেইল' : 'Email'}</th>
+              <th>${language === 'bn' ? 'ফোন' : 'Phone'}</th>
+              <th>${language === 'bn' ? 'ডিভাইস' : 'Device'}</th>
+              <th>IP</th>
+              <th>${language === 'bn' ? 'স্ট্যাটাস' : 'Status'}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredSupportUsers.map((user, idx) => {
+              const dept = departments.find(d => d.id === user.department_id);
+              const unit = dept ? units.find(u => u.id === dept.unit_id) : null;
+              return `
+                <tr class="${!user.is_active ? 'inactive' : ''}">
+                  <td>${idx + 1}</td>
+                  <td>${user.name}</td>
+                  <td>${user.designation || '-'}</td>
+                  <td>${unit?.name || '-'}</td>
+                  <td>${dept?.name || '-'}</td>
+                  <td>${user.email || '-'}</td>
+                  <td>${user.phone || '-'}</td>
+                  <td>${user.device_info || '-'}</td>
+                  <td>${user.ip_address || '-'}</td>
+                  <td>${user.is_active ? (language === 'bn' ? 'সক্রিয়' : 'Active') : (language === 'bn' ? 'নিষ্ক্রিয়' : 'Inactive')}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+        <p class="footer">${language === 'bn' ? 'মোট' : 'Total'}: ${filteredSupportUsers.length} ${language === 'bn' ? 'জন ইউজার' : 'users'}</p>
+      </body>
+      </html>
+    `;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(printContent);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    }
+  };
+
+  // CSV Import functions
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.csv')) {
+      toast.error(language === 'bn' ? 'শুধুমাত্র CSV ফাইল সমর্থিত' : 'Only CSV files are supported');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      parseCSV(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const parseCSV = (text: string) => {
+    const lines = text.split('\n').filter(line => line.trim());
+    if (lines.length < 2) {
+      toast.error(language === 'bn' ? 'CSV ফাইলে ডেটা নেই' : 'CSV file has no data');
+      return;
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+    const requiredFields = ['name', 'department'];
+    const missingFields = requiredFields.filter(f => !headers.includes(f));
+    
+    if (missingFields.length > 0) {
+      toast.error(`Missing required columns: ${missingFields.join(', ')}`);
+      return;
+    }
+
+    const data: Array<Record<string, string>> = [];
+    const errors: string[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].match(/("([^"]|"")*"|[^,]*)/g)?.map(v => 
+        v.trim().replace(/^"|"$/g, '').replace(/""/g, '"')
+      ) || [];
+      
+      const row: Record<string, string> = {};
+      headers.forEach((header, idx) => {
+        row[header] = values[idx] || '';
+      });
+
+      if (!row.name?.trim()) {
+        errors.push(`Row ${i + 1}: Name is required`);
+        continue;
+      }
+
+      if (!row.department?.trim()) {
+        errors.push(`Row ${i + 1}: Department is required`);
+        continue;
+      }
+
+      // Validate department exists
+      const dept = departments.find(d => d.name.toLowerCase() === row.department.toLowerCase());
+      if (!dept) {
+        errors.push(`Row ${i + 1}: Department "${row.department}" not found`);
+        continue;
+      }
+
+      row._department_id = dept.id;
+      data.push(row);
+    }
+
+    setImportData(data);
+    setImportErrors(errors);
+    setImportDialog(true);
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleImport = async () => {
+    if (importData.length === 0) return;
+    
+    setImporting(true);
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const row of importData) {
+      try {
+        await addSupportUser({
+          name: row.name.trim(),
+          email: row.email?.trim() || null,
+          phone: row.phone?.trim() || null,
+          designation: row.designation?.trim() || null,
+          device_info: row.device_info?.trim() || row['device info']?.trim() || null,
+          ip_address: row.ip_address?.trim() || row['ip address']?.trim() || null,
+          notes: row.notes?.trim() || null,
+          department_id: row._department_id,
+          is_active: row.status?.toLowerCase() !== 'inactive',
+        });
+        successCount++;
+      } catch (error) {
+        failCount++;
+      }
+    }
+
+    setImporting(false);
+    setImportDialog(false);
+    setImportData([]);
+    setImportErrors([]);
+
+    if (successCount > 0) {
+      toast.success(`${successCount} ${language === 'bn' ? 'জন ইউজার ইম্পোর্ট হয়েছে' : 'users imported successfully'}`);
+    }
+    if (failCount > 0) {
+      toast.error(`${failCount} ${language === 'bn' ? 'জন ইউজার ইম্পোর্ট ব্যর্থ' : 'users failed to import'}`);
+    }
+  };
+
+  const downloadTemplate = () => {
+    const headers = ['Name', 'Email', 'Phone', 'Designation', 'Department', 'Device Info', 'IP Address', 'Status', 'Notes'];
+    const exampleRow = ['John Doe', 'john@example.com', '+1234567890', 'Manager', departments[0]?.name || 'IT Support', 'Windows 11 PC', '192.168.1.100', 'Active', 'Example user'];
+    
+    const csvContent = [
+      headers.join(','),
+      exampleRow.map(cell => `"${cell}"`).join(',')
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'support_users_import_template.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success(language === 'bn' ? 'টেমপ্লেট ডাউনলোড হয়েছে' : 'Template downloaded');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -401,16 +629,31 @@ export default function SupportUsers() {
                 ))}
               </SelectContent>
             </Select>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={exportToCSV} disabled={filteredSupportUsers.length === 0}>
+            <div className="flex flex-wrap gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <Button variant="outline" size="sm" onClick={handlePrint} disabled={filteredSupportUsers.length === 0}>
+                <Printer className="h-4 w-4 mr-2" />
+                {language === 'bn' ? 'প্রিন্ট' : 'Print'}
+              </Button>
+              <Button variant="outline" size="sm" onClick={exportToCSV} disabled={filteredSupportUsers.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
                 CSV
               </Button>
-              <Button variant="outline" onClick={exportToExcel} disabled={filteredSupportUsers.length === 0}>
+              <Button variant="outline" size="sm" onClick={exportToExcel} disabled={filteredSupportUsers.length === 0}>
                 <Download className="h-4 w-4 mr-2" />
                 Excel
               </Button>
-              <Button onClick={() => openUserDialog()} disabled={departments.length === 0}>
+              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={departments.length === 0}>
+                <Upload className="h-4 w-4 mr-2" />
+                {language === 'bn' ? 'ইম্পোর্ট' : 'Import'}
+              </Button>
+              <Button size="sm" onClick={() => openUserDialog()} disabled={departments.length === 0}>
                 <Plus className="h-4 w-4 mr-2" />
                 {language === 'bn' ? 'নতুন ইউজার' : 'Add User'}
               </Button>
@@ -816,6 +1059,99 @@ export default function SupportUsers() {
             </Button>
             <Button onClick={handleSaveUser}>
               {userDialog.editing ? (language === 'bn' ? 'সংরক্ষণ' : 'Save') : (language === 'bn' ? 'যোগ করুন' : 'Add')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={importDialog} onOpenChange={setImportDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{language === 'bn' ? 'ইউজার ইম্পোর্ট' : 'Import Users'}</DialogTitle>
+            <DialogDescription>
+              {language === 'bn' 
+                ? 'CSV ফাইল থেকে সাপোর্ট ইউজার ইম্পোর্ট করুন' 
+                : 'Import support users from CSV file'}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {importErrors.length > 0 && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3">
+                <p className="font-medium text-destructive text-sm mb-2">
+                  {language === 'bn' ? 'সমস্যা পাওয়া গেছে:' : 'Issues found:'}
+                </p>
+                <ul className="text-xs text-destructive space-y-1 max-h-24 overflow-y-auto">
+                  {importErrors.slice(0, 10).map((err, idx) => (
+                    <li key={idx}>• {err}</li>
+                  ))}
+                  {importErrors.length > 10 && (
+                    <li>...and {importErrors.length - 10} more</li>
+                  )}
+                </ul>
+              </div>
+            )}
+
+            {importData.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm text-muted-foreground">
+                  {language === 'bn' 
+                    ? `${importData.length} জন ইউজার ইম্পোর্ট করতে প্রস্তুত` 
+                    : `${importData.length} users ready to import`}
+                </p>
+                <div className="border rounded-md max-h-64 overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted sticky top-0">
+                      <tr>
+                        <th className="text-left p-2">{language === 'bn' ? 'নাম' : 'Name'}</th>
+                        <th className="text-left p-2">{language === 'bn' ? 'ইমেইল' : 'Email'}</th>
+                        <th className="text-left p-2">{language === 'bn' ? 'বিভাগ' : 'Department'}</th>
+                        <th className="text-left p-2">{language === 'bn' ? 'পদবী' : 'Designation'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importData.slice(0, 20).map((row, idx) => (
+                        <tr key={idx} className="border-t">
+                          <td className="p-2">{row.name}</td>
+                          <td className="p-2">{row.email || '-'}</td>
+                          <td className="p-2">{row.department}</td>
+                          <td className="p-2">{row.designation || '-'}</td>
+                        </tr>
+                      ))}
+                      {importData.length > 20 && (
+                        <tr className="border-t">
+                          <td colSpan={4} className="p-2 text-center text-muted-foreground">
+                            ...and {importData.length - 20} more
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Button variant="link" size="sm" className="h-auto p-0" onClick={downloadTemplate}>
+                <Download className="h-3 w-3 mr-1" />
+                {language === 'bn' ? 'টেমপ্লেট ডাউনলোড' : 'Download template'}
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => {
+              setImportDialog(false);
+              setImportData([]);
+              setImportErrors([]);
+            }}>
+              {language === 'bn' ? 'বাতিল' : 'Cancel'}
+            </Button>
+            <Button onClick={handleImport} disabled={importData.length === 0 || importing}>
+              {importing 
+                ? (language === 'bn' ? 'ইম্পোর্ট হচ্ছে...' : 'Importing...') 
+                : (language === 'bn' ? 'ইম্পোর্ট করুন' : 'Import')}
             </Button>
           </DialogFooter>
         </DialogContent>
