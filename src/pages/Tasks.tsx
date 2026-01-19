@@ -138,51 +138,51 @@ function SortableTask({ task, checklists, categories, supportUserInfo, onToggle,
             onCheckedChange={(c) => onToggle(task.id, !!c)}
           />
           <div className="flex-1 min-w-0">
-            <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+            <p className={`font-medium text-sm md:text-base ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
               {task.title}
             </p>
             {task.description && (
-              <p className="text-sm text-muted-foreground truncate">{task.description}</p>
+              <p className="text-xs md:text-sm text-muted-foreground truncate">{task.description}</p>
             )}
             {/* Support User Info for Office Tasks */}
             {supportUserInfo && (
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
-                <span className="font-medium text-primary">{supportUserInfo.name}</span>
-                <span>•</span>
-                <span>{supportUserInfo.unit_name}</span>
-                <span>→</span>
-                <span>{supportUserInfo.department_name}</span>
+              <div className="flex items-center gap-1 md:gap-1.5 text-[10px] md:text-xs text-muted-foreground mt-1">
+                <span className="font-medium text-primary truncate max-w-[60px] md:max-w-none">{supportUserInfo.name}</span>
+                <span className="hidden md:inline">•</span>
+                <span className="hidden md:inline">{supportUserInfo.unit_name}</span>
+                <span className="hidden md:inline">→</span>
+                <span className="hidden md:inline">{supportUserInfo.department_name}</span>
               </div>
             )}
           </div>
           {checklists.length > 0 && (
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="text-[10px] md:text-xs">
               {completedCount}/{checklists.length}
             </Badge>
           )}
           {category && (
             <Badge
               variant="outline" 
-              className="text-xs flex items-center gap-1"
+              className="text-[10px] md:text-xs flex items-center gap-1 max-w-[80px] md:max-w-none truncate"
               style={{ borderColor: category.color, color: category.color }}
             >
-              <FolderOpen className="h-3 w-3" />
-              {category.name}
+              <FolderOpen className="h-2.5 w-2.5 md:h-3 md:w-3 flex-shrink-0" />
+              <span className="truncate">{category.name}</span>
             </Badge>
           )}
           {task.is_recurring && (
-            <Badge variant="outline" className="text-xs flex items-center gap-1">
+            <Badge variant="outline" className="text-[10px] md:text-xs flex items-center gap-1 hidden md:flex">
               <Repeat className="h-3 w-3" />
               {getPatternLabel(task.recurring_pattern || 'weekly')}
             </Badge>
           )}
           {task.priority && (
-            <Badge className={priorityColors[task.priority] || 'bg-muted text-muted-foreground'}>
+            <Badge className={`text-[10px] md:text-xs ${priorityColors[task.priority] || 'bg-muted text-muted-foreground'}`}>
               {task.priority}
             </Badge>
           )}
           {task.due_date && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-[10px] md:text-xs text-muted-foreground">
               {format(new Date(task.due_date), 'MMM d')}
             </span>
           )}

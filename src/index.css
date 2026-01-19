@@ -376,3 +376,75 @@ html {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* Mobile-specific smaller font sizes */
+@media (max-width: 768px) {
+  /* Page titles */
+  h1 {
+    font-size: 1.25rem !important;
+  }
+  
+  h2 {
+    font-size: 1.125rem !important;
+  }
+  
+  h3 {
+    font-size: 1rem !important;
+  }
+  
+  /* Card titles and content */
+  .card-title, [class*="CardTitle"] {
+    font-size: 0.9375rem !important;
+  }
+  
+  /* Task and list items */
+  .task-title, .font-medium {
+    font-size: 0.875rem;
+  }
+  
+  /* Badges and small text */
+  .badge, [class*="Badge"] {
+    font-size: 0.625rem !important;
+    padding: 0.125rem 0.375rem !important;
+  }
+  
+  /* Tab triggers */
+  [role="tablist"] button, .tabs-trigger {
+    font-size: 0.75rem !important;
+  }
+  
+  /* Form labels */
+  label, .label {
+    font-size: 0.8125rem !important;
+  }
+  
+  /* Input text */
+  input, textarea, select, [role="combobox"] {
+    font-size: 0.875rem !important;
+  }
+  
+  /* Muted/secondary text */
+  .text-muted-foreground {
+    font-size: 0.75rem;
+  }
+  
+  /* Dropdown menu items */
+  [role="menuitem"], [role="option"] {
+    font-size: 0.8125rem !important;
+  }
+  
+  /* Button text */
+  button:not([class*="icon"]) {
+    font-size: 0.8125rem;
+  }
+  
+  /* Date and time displays */
+  .text-xs {
+    font-size: 0.625rem !important;
+  }
+  
+  /* Table text */
+  table, th, td {
+    font-size: 0.75rem !important;
+  }
+}

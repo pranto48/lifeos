@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const ONBOARDING_KEY = 'arifos_onboarding_completed';
+const ONBOARDING_KEY = 'lifeos_onboarding_completed';
 
 export function useOnboarding() {
   const [showOnboarding, setShowOnboarding] = useState(false);

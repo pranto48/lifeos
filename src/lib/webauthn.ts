@@ -87,7 +87,7 @@ export async function registerWebAuthnCredential(
   const publicKeyCredentialCreationOptions: PublicKeyCredentialCreationOptions = {
     challenge: challenge.buffer,
     rp: {
-      name: 'Pranto Life OS',
+      name: 'LifeOS',
       id: window.location.hostname,
     },
     user: {
