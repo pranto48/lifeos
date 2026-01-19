@@ -543,7 +543,8 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
 
   const filteredRoles = userRoles.filter(role => 
     role.user_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    role.role.toLowerCase().includes(searchQuery.toLowerCase())
+    role.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (userEmails[role.user_id] || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   if (loading) {
