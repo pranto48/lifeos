@@ -968,6 +968,7 @@ export type Database = {
           assigned_to: string
           created_at: string
           id: string
+          message: string | null
           responded_at: string | null
           status: string
           task_id: string
@@ -979,6 +980,7 @@ export type Database = {
           assigned_to: string
           created_at?: string
           id?: string
+          message?: string | null
           responded_at?: string | null
           status?: string
           task_id: string
@@ -990,6 +992,7 @@ export type Database = {
           assigned_to?: string
           created_at?: string
           id?: string
+          message?: string | null
           responded_at?: string | null
           status?: string
           task_id?: string
