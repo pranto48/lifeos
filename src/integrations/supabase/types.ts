@@ -1041,6 +1041,47 @@ export type Database = {
         }
         Relationships: []
       }
+      support_user_devices: {
+        Row: {
+          created_at: string
+          device_handover_date: string | null
+          device_name: string
+          id: string
+          notes: string | null
+          support_user_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          device_handover_date?: string | null
+          device_name: string
+          id?: string
+          notes?: string | null
+          support_user_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          device_handover_date?: string | null
+          device_name?: string
+          id?: string
+          notes?: string | null
+          support_user_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_user_devices_support_user_id_fkey"
+            columns: ["support_user_id"]
+            isOneToOne: false
+            referencedRelation: "support_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_users: {
         Row: {
           created_at: string

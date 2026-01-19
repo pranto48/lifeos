@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History, ListTodo, Eye, CheckSquare, Clock, AlertCircle } from 'lucide-react';
+import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History, ListTodo, Eye, CheckSquare, Clock, AlertCircle, HardDrive } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+import { PasswordField } from '@/components/support/PasswordField';
+import { DeviceManagement, DeviceEntry } from '@/components/support/DeviceManagement';
 
 interface SupportUserTask {
   id: string;
@@ -96,25 +98,47 @@ export default function SupportUsers() {
   const [userTasks, setUserTasks] = useState<SupportUserTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
 
-  // Load task counts for support users
+  // Devices for user form
+  const [userDevices, setUserDevices] = useState<DeviceEntry[]>([]);
+
+  // Device counts per support user
+  const [deviceCounts, setDeviceCounts] = useState<Record<string, number>>({});
+
+  // Load task and device counts for support users
   useEffect(() => {
-    const loadTaskCounts = async () => {
-      const { data } = await supabase
+    const loadCounts = async () => {
+      // Load task counts
+      const { data: tasksData } = await supabase
         .from('tasks')
         .select('support_user_id')
         .not('support_user_id', 'is', null);
       
-      if (data) {
+      if (tasksData) {
         const counts: Record<string, number> = {};
-        data.forEach(task => {
+        tasksData.forEach(task => {
           if (task.support_user_id) {
             counts[task.support_user_id] = (counts[task.support_user_id] || 0) + 1;
           }
         });
         setTaskCounts(counts);
       }
+
+      // Load device counts
+      const { data: devicesData } = await supabase
+        .from('support_user_devices')
+        .select('support_user_id');
+      
+      if (devicesData) {
+        const counts: Record<string, number> = {};
+        devicesData.forEach(device => {
+          if (device.support_user_id) {
+            counts[device.support_user_id] = (counts[device.support_user_id] || 0) + 1;
+          }
+        });
+        setDeviceCounts(counts);
+      }
     };
-    loadTaskCounts();
+    loadCounts();
   }, [supportUsers]);
 
   // Load tasks for a specific support user
@@ -254,7 +278,26 @@ export default function SupportUsers() {
   };
 
   // Support User handlers
-  const openUserDialog = (user?: SupportUser) => {
+  const loadUserDevices = async (userId: string) => {
+    const { data } = await supabase
+      .from('support_user_devices')
+      .select('*')
+      .eq('support_user_id', userId)
+      .order('created_at', { ascending: true });
+    
+    if (data) {
+      setUserDevices(data.map(d => ({
+        id: d.id,
+        device_name: d.device_name,
+        device_handover_date: d.device_handover_date || '',
+        notes: d.notes || '',
+      })));
+    } else {
+      setUserDevices([]);
+    }
+  };
+
+  const openUserDialog = async (user?: SupportUser) => {
     if (user) {
       setUserForm({
         name: user.name,
@@ -276,6 +319,7 @@ export default function SupportUsers() {
         device_assign_date: user.device_assign_date || '',
       });
       setUserDialog({ open: true, editing: user });
+      await loadUserDevices(user.id);
     } else {
       setUserForm({
         name: '',
@@ -296,7 +340,28 @@ export default function SupportUsers() {
         new_device_assign: '',
         device_assign_date: '',
       });
+      setUserDevices([]);
       setUserDialog({ open: true, editing: null });
+    }
+  };
+
+  const saveUserDevices = async (supportUserId: string, userId: string) => {
+    // Delete removed devices
+    const deletedDevices = userDevices.filter(d => d.isDeleted && d.id && !d.id.startsWith('temp-'));
+    for (const device of deletedDevices) {
+      await supabase.from('support_user_devices').delete().eq('id', device.id);
+    }
+
+    // Add new devices
+    const newDevices = userDevices.filter(d => d.isNew && !d.isDeleted);
+    for (const device of newDevices) {
+      await supabase.from('support_user_devices').insert({
+        support_user_id: supportUserId,
+        user_id: userId,
+        device_name: device.device_name,
+        device_handover_date: device.device_handover_date || null,
+        notes: device.notes || null,
+      });
     }
   };
 
@@ -307,14 +372,32 @@ export default function SupportUsers() {
     }
 
     try {
+      let savedUserId: string | undefined;
+      
       if (userDialog.editing) {
         await updateSupportUser(userDialog.editing.id, userForm);
+        savedUserId = userDialog.editing.id;
+        
+        // Get current user id for device saving
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await saveUserDevices(savedUserId, user.id);
+        }
+        
         toast.success('User updated');
       } else {
-        await addSupportUser(userForm as any);
+        const newUser = await addSupportUser(userForm as any);
+        
+        // Get newly created user id and save devices
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user && newUser) {
+          await saveUserDevices(newUser.id, user.id);
+        }
+        
         toast.success('User added');
       }
       setUserDialog({ open: false, editing: null });
+      setUserDevices([]);
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -830,7 +913,7 @@ export default function SupportUsers() {
                         <span>{user.ip_address}</span>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 pt-1 border-t mt-2">
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t mt-2">
                       <Button
                         variant="ghost"
                         size="sm"
@@ -844,6 +927,12 @@ export default function SupportUsers() {
                         <span className="text-xs font-medium">{taskCounts[user.id] || 0} {language === 'bn' ? 'টাস্ক' : 'tasks'}</span>
                         <Eye className="h-3 w-3 ml-1" />
                       </Button>
+                      {deviceCounts[user.id] > 0 && (
+                        <div className="flex items-center gap-1 text-muted-foreground">
+                          <HardDrive className="h-3 w-3" />
+                          <span className="text-xs">{deviceCounts[user.id]} {language === 'bn' ? 'ডিভাইস' : 'devices'}</span>
+                        </div>
+                      )}
                       {!user.is_active && (
                         <Badge variant="secondary" className="text-xs ml-auto">Inactive</Badge>
                       )}
@@ -1407,21 +1496,19 @@ export default function SupportUsers() {
 
               <div className="space-y-2">
                 <Label>{language === 'bn' ? 'এক্সটেনশন পাসওয়ার্ড' : 'Extension Password'}</Label>
-                <Input
-                  type="password"
+                <PasswordField
                   value={userForm.extension_password}
-                  onChange={(e) => setUserForm({ ...userForm, extension_password: e.target.value })}
-                  placeholder="••••••"
+                  onChange={(val) => setUserForm({ ...userForm, extension_password: val })}
+                  language={language}
                 />
               </div>
 
               <div className="space-y-2">
                 <Label>{language === 'bn' ? 'মেইল পাসওয়ার্ড' : 'Mail Password'}</Label>
-                <Input
-                  type="password"
+                <PasswordField
                   value={userForm.mail_password}
-                  onChange={(e) => setUserForm({ ...userForm, mail_password: e.target.value })}
-                  placeholder="••••••"
+                  onChange={(val) => setUserForm({ ...userForm, mail_password: val })}
+                  language={language}
                 />
               </div>
 
@@ -1436,45 +1523,19 @@ export default function SupportUsers() {
 
               <div className="space-y-2 col-span-2">
                 <Label>{language === 'bn' ? 'NAS পাসওয়ার্ড' : 'NAS Password'}</Label>
-                <Input
-                  type="password"
+                <PasswordField
                   value={userForm.nas_password}
-                  onChange={(e) => setUserForm({ ...userForm, nas_password: e.target.value })}
-                  placeholder="••••••"
+                  onChange={(val) => setUserForm({ ...userForm, nas_password: val })}
+                  language={language}
                 />
               </div>
 
               {/* Device Assignment Section */}
               <div className="col-span-2 border-t pt-4 mt-2">
-                <p className="text-sm font-medium text-muted-foreground mb-3">
-                  {language === 'bn' ? 'ডিভাইস অ্যাসাইনমেন্ট' : 'Device Assignment'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>{language === 'bn' ? 'ডিভাইস হ্যান্ডওভার তারিখ' : 'Device Handover Date'}</Label>
-                <Input
-                  type="date"
-                  value={userForm.device_handover_date}
-                  onChange={(e) => setUserForm({ ...userForm, device_handover_date: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label>{language === 'bn' ? 'নতুন ডিভাইস অ্যাসাইন' : 'New Device Assign'}</Label>
-                <Input
-                  value={userForm.new_device_assign}
-                  onChange={(e) => setUserForm({ ...userForm, new_device_assign: e.target.value })}
-                  placeholder={language === 'bn' ? 'নতুন ডিভাইস নাম/মডেল' : 'New device name/model'}
-                />
-              </div>
-
-              <div className="space-y-2 col-span-2">
-                <Label>{language === 'bn' ? 'ডিভাইস অ্যাসাইন তারিখ' : 'Device Assign Date'}</Label>
-                <Input
-                  type="date"
-                  value={userForm.device_assign_date}
-                  onChange={(e) => setUserForm({ ...userForm, device_assign_date: e.target.value })}
+                <DeviceManagement
+                  devices={userDevices}
+                  onChange={setUserDevices}
+                  language={language}
                 />
               </div>
 
