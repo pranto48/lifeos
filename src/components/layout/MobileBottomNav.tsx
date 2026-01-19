@@ -1,0 +1,139 @@
+import { 
+  LayoutDashboard, 
+  CheckSquare, 
+  FileText, 
+  Calendar,
+  Settings,
+  Menu,
+  HeadsetIcon,
+  Target,
+  Wallet,
+  Repeat,
+  Users as UsersIcon
+} from 'lucide-react';
+import { NavLink, useLocation } from 'react-router-dom';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { TranslationKey } from '@/translations';
+
+interface NavItem {
+  titleKey: TranslationKey;
+  url: string;
+  icon: any;
+  personalOnly?: boolean;
+}
+
+// Primary nav items for bottom bar (max 5)
+const primaryNavItems: NavItem[] = [
+  { titleKey: 'nav.dashboard', url: '/', icon: LayoutDashboard },
+  { titleKey: 'nav.tasks', url: '/tasks', icon: CheckSquare },
+  { titleKey: 'nav.calendar', url: '/calendar', icon: Calendar },
+  { titleKey: 'nav.notes', url: '/notes', icon: FileText },
+];
+
+// All nav items for the "more" menu
+const allNavItems: NavItem[] = [
+  { titleKey: 'nav.dashboard', url: '/', icon: LayoutDashboard },
+  { titleKey: 'nav.calendar', url: '/calendar', icon: Calendar },
+  { titleKey: 'nav.tasks', url: '/tasks', icon: CheckSquare },
+  { titleKey: 'nav.notes', url: '/notes', icon: FileText },
+  { titleKey: 'nav.supportUsers', url: '/support-users', icon: HeadsetIcon },
+  { titleKey: 'nav.habits', url: '/habits', icon: Repeat, personalOnly: true },
+  { titleKey: 'nav.family', url: '/family', icon: UsersIcon, personalOnly: true },
+  { titleKey: 'nav.budget', url: '/budget', icon: Wallet, personalOnly: true },
+  { titleKey: 'nav.goals', url: '/goals', icon: Target },
+  { titleKey: 'nav.settings', url: '/settings', icon: Settings },
+];
+
+export function MobileBottomNav() {
+  const { t } = useLanguage();
+  const { mode } = useDashboardMode();
+  const location = useLocation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const isActive = (path: string) => {
+    if (path === '/') return location.pathname === '/';
+    return location.pathname.startsWith(path);
+  };
+
+  const filteredAllNavItems = allNavItems.filter(item => {
+    if (mode === 'office' && item.personalOnly) {
+      return false;
+    }
+    return true;
+  });
+
+  return (
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-sidebar/95 backdrop-blur-xl border-t border-sidebar-border safe-area-pb">
+      <div className="flex items-center justify-around h-16 px-2">
+        {primaryNavItems.map(item => (
+          <NavLink
+            key={item.url}
+            to={item.url}
+            className={cn(
+              'flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-lg transition-all active:scale-95',
+              isActive(item.url)
+                ? 'text-primary'
+                : 'text-muted-foreground'
+            )}
+          >
+            <item.icon className={cn(
+              'h-5 w-5',
+              isActive(item.url) && 'text-primary'
+            )} />
+            <span className="text-[10px] font-medium">{t(item.titleKey)}</span>
+            {isActive(item.url) && (
+              <div className="absolute bottom-1 w-6 h-0.5 bg-primary rounded-full" />
+            )}
+          </NavLink>
+        ))}
+        
+        {/* More Menu */}
+        <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+          <SheetTrigger asChild>
+            <button
+              className={cn(
+                'flex flex-col items-center justify-center gap-1 flex-1 py-2 rounded-lg transition-all active:scale-95',
+                menuOpen ? 'text-primary' : 'text-muted-foreground'
+              )}
+            >
+              <Menu className="h-5 w-5" />
+              <span className="text-[10px] font-medium">More</span>
+            </button>
+          </SheetTrigger>
+          <SheetContent side="bottom" className="h-[70vh] rounded-t-3xl bg-sidebar border-sidebar-border">
+            <SheetHeader className="pb-4">
+              <SheetTitle className="text-sidebar-foreground text-left">
+                All Features
+              </SheetTitle>
+            </SheetHeader>
+            <div className="grid grid-cols-4 gap-4 pb-safe">
+              {filteredAllNavItems.map(item => (
+                <NavLink
+                  key={item.url}
+                  to={item.url}
+                  onClick={() => setMenuOpen(false)}
+                  className={cn(
+                    'flex flex-col items-center justify-center gap-2 p-4 rounded-2xl transition-all active:scale-95',
+                    isActive(item.url)
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-secondary/50 text-sidebar-foreground hover:bg-secondary'
+                  )}
+                >
+                  <item.icon className="h-6 w-6" />
+                  <span className="text-xs font-medium text-center leading-tight">
+                    {t(item.titleKey)}
+                  </span>
+                </NavLink>
+              ))}
+            </div>
+          </SheetContent>
+        </Sheet>
+      </div>
+    </nav>
+  );
+}

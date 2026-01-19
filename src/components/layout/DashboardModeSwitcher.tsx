@@ -125,14 +125,14 @@ export function DashboardModeSwitcher() {
             size="sm"
             onClick={() => handleModeSwitch('office')}
             className={cn(
-              'flex items-center gap-2 h-8 px-3 rounded-md transition-all',
+              'flex items-center gap-1 md:gap-2 h-8 px-2 md:px-3 rounded-md transition-all',
               mode === 'office' 
                 ? 'bg-background shadow-sm text-foreground' 
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
             <Briefcase className="h-4 w-4" />
-            <span className="text-sm font-medium">Office</span>
+            <span className="text-xs md:text-sm font-medium hidden sm:inline">Office</span>
           </Button>
         )}
         {permissions.personal_enabled && (
@@ -141,14 +141,14 @@ export function DashboardModeSwitcher() {
             size="sm"
             onClick={() => handleModeSwitch('personal')}
             className={cn(
-              'flex items-center gap-2 h-8 px-3 rounded-md transition-all',
+              'flex items-center gap-1 md:gap-2 h-8 px-2 md:px-3 rounded-md transition-all',
               mode === 'personal' 
                 ? 'bg-background shadow-sm text-foreground' 
                 : 'text-muted-foreground hover:text-foreground'
             )}
           >
             <Home className="h-4 w-4" />
-            <span className="text-sm font-medium">Personal</span>
+            <span className="text-xs md:text-sm font-medium hidden sm:inline">Personal</span>
             {!isPersonalUnlocked && <Lock className="h-3 w-3 ml-1" />}
           </Button>
         )}

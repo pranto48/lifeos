@@ -50,17 +50,18 @@ export function QuickAddButton() {
     <>
       <Button
         onClick={() => setOpen(true)}
-        className="bg-primary text-primary-foreground hover:bg-primary/90 gap-2"
+        size="icon"
+        className="bg-primary text-primary-foreground hover:bg-primary/90 h-9 w-9 md:h-10 md:w-auto md:px-4"
       >
-        <Plus className="h-4 w-4" />
-        <span className="hidden sm:inline">Quick Add</span>
-        <kbd className="hidden md:inline-flex h-5 select-none items-center gap-1 rounded border bg-primary-foreground/10 px-1.5 font-mono text-[10px] font-medium">
+        <Plus className="h-5 w-5 md:h-4 md:w-4" />
+        <span className="hidden md:inline ml-2">Quick Add</span>
+        <kbd className="hidden lg:inline-flex ml-2 h-5 select-none items-center gap-1 rounded border bg-primary-foreground/10 px-1.5 font-mono text-[10px] font-medium">
           ⌘K
         </kbd>
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[500px] bg-card border-border">
+        <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto bg-card border-border mx-4 md:mx-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">Quick Add</DialogTitle>
           </DialogHeader>
@@ -71,10 +72,10 @@ export function QuickAddButton() {
                 <TabsTrigger
                   key={tab.id}
                   value={tab.id}
-                  className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground"
+                  className="flex items-center justify-center gap-1 md:gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground px-2 py-2"
                 >
                   <tab.icon className="h-4 w-4" />
-                  <span className="hidden sm:inline">{tab.label}</span>
+                  <span className="text-xs md:text-sm">{tab.label}</span>
                 </TabsTrigger>
               ))}
             </TabsList>

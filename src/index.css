@@ -292,3 +292,76 @@
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
+
+/* Mobile App Utilities */
+.safe-area-pt {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+.pb-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0) + 1rem);
+}
+
+/* Touch-friendly targets */
+@media (max-width: 768px) {
+  button, 
+  [role="button"],
+  a {
+    min-height: 44px;
+  }
+  
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+}
+
+/* Hide scrollbar on mobile for cleaner app feel */
+@media (max-width: 768px) {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Full-screen mobile experience */
+@supports (padding-top: env(safe-area-inset-top)) {
+  body {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* Prevent overscroll bounce on iOS */
+html {
+  overscroll-behavior: none;
+}
+
+/* Better tap highlighting on mobile */
+@media (max-width: 768px) {
+  * {
+    -webkit-tap-highlight-color: hsl(var(--primary) / 0.1);
+  }
+}
+
+/* Smooth scrolling for mobile */
+@media (max-width: 768px) {
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  main {
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
+  }
+}
