@@ -33,6 +33,15 @@ export interface SupportUser {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // New credential and device fields
+  extension_number: string | null;
+  extension_password: string | null;
+  mail_password: string | null;
+  nas_username: string | null;
+  nas_password: string | null;
+  device_handover_date: string | null;
+  new_device_assign: string | null;
+  device_assign_date: string | null;
 }
 
 export interface SupportActivityLog {
@@ -195,7 +204,25 @@ export function useSupportData() {
   };
 
   // Support User operations
-  const addSupportUser = async (userData: Omit<SupportUser, 'id' | 'created_at' | 'updated_at'> & { department_id: string }) => {
+  const addSupportUser = async (userData: {
+    department_id: string;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    designation?: string | null;
+    device_info?: string | null;
+    ip_address?: string | null;
+    notes?: string | null;
+    is_active?: boolean;
+    extension_number?: string | null;
+    extension_password?: string | null;
+    mail_password?: string | null;
+    nas_username?: string | null;
+    nas_password?: string | null;
+    device_handover_date?: string | null;
+    new_device_assign?: string | null;
+    device_assign_date?: string | null;
+  }) => {
     if (!user) return null;
     const { data: newUser, error } = await supabase.from('support_users').insert({
       user_id: user.id,

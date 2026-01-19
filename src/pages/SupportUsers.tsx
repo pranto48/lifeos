@@ -77,6 +77,15 @@ export default function SupportUsers() {
     notes: '',
     department_id: '',
     is_active: true,
+    // New credential and device fields
+    extension_number: '',
+    extension_password: '',
+    mail_password: '',
+    nas_username: '',
+    nas_password: '',
+    device_handover_date: '',
+    new_device_assign: '',
+    device_assign_date: '',
   });
 
   // Task counts per support user
@@ -257,6 +266,14 @@ export default function SupportUsers() {
         notes: user.notes || '',
         department_id: user.department_id,
         is_active: user.is_active,
+        extension_number: user.extension_number || '',
+        extension_password: user.extension_password || '',
+        mail_password: user.mail_password || '',
+        nas_username: user.nas_username || '',
+        nas_password: user.nas_password || '',
+        device_handover_date: user.device_handover_date || '',
+        new_device_assign: user.new_device_assign || '',
+        device_assign_date: user.device_assign_date || '',
       });
       setUserDialog({ open: true, editing: user });
     } else {
@@ -270,6 +287,14 @@ export default function SupportUsers() {
         notes: '',
         department_id: departments[0]?.id || '',
         is_active: true,
+        extension_number: '',
+        extension_password: '',
+        mail_password: '',
+        nas_username: '',
+        nas_password: '',
+        device_handover_date: '',
+        new_device_assign: '',
+        device_assign_date: '',
       });
       setUserDialog({ open: true, editing: null });
     }
@@ -1361,6 +1386,95 @@ export default function SupportUsers() {
                   value={userForm.device_info}
                   onChange={(e) => setUserForm({ ...userForm, device_info: e.target.value })}
                   placeholder={language === 'bn' ? 'কম্পিউটার/ল্যাপটপ মডেল' : 'Computer/Laptop model'}
+                />
+              </div>
+
+              {/* Credentials Section */}
+              <div className="col-span-2 border-t pt-4 mt-2">
+                <p className="text-sm font-medium text-muted-foreground mb-3">
+                  {language === 'bn' ? 'ক্রেডেনশিয়াল তথ্য' : 'Credentials'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'bn' ? 'এক্সটেনশন নম্বর' : 'Extension Number'}</Label>
+                <Input
+                  value={userForm.extension_number}
+                  onChange={(e) => setUserForm({ ...userForm, extension_number: e.target.value })}
+                  placeholder="1234"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'bn' ? 'এক্সটেনশন পাসওয়ার্ড' : 'Extension Password'}</Label>
+                <Input
+                  type="password"
+                  value={userForm.extension_password}
+                  onChange={(e) => setUserForm({ ...userForm, extension_password: e.target.value })}
+                  placeholder="••••••"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'bn' ? 'মেইল পাসওয়ার্ড' : 'Mail Password'}</Label>
+                <Input
+                  type="password"
+                  value={userForm.mail_password}
+                  onChange={(e) => setUserForm({ ...userForm, mail_password: e.target.value })}
+                  placeholder="••••••"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'bn' ? 'NAS ইউজারনেম' : 'NAS Username'}</Label>
+                <Input
+                  value={userForm.nas_username}
+                  onChange={(e) => setUserForm({ ...userForm, nas_username: e.target.value })}
+                  placeholder="nas_user"
+                />
+              </div>
+
+              <div className="space-y-2 col-span-2">
+                <Label>{language === 'bn' ? 'NAS পাসওয়ার্ড' : 'NAS Password'}</Label>
+                <Input
+                  type="password"
+                  value={userForm.nas_password}
+                  onChange={(e) => setUserForm({ ...userForm, nas_password: e.target.value })}
+                  placeholder="••••••"
+                />
+              </div>
+
+              {/* Device Assignment Section */}
+              <div className="col-span-2 border-t pt-4 mt-2">
+                <p className="text-sm font-medium text-muted-foreground mb-3">
+                  {language === 'bn' ? 'ডিভাইস অ্যাসাইনমেন্ট' : 'Device Assignment'}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'bn' ? 'ডিভাইস হ্যান্ডওভার তারিখ' : 'Device Handover Date'}</Label>
+                <Input
+                  type="date"
+                  value={userForm.device_handover_date}
+                  onChange={(e) => setUserForm({ ...userForm, device_handover_date: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'bn' ? 'নতুন ডিভাইস অ্যাসাইন' : 'New Device Assign'}</Label>
+                <Input
+                  value={userForm.new_device_assign}
+                  onChange={(e) => setUserForm({ ...userForm, new_device_assign: e.target.value })}
+                  placeholder={language === 'bn' ? 'নতুন ডিভাইস নাম/মডেল' : 'New device name/model'}
+                />
+              </div>
+
+              <div className="space-y-2 col-span-2">
+                <Label>{language === 'bn' ? 'ডিভাইস অ্যাসাইন তারিখ' : 'Device Assign Date'}</Label>
+                <Input
+                  type="date"
+                  value={userForm.device_assign_date}
+                  onChange={(e) => setUserForm({ ...userForm, device_assign_date: e.target.value })}
                 />
               </div>
 

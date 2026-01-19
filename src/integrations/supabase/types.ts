@@ -1046,12 +1046,20 @@ export type Database = {
           created_at: string
           department_id: string
           designation: string | null
+          device_assign_date: string | null
+          device_handover_date: string | null
           device_info: string | null
           email: string | null
+          extension_number: string | null
+          extension_password: string | null
           id: string
           ip_address: string | null
           is_active: boolean
+          mail_password: string | null
           name: string
+          nas_password: string | null
+          nas_username: string | null
+          new_device_assign: string | null
           notes: string | null
           phone: string | null
           updated_at: string
@@ -1061,12 +1069,20 @@ export type Database = {
           created_at?: string
           department_id: string
           designation?: string | null
+          device_assign_date?: string | null
+          device_handover_date?: string | null
           device_info?: string | null
           email?: string | null
+          extension_number?: string | null
+          extension_password?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean
+          mail_password?: string | null
           name: string
+          nas_password?: string | null
+          nas_username?: string | null
+          new_device_assign?: string | null
           notes?: string | null
           phone?: string | null
           updated_at?: string
@@ -1076,12 +1092,20 @@ export type Database = {
           created_at?: string
           department_id?: string
           designation?: string | null
+          device_assign_date?: string | null
+          device_handover_date?: string | null
           device_info?: string | null
           email?: string | null
+          extension_number?: string | null
+          extension_password?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean
+          mail_password?: string | null
           name?: string
+          nas_password?: string | null
+          nas_username?: string | null
+          new_device_assign?: string | null
           notes?: string | null
           phone?: string | null
           updated_at?: string
