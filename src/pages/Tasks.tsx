@@ -251,6 +251,7 @@ export default function Tasks() {
   const [supportUserInfoMap, setSupportUserInfoMap] = useState<Record<string, SupportUserInfo>>({});
   const [filter, setFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [supportUserFilter, setSupportUserFilter] = useState<string>('all');
   const [showCategoryManager, setShowCategoryManager] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
@@ -545,6 +546,11 @@ export default function Tasks() {
       if (categoryFilter === 'uncategorized') return !t.category_id;
       if (t.category_id !== categoryFilter) return false;
     }
+    // Support user filter (office mode only)
+    if (mode === 'office' && supportUserFilter !== 'all') {
+      if (supportUserFilter === 'unassigned') return !t.support_user_id;
+      if (t.support_user_id !== supportUserFilter) return false;
+    }
     return true;
   });
 
@@ -601,28 +607,54 @@ export default function Tasks() {
       </div>
 
       {/* Category Filter */}
-      <div className="flex items-center gap-3">
-        <span className="text-sm text-muted-foreground">Filter by category:</span>
-        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Select category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Categories</SelectItem>
-            <SelectItem value="uncategorized">Uncategorized</SelectItem>
-            {categories.map((cat) => (
-              <SelectItem key={cat.id} value={cat.id}>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{ backgroundColor: cat.color }}
-                  />
-                  {cat.name}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Category:</span>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="uncategorized">Uncategorized</SelectItem>
+              {categories.map((cat) => (
+                <SelectItem key={cat.id} value={cat.id}>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: cat.color }}
+                    />
+                    {cat.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Support User Filter - Office Mode Only */}
+        {mode === 'office' && allSupportUsers.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Support User:</span>
+            <Select value={supportUserFilter} onValueChange={setSupportUserFilter}>
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Select support user" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Support Users</SelectItem>
+                <SelectItem value="unassigned">Unassigned</SelectItem>
+                {allSupportUsers.map((su) => (
+                  <SelectItem key={su.id} value={su.id}>
+                    <div className="flex flex-col">
+                      <span>{su.name}</span>
+                      <span className="text-xs text-muted-foreground">{su.unit_name} → {su.department_name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       {showCategoryManager && (

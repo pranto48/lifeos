@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History, ListTodo } from 'lucide-react';
+import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History, ListTodo, Eye, CheckSquare, Clock, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,12 +10,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { useSupportData, SupportUnit, SupportDepartment, SupportUser } from '@/hooks/useSupportData';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
+
+interface SupportUserTask {
+  id: string;
+  title: string;
+  description: string | null;
+  priority: string | null;
+  status: string | null;
+  due_date: string | null;
+  created_at: string;
+}
 
 export default function SupportUsers() {
   const { t, language } = useLanguage();
@@ -70,6 +81,11 @@ export default function SupportUsers() {
 
   // Task counts per support user
   const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
+  
+  // Task details dialog
+  const [taskDetailsDialog, setTaskDetailsDialog] = useState<{ open: boolean; user: SupportUser | null }>({ open: false, user: null });
+  const [userTasks, setUserTasks] = useState<SupportUserTask[]>([]);
+  const [loadingTasks, setLoadingTasks] = useState(false);
 
   // Load task counts for support users
   useEffect(() => {
@@ -91,6 +107,28 @@ export default function SupportUsers() {
     };
     loadTaskCounts();
   }, [supportUsers]);
+
+  // Load tasks for a specific support user
+  const loadUserTasks = async (userId: string) => {
+    setLoadingTasks(true);
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('id, title, description, priority, status, due_date, created_at')
+      .eq('support_user_id', userId)
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      toast.error(language === 'bn' ? 'টাস্ক লোড করতে ব্যর্থ' : 'Failed to load tasks');
+    } else {
+      setUserTasks(data || []);
+    }
+    setLoadingTasks(false);
+  };
+
+  const openTaskDetailsDialog = (user: SupportUser) => {
+    setTaskDetailsDialog({ open: true, user });
+    loadUserTasks(user.id);
+  };
 
   // Filter support users based on search and filters
   const filteredSupportUsers = supportUsers.filter(user => {
@@ -768,10 +806,19 @@ export default function SupportUsers() {
                       </div>
                     )}
                     <div className="flex items-center gap-2 pt-1 border-t mt-2">
-                      <div className="flex items-center gap-1 text-primary">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-auto p-0 gap-1 text-primary hover:text-primary/80"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openTaskDetailsDialog(user);
+                        }}
+                      >
                         <ListTodo className="h-3 w-3" />
                         <span className="text-xs font-medium">{taskCounts[user.id] || 0} {language === 'bn' ? 'টাস্ক' : 'tasks'}</span>
-                      </div>
+                        <Eye className="h-3 w-3 ml-1" />
+                      </Button>
                       {!user.is_active && (
                         <Badge variant="secondary" className="text-xs ml-auto">Inactive</Badge>
                       )}
@@ -1437,6 +1484,115 @@ export default function SupportUsers() {
                 : (language === 'bn' ? 'ইম্পোর্ট করুন' : 'Import')}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Details Dialog */}
+      <Dialog open={taskDetailsDialog.open} onOpenChange={(open) => {
+        if (!open) {
+          setTaskDetailsDialog({ open: false, user: null });
+          setUserTasks([]);
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ListTodo className="h-5 w-5 text-primary" />
+              {language === 'bn' ? 'টাস্ক তালিকা' : 'Tasks for'} {taskDetailsDialog.user?.name}
+            </DialogTitle>
+            <DialogDescription>
+              {(() => {
+                const dept = departments.find(d => d.id === taskDetailsDialog.user?.department_id);
+                const unit = dept ? units.find(u => u.id === dept.unit_id) : null;
+                return `${unit?.name || ''} → ${dept?.name || ''}`;
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <ScrollArea className="max-h-[50vh]">
+            {loadingTasks ? (
+              <div className="py-8 text-center text-muted-foreground">
+                {language === 'bn' ? 'লোড হচ্ছে...' : 'Loading tasks...'}
+              </div>
+            ) : userTasks.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <CheckSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                {language === 'bn' ? 'এই ব্যবহারকারীর জন্য কোন টাস্ক নেই' : 'No tasks assigned to this user'}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {userTasks.map((task) => {
+                  const priorityColors: Record<string, string> = {
+                    urgent: 'bg-red-500/20 text-red-400 border-red-500/30',
+                    high: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
+                    medium: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+                    low: 'bg-green-500/20 text-green-400 border-green-500/30',
+                  };
+                  const statusColors: Record<string, string> = {
+                    todo: 'bg-slate-500/20 text-slate-400',
+                    'in-progress': 'bg-blue-500/20 text-blue-400',
+                    completed: 'bg-green-500/20 text-green-400',
+                  };
+
+                  return (
+                    <Card key={task.id} className="bg-card border-border">
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <p className={`font-medium ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                              {task.title}
+                            </p>
+                            {task.description && (
+                              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{task.description}</p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 mt-2">
+                              {task.priority && (
+                                <Badge className={`text-xs ${priorityColors[task.priority] || ''}`}>
+                                  {task.priority}
+                                </Badge>
+                              )}
+                              {task.status && (
+                                <Badge variant="outline" className={`text-xs ${statusColors[task.status] || ''}`}>
+                                  {task.status}
+                                </Badge>
+                              )}
+                              {task.due_date && (
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <Clock className="h-3 w-3" />
+                                  <span>{format(new Date(task.due_date), 'dd MMM yyyy')}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground shrink-0">
+                            {format(new Date(task.created_at), 'dd MMM yyyy')}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </ScrollArea>
+
+          <div className="flex items-center justify-between pt-4 border-t">
+            <div className="text-sm text-muted-foreground">
+              {language === 'bn' ? 'মোট' : 'Total'}: {userTasks.length} {language === 'bn' ? 'টাস্ক' : 'tasks'}
+              {userTasks.length > 0 && (
+                <>
+                  {' • '}
+                  {userTasks.filter(t => t.status === 'completed').length} {language === 'bn' ? 'সম্পন্ন' : 'completed'}
+                </>
+              )}
+            </div>
+            <Button variant="outline" onClick={() => {
+              setTaskDetailsDialog({ open: false, user: null });
+              setUserTasks([]);
+            }}>
+              {language === 'bn' ? 'বন্ধ করুন' : 'Close'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
