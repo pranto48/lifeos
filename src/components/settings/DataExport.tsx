@@ -40,10 +40,29 @@ export function DataExport() {
   const [pendingRestoreData, setPendingRestoreData] = useState<any>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [isActive, setIsActive] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     loadBackupSchedule();
+    checkAdminStatus();
   }, [user]);
+
+  const checkAdminStatus = async () => {
+    if (!user) return;
+    try {
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      
+      setIsAdmin(!!data);
+    } catch (error) {
+      console.error('Failed to check admin status:', error);
+      setIsAdmin(false);
+    }
+  };
 
   const loadBackupSchedule = async () => {
     if (!user) return;
@@ -822,59 +841,73 @@ export function DataExport() {
             </Button>
           </div>
 
-          <div className="pt-4 border-t border-border space-y-4">
-            {/* Additive Import */}
-            <div>
-              <Label htmlFor="import-file" className="text-sm font-medium flex items-center gap-2">
-                <Upload className="h-4 w-4" />
-                {language === 'bn' ? 'JSON ব্যাকআপ ইমপোর্ট করুন (যোগ করুন)' : 'Import JSON Backup (Add)'}
-              </Label>
-              <div className="flex items-center gap-2 mt-2">
-                <Input
-                  id="import-file"
-                  type="file"
-                  accept=".json"
-                  onChange={importJSON}
-                  disabled={importing || restoring}
-                  className="flex-1"
-                />
-                {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+          {isAdmin && (
+            <div className="pt-4 border-t border-border space-y-4">
+              {/* Additive Import - Admin Only */}
+              <div>
+                <Label htmlFor="import-file" className="text-sm font-medium flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  {language === 'bn' ? 'JSON ব্যাকআপ ইমপোর্ট করুন (যোগ করুন)' : 'Import JSON Backup (Add)'}
+                </Label>
+                <div className="flex items-center gap-2 mt-2">
+                  <Input
+                    id="import-file"
+                    type="file"
+                    accept=".json"
+                    onChange={importJSON}
+                    disabled={importing || restoring}
+                    className="flex-1"
+                  />
+                  {importing && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {language === 'bn' 
+                    ? 'ইমপোর্ট করা ডেটা বিদ্যমান ডেটার সাথে যুক্ত হবে।'
+                    : 'Imported data will be added to existing data.'
+                  }
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {language === 'bn' 
-                  ? 'ইমপোর্ট করা ডেটা বিদ্যমান ডেটার সাথে যুক্ত হবে।'
-                  : 'Imported data will be added to existing data.'
-                }
-              </p>
-            </div>
 
-            {/* Full Restore */}
-            <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-              <Label htmlFor="restore-file" className="text-sm font-medium flex items-center gap-2 text-destructive">
-                <RotateCcw className="h-4 w-4" />
-                {language === 'bn' ? 'সম্পূর্ণ পুনরুদ্ধার (সবকিছু প্রতিস্থাপন করুন)' : 'Full Restore (Replace All Data)'}
-              </Label>
-              <div className="flex items-center gap-2 mt-2">
-                <Input
-                  id="restore-file"
-                  ref={restoreInputRef}
-                  type="file"
-                  accept=".json"
-                  onChange={handleRestoreFileSelect}
-                  disabled={importing || restoring}
-                  className="flex-1"
-                />
-                {restoring && <Loader2 className="h-4 w-4 animate-spin" />}
+              {/* Full Restore - Admin Only */}
+              <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                <Label htmlFor="restore-file" className="text-sm font-medium flex items-center gap-2 text-destructive">
+                  <RotateCcw className="h-4 w-4" />
+                  {language === 'bn' ? 'সম্পূর্ণ পুনরুদ্ধার (সবকিছু প্রতিস্থাপন করুন)' : 'Full Restore (Replace All Data)'}
+                </Label>
+                <div className="flex items-center gap-2 mt-2">
+                  <Input
+                    id="restore-file"
+                    ref={restoreInputRef}
+                    type="file"
+                    accept=".json"
+                    onChange={handleRestoreFileSelect}
+                    disabled={importing || restoring}
+                    className="flex-1"
+                  />
+                  {restoring && <Loader2 className="h-4 w-4 animate-spin" />}
+                </div>
+                <p className="text-xs text-destructive/80 mt-1 flex items-start gap-1">
+                  <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                  {language === 'bn' 
+                    ? 'সতর্কতা: এটি আপনার সমস্ত বিদ্যমান ডেটা মুছে ফেলবে এবং ব্যাকআপ থেকে প্রতিস্থাপন করবে!'
+                    : 'Warning: This will DELETE all your existing data and replace with backup!'
+                  }
+                </p>
               </div>
-              <p className="text-xs text-destructive/80 mt-1 flex items-start gap-1">
-                <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+            </div>
+          )}
+
+          {!isAdmin && (
+            <div className="pt-4 border-t border-border">
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <AlertTriangle className="h-4 w-4" />
                 {language === 'bn' 
-                  ? 'সতর্কতা: এটি আপনার সমস্ত বিদ্যমান ডেটা মুছে ফেলবে এবং ব্যাকআপ থেকে প্রতিস্থাপন করবে!'
-                  : 'Warning: This will DELETE all your existing data and replace with backup!'
+                  ? 'শুধুমাত্র অ্যাডমিনরা ডেটা ইমপোর্ট ও রিস্টোর করতে পারেন।'
+                  : 'Only admins can import and restore data.'
                 }
               </p>
             </div>
-          </div>
+          )}
         </CardContent>
       </Card>
 
