@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X } from 'lucide-react';
+import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -238,6 +238,86 @@ export default function SupportUsers() {
   // Get department name for a user
   const getDeptName = (deptId: string) => departments.find(d => d.id === deptId)?.name || 'Unknown';
 
+  // Export functions
+  const exportToCSV = () => {
+    const headers = ['Name', 'Email', 'Phone', 'Designation', 'Unit', 'Department', 'Device Info', 'IP Address', 'Status', 'Notes'];
+    const rows = filteredSupportUsers.map(user => {
+      const dept = departments.find(d => d.id === user.department_id);
+      const unit = dept ? units.find(u => u.id === dept.unit_id) : null;
+      return [
+        user.name,
+        user.email || '',
+        user.phone || '',
+        user.designation || '',
+        unit?.name || '',
+        dept?.name || '',
+        user.device_info || '',
+        user.ip_address || '',
+        user.is_active ? 'Active' : 'Inactive',
+        user.notes || '',
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `support_users_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success(language === 'bn' ? 'CSV ডাউনলোড হয়েছে' : 'CSV downloaded');
+  };
+
+  const exportToExcel = () => {
+    // Create Excel-compatible XML
+    const headers = ['Name', 'Email', 'Phone', 'Designation', 'Unit', 'Department', 'Device Info', 'IP Address', 'Status', 'Notes'];
+    const rows = filteredSupportUsers.map(user => {
+      const dept = departments.find(d => d.id === user.department_id);
+      const unit = dept ? units.find(u => u.id === dept.unit_id) : null;
+      return [
+        user.name,
+        user.email || '',
+        user.phone || '',
+        user.designation || '',
+        unit?.name || '',
+        dept?.name || '',
+        user.device_info || '',
+        user.ip_address || '',
+        user.is_active ? 'Active' : 'Inactive',
+        user.notes || '',
+      ];
+    });
+
+    let excelContent = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+  xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">
+  <Worksheet ss:Name="Support Users">
+    <Table>
+      <Row>
+        ${headers.map(h => `<Cell><Data ss:Type="String">${h}</Data></Cell>`).join('')}
+      </Row>
+      ${rows.map(row => `
+      <Row>
+        ${row.map(cell => `<Cell><Data ss:Type="String">${(cell || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Data></Cell>`).join('')}
+      </Row>`).join('')}
+    </Table>
+  </Worksheet>
+</Workbook>`;
+
+    const blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `support_users_${new Date().toISOString().split('T')[0]}.xls`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success(language === 'bn' ? 'Excel ডাউনলোড হয়েছে' : 'Excel downloaded');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -321,10 +401,20 @@ export default function SupportUsers() {
                 ))}
               </SelectContent>
             </Select>
-            <Button onClick={() => openUserDialog()} disabled={departments.length === 0}>
-              <Plus className="h-4 w-4 mr-2" />
-              {language === 'bn' ? 'নতুন ইউজার' : 'Add User'}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={exportToCSV} disabled={filteredSupportUsers.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                CSV
+              </Button>
+              <Button variant="outline" onClick={exportToExcel} disabled={filteredSupportUsers.length === 0}>
+                <Download className="h-4 w-4 mr-2" />
+                Excel
+              </Button>
+              <Button onClick={() => openUserDialog()} disabled={departments.length === 0}>
+                <Plus className="h-4 w-4 mr-2" />
+                {language === 'bn' ? 'নতুন ইউজার' : 'Add User'}
+              </Button>
+            </div>
           </div>
 
           {departments.length === 0 && (
