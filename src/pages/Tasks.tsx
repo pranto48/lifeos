@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen, Settings2, CheckCheck } from 'lucide-react';
+import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen, Settings2, CheckCheck, UserPlus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -23,6 +23,8 @@ import { getPatternLabel } from '@/lib/recurringEvents';
 import { useTaskCategories, TaskCategory } from '@/hooks/useTaskCategories';
 import { TaskCategoryManager } from '@/components/tasks/TaskCategoryManager';
 import { BulkCategoryAssign } from '@/components/tasks/BulkCategoryAssign';
+import { TaskAssignDialog } from '@/components/tasks/TaskAssignDialog';
+import { PendingTaskAssignments } from '@/components/tasks/PendingTaskAssignments';
 import {
   DndContext,
   closestCenter,
@@ -70,6 +72,7 @@ interface SortableTaskProps {
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
   onMove: (id: string, currentType: string) => void;
+  onAssign: (task: Task) => void;
   onChecklistUpdate: () => void;
   priorityColors: Record<string, string>;
   selectionMode: boolean;
@@ -77,7 +80,7 @@ interface SortableTaskProps {
   onSelectionChange: (id: string, selected: boolean) => void;
 }
 
-function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete, onMove, onChecklistUpdate, priorityColors, selectionMode, isSelected, onSelectionChange }: SortableTaskProps) {
+function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete, onMove, onAssign, onChecklistUpdate, priorityColors, selectionMode, isSelected, onSelectionChange }: SortableTaskProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     attributes,
@@ -184,6 +187,12 @@ function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete
                 <ArrowRightLeft className="h-4 w-4 mr-2" />
                 Move to {task.task_type === 'office' ? 'Personal' : 'Office'}
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onAssign(task)}>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Assign to User
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => onDelete(task.id)}
                 className="text-destructive focus:text-destructive"
@@ -225,6 +234,8 @@ export default function Tasks() {
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [assigningTask, setAssigningTask] = useState<Task | null>(null);
   const [page, setPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -375,6 +386,11 @@ export default function Tasks() {
     }
   };
 
+  const handleAssign = (task: Task) => {
+    setAssigningTask(task);
+    setAssignDialogOpen(true);
+  };
+
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
@@ -490,6 +506,9 @@ export default function Tasks() {
         <TaskCategoryManager />
       )}
 
+      {/* Pending Task Assignments */}
+      <PendingTaskAssignments onAccepted={() => loadData(0, true)} />
+
       <div className="space-y-2">
         {filteredTasks.length === 0 ? (
           <Card className="bg-card border-border">
@@ -531,6 +550,7 @@ export default function Tasks() {
                     onEdit={handleEdit}
                     onDelete={handleDelete}
                     onMove={handleMove}
+                    onAssign={handleAssign}
                     onChecklistUpdate={() => loadData(0, true)}
                     priorityColors={priorityColors}
                     selectionMode={selectionMode}
@@ -650,6 +670,19 @@ export default function Tasks() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {/* Assign Task Dialog */}
+      {assigningTask && (
+        <TaskAssignDialog
+          open={assignDialogOpen}
+          onOpenChange={setAssignDialogOpen}
+          taskId={assigningTask.id}
+          taskTitle={assigningTask.title}
+          onAssigned={() => {
+            toast.success('Task assigned successfully');
+          }}
+        />
+      )}
     </div>
   );
 }
