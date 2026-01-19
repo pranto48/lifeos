@@ -64,12 +64,21 @@ interface Task {
   is_recurring: boolean | null;
   recurring_pattern: string | null;
   category_id: string | null;
+  support_user_id: string | null;
+}
+
+interface SupportUserInfo {
+  id: string;
+  name: string;
+  department_name: string;
+  unit_name: string;
 }
 
 interface SortableTaskProps {
   task: Task;
   checklists: ChecklistItem[];
   categories: TaskCategory[];
+  supportUserInfo?: SupportUserInfo;
   onToggle: (id: string, completed: boolean) => void;
   onEdit: (task: Task) => void;
   onDelete: (id: string) => void;
@@ -82,7 +91,7 @@ interface SortableTaskProps {
   onSelectionChange: (id: string, selected: boolean) => void;
 }
 
-function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete, onMove, onAssign, onChecklistUpdate, priorityColors, selectionMode, isSelected, onSelectionChange }: SortableTaskProps) {
+function SortableTask({ task, checklists, categories, supportUserInfo, onToggle, onEdit, onDelete, onMove, onAssign, onChecklistUpdate, priorityColors, selectionMode, isSelected, onSelectionChange }: SortableTaskProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const {
     attributes,
@@ -135,6 +144,16 @@ function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete
             {task.description && (
               <p className="text-sm text-muted-foreground truncate">{task.description}</p>
             )}
+            {/* Support User Info for Office Tasks */}
+            {supportUserInfo && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-1">
+                <span className="font-medium text-primary">{supportUserInfo.name}</span>
+                <span>•</span>
+                <span>{supportUserInfo.unit_name}</span>
+                <span>→</span>
+                <span>{supportUserInfo.department_name}</span>
+              </div>
+            )}
           </div>
           {checklists.length > 0 && (
             <Badge variant="outline" className="text-xs">
@@ -142,7 +161,7 @@ function SortableTask({ task, checklists, categories, onToggle, onEdit, onDelete
             </Badge>
           )}
           {category && (
-            <Badge 
+            <Badge
               variant="outline" 
               className="text-xs flex items-center gap-1"
               style={{ borderColor: category.color, color: category.color }}
@@ -229,6 +248,7 @@ export default function Tasks() {
   const { categories, reload: reloadCategories } = useTaskCategories();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [checklists, setChecklists] = useState<Record<string, ChecklistItem[]>>({});
+  const [supportUserInfoMap, setSupportUserInfoMap] = useState<Record<string, SupportUserInfo>>({});
   const [filter, setFilter] = useState('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [showCategoryManager, setShowCategoryManager] = useState(false);
@@ -301,6 +321,52 @@ export default function Tasks() {
         grouped[c.task_id].push(c);
       });
       setChecklists(prev => reset ? grouped : { ...prev, ...grouped });
+    }
+
+    // Load support user info for office tasks
+    const supportUserIds = (reset ? newTasks : [...tasks, ...newTasks])
+      .filter(t => t.support_user_id)
+      .map(t => t.support_user_id as string);
+    
+    if (supportUserIds.length > 0) {
+      const uniqueIds = [...new Set(supportUserIds)];
+      
+      // Fetch support users with department info
+      const { data: supportUsersData } = await supabase
+        .from('support_users')
+        .select('id, name, department_id')
+        .in('id', uniqueIds);
+      
+      if (supportUsersData && supportUsersData.length > 0) {
+        const deptIds = [...new Set(supportUsersData.map(u => u.department_id))];
+        
+        const { data: deptsData } = await supabase
+          .from('support_departments')
+          .select('id, name, unit_id')
+          .in('id', deptIds);
+        
+        const unitIds = deptsData ? [...new Set(deptsData.map(d => d.unit_id))] : [];
+        
+        const { data: unitsData } = await supabase
+          .from('support_units')
+          .select('id, name')
+          .in('id', unitIds);
+        
+        const newInfoMap: Record<string, SupportUserInfo> = {};
+        supportUsersData.forEach(sUser => {
+          const dept = deptsData?.find(d => d.id === sUser.department_id);
+          const unit = dept ? unitsData?.find(u => u.id === dept.unit_id) : null;
+          
+          newInfoMap[sUser.id] = {
+            id: sUser.id,
+            name: sUser.name,
+            department_name: dept?.name || 'N/A',
+            unit_name: unit?.name || 'N/A',
+          };
+        });
+        
+        setSupportUserInfoMap(prev => reset ? newInfoMap : { ...prev, ...newInfoMap });
+      }
     }
     
     setLoading(false);
@@ -554,6 +620,7 @@ export default function Tasks() {
                     task={task}
                     checklists={checklists[task.id] || []}
                     categories={categories}
+                    supportUserInfo={task.support_user_id ? supportUserInfoMap[task.support_user_id] : undefined}
                     onToggle={toggleTask}
                     onEdit={handleEdit}
                     onDelete={handleDelete}

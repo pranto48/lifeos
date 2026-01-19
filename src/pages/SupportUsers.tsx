@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User } from 'lucide-react';
+import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,11 @@ export default function SupportUsers() {
     getUsersByDepartment,
   } = useSupportData();
 
+  // Search and filter states
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterUnit, setFilterUnit] = useState<string>('all');
+  const [filterDepartment, setFilterDepartment] = useState<string>('all');
+
   // Dialog states
   const [unitDialog, setUnitDialog] = useState<{ open: boolean; editing: SupportUnit | null }>({ open: false, editing: null });
   const [deptDialog, setDeptDialog] = useState<{ open: boolean; editing: SupportDepartment | null }>({ open: false, editing: null });
@@ -53,6 +58,36 @@ export default function SupportUsers() {
     department_id: '',
     is_active: true,
   });
+
+  // Filter support users based on search and filters
+  const filteredSupportUsers = supportUsers.filter(user => {
+    // Search filter
+    const query = searchQuery.toLowerCase();
+    const matchesSearch = !query || 
+      user.name.toLowerCase().includes(query) ||
+      (user.email?.toLowerCase().includes(query)) ||
+      (user.designation?.toLowerCase().includes(query));
+
+    if (!matchesSearch) return false;
+
+    // Unit filter
+    if (filterUnit !== 'all') {
+      const dept = departments.find(d => d.id === user.department_id);
+      if (!dept || dept.unit_id !== filterUnit) return false;
+    }
+
+    // Department filter
+    if (filterDepartment !== 'all') {
+      if (user.department_id !== filterDepartment) return false;
+    }
+
+    return true;
+  });
+
+  // Get filtered departments based on selected unit
+  const filteredDepartmentsForFilter = filterUnit === 'all' 
+    ? departments 
+    : departments.filter(d => d.unit_id === filterUnit);
 
   // Unit handlers
   const openUnitDialog = (unit?: SupportUnit) => {
@@ -240,7 +275,52 @@ export default function SupportUsers() {
 
         {/* Users Tab */}
         <TabsContent value="users" className="space-y-4">
-          <div className="flex justify-end">
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder={language === 'bn' ? 'নাম বা ইমেইল দিয়ে খুঁজুন...' : 'Search by name or email...'}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+              {searchQuery && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                  onClick={() => setSearchQuery('')}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
+            </div>
+            <Select value={filterUnit} onValueChange={(val) => {
+              setFilterUnit(val);
+              setFilterDepartment('all');
+            }}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder={language === 'bn' ? 'ইউনিট' : 'Unit'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{language === 'bn' ? 'সকল ইউনিট' : 'All Units'}</SelectItem>
+                {units.map(unit => (
+                  <SelectItem key={unit.id} value={unit.id}>{unit.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterDepartment} onValueChange={setFilterDepartment}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder={language === 'bn' ? 'বিভাগ' : 'Department'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{language === 'bn' ? 'সকল বিভাগ' : 'All Departments'}</SelectItem>
+                {filteredDepartmentsForFilter.map(dept => (
+                  <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button onClick={() => openUserDialog()} disabled={departments.length === 0}>
               <Plus className="h-4 w-4 mr-2" />
               {language === 'bn' ? 'নতুন ইউজার' : 'Add User'}
@@ -258,7 +338,7 @@ export default function SupportUsers() {
           )}
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {supportUsers.map(user => {
+            {filteredSupportUsers.map(user => {
               const dept = departments.find(d => d.id === user.department_id);
               const unit = dept ? units.find(u => u.id === dept.unit_id) : null;
 
@@ -325,10 +405,12 @@ export default function SupportUsers() {
             })}
           </div>
 
-          {supportUsers.length === 0 && departments.length > 0 && (
+          {filteredSupportUsers.length === 0 && departments.length > 0 && (
             <Card className="border-dashed">
               <CardContent className="py-8 text-center text-muted-foreground">
-                {language === 'bn' ? 'কোন ইউজার নেই' : 'No users yet'}
+                {searchQuery || filterUnit !== 'all' || filterDepartment !== 'all'
+                  ? (language === 'bn' ? 'কোন ম্যাচিং ইউজার নেই' : 'No matching users found')
+                  : (language === 'bn' ? 'কোন ইউজার নেই' : 'No users yet')}
               </CardContent>
             </Card>
           )}
