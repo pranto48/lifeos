@@ -15,6 +15,8 @@ export const translations = {
   'nav.family': { bn: 'পরিবার', en: 'Family' },
   'nav.supportUsers': { bn: 'সাপোর্ট ইউজার', en: 'Support Users' },
   'nav.settings': { bn: 'সেটিংস', en: 'Settings' },
+  'nav.more': { bn: 'আরও', en: 'More' },
+  'nav.allFeatures': { bn: 'সব ফিচার', en: 'All Features' },
 
   // Common
   'common.save': { bn: 'সংরক্ষণ করুন', en: 'Save' },

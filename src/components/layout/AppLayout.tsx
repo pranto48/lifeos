@@ -6,6 +6,8 @@ import { QuickAddButton } from '@/components/quick-add/QuickAddButton';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
 import { MfaGuard } from '@/components/auth/MfaGuard';
 import { DashboardModeSwitcher } from './DashboardModeSwitcher';
+import { MobileBottomNav } from './MobileBottomNav';
+import { MobileHeader } from './MobileHeader';
 import { Loader2 } from 'lucide-react';
 
 interface AppLayoutProps {
@@ -40,12 +42,18 @@ export function AppLayout({ children }: AppLayoutProps) {
   return (
     <MfaGuard>
       <div className="min-h-screen bg-background">
-        <AppSidebar />
+        {/* Desktop Sidebar - Hidden on mobile */}
+        <div className="hidden md:block">
+          <AppSidebar />
+        </div>
+        
+        {/* Mobile Header - Only on mobile */}
+        <MobileHeader />
         
         {/* Main Content */}
-        <main className="ml-[72px] md:ml-[240px] min-h-screen transition-all duration-200">
-          {/* Top Bar */}
-          <header className="sticky top-0 z-30 h-16 border-b border-border bg-background/80 backdrop-blur-xl flex items-center justify-between px-6">
+        <main className="md:ml-[72px] lg:ml-[240px] min-h-screen transition-all duration-200 pb-20 md:pb-0">
+          {/* Desktop Top Bar - Hidden on mobile */}
+          <header className="hidden md:flex sticky top-0 z-30 h-16 border-b border-border bg-background/80 backdrop-blur-xl items-center justify-between px-6">
             <div className="flex items-center gap-4">
               <GlobalSearch />
               <DashboardModeSwitcher />
@@ -54,10 +62,13 @@ export function AppLayout({ children }: AppLayoutProps) {
           </header>
 
           {/* Page Content */}
-          <div className="p-6">
+          <div className="p-4 md:p-6">
             {children}
           </div>
         </main>
+
+        {/* Mobile Bottom Navigation - Only on mobile */}
+        <MobileBottomNav />
       </div>
     </MfaGuard>
   );

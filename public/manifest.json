@@ -4,8 +4,8 @@
   "description": "Your complete personal life management system - tasks, notes, budget, habits, and more.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0f",
-  "theme_color": "#6366f1",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
   "orientation": "portrait-primary",
   "icons": [
     {
@@ -32,6 +32,11 @@
     {
       "name": "Notes",
       "url": "/notes",
+      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Calendar",
+      "url": "/calendar",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     },
     {

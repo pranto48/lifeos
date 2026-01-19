@@ -2,18 +2,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>LifeOS - Personal Life Management</title>
     <meta name="description" content="Your complete personal life management system - tasks, notes, budget, habits, and more." />
     <meta name="author" content="LifeOS" />
-    <meta name="theme-color" content="#6366f1" />
+    <meta name="theme-color" content="#0f172a" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="LifeOS" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="format-detection" content="telephone=no" />
+    <meta name="msapplication-tap-highlight" content="no" />
 
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="manifest" href="/manifest.json" />
-    <link rel="apple-touch-icon" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="192x192" href="/icon-192.png" />
+    <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
 
     <meta property="og:title" content="LifeOS - Personal Life Management" />
     <meta property="og:description" content="Your complete personal life management system - tasks, notes, budget, habits, and more." />
@@ -23,6 +29,14 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@LifeOS" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+
+    <!-- Splash screens for iOS -->
+    <style>
+      /* Prevent white flash on load */
+      html, body {
+        background-color: #0f172a;
+      }
+    </style>
   </head>
 
   <body>
