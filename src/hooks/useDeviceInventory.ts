@@ -51,21 +51,36 @@ export function useDeviceInventory() {
   const [categories, setCategories] = useState<DeviceCategory[]>([]);
   const [devices, setDevices] = useState<DeviceInventory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check admin status
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      setIsAdmin(!!data);
+    };
+    checkAdminStatus();
+  }, [user]);
 
   const loadData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
 
+    // Load ALL data - RLS policies allow all authenticated users to view
     const [categoriesRes, devicesRes] = await Promise.all([
       supabase
         .from('device_categories')
         .select('*')
-        .eq('user_id', user.id)
         .order('name'),
       supabase
         .from('device_inventory')
         .select('*')
-        .eq('user_id', user.id)
         .order('created_at', { ascending: false }),
     ]);
 
@@ -220,6 +235,7 @@ export function useDeviceInventory() {
     categories,
     devices,
     loading,
+    isAdmin,
     addCategory,
     updateCategory,
     deleteCategory,

@@ -38,6 +38,7 @@ export default function SupportUsers() {
     supportUsers,
     activityLogs,
     loading,
+    isAdmin,
     addUnit,
     updateUnit,
     deleteUnit,
@@ -833,14 +834,18 @@ export default function SupportUsers() {
                 <Download className="h-4 w-4 mr-2" />
                 Excel
               </Button>
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={departments.length === 0}>
-                <Upload className="h-4 w-4 mr-2" />
-                {language === 'bn' ? 'ইম্পোর্ট' : 'Import'}
-              </Button>
-              <Button size="sm" onClick={() => openUserDialog()} disabled={departments.length === 0}>
-                <Plus className="h-4 w-4 mr-2" />
-                {language === 'bn' ? 'নতুন ইউজার' : 'Add User'}
-              </Button>
+              {isAdmin && (
+                <>
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={departments.length === 0}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    {language === 'bn' ? 'ইম্পোর্ট' : 'Import'}
+                  </Button>
+                  <Button size="sm" onClick={() => openUserDialog()} disabled={departments.length === 0}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {language === 'bn' ? 'নতুন ইউজার' : 'Add User'}
+                  </Button>
+                </>
+              )}
             </div>
           </div>
 
@@ -875,12 +880,16 @@ export default function SupportUsers() {
                         </div>
                       </div>
                       <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openUserDialog(user)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteUser(user.id)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {isAdmin && (
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openUserDialog(user)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteUser(user.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </div>
                   </CardHeader>
@@ -956,12 +965,14 @@ export default function SupportUsers() {
 
         {/* Departments Tab */}
         <TabsContent value="departments" className="space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={() => openDeptDialog()} disabled={units.length === 0}>
-              <Plus className="h-4 w-4 mr-2" />
-              {language === 'bn' ? 'নতুন বিভাগ' : 'Add Department'}
-            </Button>
-          </div>
+          {isAdmin && (
+            <div className="flex justify-end">
+              <Button onClick={() => openDeptDialog()} disabled={units.length === 0}>
+                <Plus className="h-4 w-4 mr-2" />
+                {language === 'bn' ? 'নতুন বিভাগ' : 'Add Department'}
+              </Button>
+            </div>
+          )}
 
           {units.length === 0 && (
             <Card className="border-dashed">
@@ -983,14 +994,16 @@ export default function SupportUsers() {
                         <p className="text-xs text-muted-foreground">{getUnitName(dept.unit_id)}</p>
                       </div>
                     </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDeptDialog(dept)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteDept(dept.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openDeptDialog(dept)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteDept(dept.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -1008,12 +1021,14 @@ export default function SupportUsers() {
 
         {/* Units Tab */}
         <TabsContent value="units" className="space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={() => openUnitDialog()}>
-              <Plus className="h-4 w-4 mr-2" />
-              {language === 'bn' ? 'নতুন ইউনিট' : 'Add Unit'}
-            </Button>
-          </div>
+          {isAdmin && (
+            <div className="flex justify-end">
+              <Button onClick={() => openUnitDialog()}>
+                <Plus className="h-4 w-4 mr-2" />
+                {language === 'bn' ? 'নতুন ইউনিট' : 'Add Unit'}
+              </Button>
+            </div>
+          )}
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {units.map(unit => (
@@ -1024,14 +1039,16 @@ export default function SupportUsers() {
                       <Building2 className="h-5 w-5 text-primary" />
                       <CardTitle className="text-base">{unit.name}</CardTitle>
                     </div>
-                    <div className="flex gap-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openUnitDialog(unit)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteUnit(unit.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    {isAdmin && (
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openUnitDialog(unit)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteUnit(unit.id)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent>
