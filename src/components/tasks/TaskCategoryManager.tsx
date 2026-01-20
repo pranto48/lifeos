@@ -113,7 +113,7 @@ function CategoryForm({ onSubmit, onCancel, initialName = '', initialColor = '#3
 }
 
 export function TaskCategoryManager() {
-  const { categories, loading, addCategory, updateCategory, deleteCategory } = useTaskCategories();
+  const { categories, loading, isAdmin, addCategory, updateCategory, deleteCategory, canEditCategory } = useTaskCategories();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<TaskCategory | null>(null);
 
@@ -203,25 +203,30 @@ export function TaskCategoryManager() {
                   />
                   <span className="font-medium text-foreground">{category.name}</span>
                   <span className="text-xs text-muted-foreground">({category.icon || 'Folder'})</span>
+                  {category.is_admin_category && (
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded">Admin</span>
+                  )}
                 </div>
-                <div className="flex items-center gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setEditingCategory(category)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-destructive hover:text-destructive"
-                    onClick={() => handleDeleteCategory(category.id, category.name)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                {canEditCategory(category) && (
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8"
+                      onClick={() => setEditingCategory(category)}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteCategory(category.id, category.name)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
