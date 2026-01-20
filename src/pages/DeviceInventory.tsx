@@ -54,6 +54,7 @@ export default function DeviceInventoryPage() {
     categories,
     devices,
     loading,
+    isAdmin,
     addCategory,
     updateCategory,
     deleteCategory,
@@ -433,14 +434,18 @@ export default function DeviceInventoryPage() {
             <Download className="h-4 w-4 mr-1" />
             <span className="hidden sm:inline">{language === 'bn' ? 'রপ্তানি' : 'Export'}</span>
           </Button>
-          <Button variant="outline" size="sm" onClick={() => openCategoryDialog()}>
-            <Tag className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">{language === 'bn' ? 'ক্যাটাগরি' : 'Category'}</span>
-          </Button>
-          <Button size="sm" onClick={() => openDeviceDialog()}>
-            <Plus className="h-4 w-4 mr-1" />
-            {language === 'bn' ? 'ডিভাইস যোগ' : 'Add Device'}
-          </Button>
+          {isAdmin && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => openCategoryDialog()}>
+                <Tag className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">{language === 'bn' ? 'ক্যাটাগরি' : 'Category'}</span>
+              </Button>
+              <Button size="sm" onClick={() => openDeviceDialog()}>
+                <Plus className="h-4 w-4 mr-1" />
+                {language === 'bn' ? 'ডিভাইস যোগ' : 'Add Device'}
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -624,22 +629,28 @@ export default function DeviceInventoryPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => openDeviceDialog(device)}>
-                                <Pencil className="h-4 w-4 mr-2" />
-                                {language === 'bn' ? 'সম্পাদনা' : 'Edit'}
-                              </DropdownMenuItem>
+                              {isAdmin && (
+                                <DropdownMenuItem onClick={() => openDeviceDialog(device)}>
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  {language === 'bn' ? 'সম্পাদনা' : 'Edit'}
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => openServiceDialog(device)}>
                                 <Wrench className="h-4 w-4 mr-2" />
                                 {language === 'bn' ? 'সার্ভিস ইতিহাস' : 'Service History'}
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem 
-                                onClick={() => handleDeleteDevice(device.id)}
-                                className="text-destructive focus:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                {language === 'bn' ? 'মুছুন' : 'Delete'}
-                              </DropdownMenuItem>
+                              {isAdmin && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => handleDeleteDevice(device.id)}
+                                    className="text-destructive focus:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    {language === 'bn' ? 'মুছুন' : 'Delete'}
+                                  </DropdownMenuItem>
+                                </>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>

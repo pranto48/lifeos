@@ -14,7 +14,8 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Calendar
+  Calendar,
+  HardDrive
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -39,6 +40,7 @@ const navItems: NavItem[] = [
   { titleKey: 'nav.tasks', url: '/tasks', icon: CheckSquare },
   { titleKey: 'nav.notes', url: '/notes', icon: FileText },
   { titleKey: 'nav.supportUsers', url: '/support-users', icon: HeadsetIcon },
+  { titleKey: 'nav.deviceInventory', url: '/device-inventory', icon: HardDrive },
   { titleKey: 'nav.habits', url: '/habits', icon: Repeat, personalOnly: true },
   { titleKey: 'nav.family', url: '/family', icon: Users, personalOnly: true },
   { titleKey: 'nav.budget', url: '/budget', icon: Wallet, personalOnly: true },

@@ -61,6 +61,22 @@ export function useSupportData() {
   const [supportUsers, setSupportUsers] = useState<SupportUser[]>([]);
   const [activityLogs, setActivityLogs] = useState<SupportActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // Check admin status
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user) return;
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle();
+      setIsAdmin(!!data);
+    };
+    checkAdminStatus();
+  }, [user]);
 
   // Log activity to audit_logs table
   const logActivity = async (
@@ -90,10 +106,11 @@ export function useSupportData() {
     if (!user) return;
     setLoading(true);
 
+    // Load ALL data - RLS policies now allow all authenticated users to view
     const [unitsRes, deptsRes, usersRes, logsRes] = await Promise.all([
-      supabase.from('support_units').select('*').eq('user_id', user.id).order('name'),
-      supabase.from('support_departments').select('*').eq('user_id', user.id).order('name'),
-      supabase.from('support_users').select('*').eq('user_id', user.id).order('name'),
+      supabase.from('support_units').select('*').order('name'),
+      supabase.from('support_departments').select('*').order('name'),
+      supabase.from('support_users').select('*').order('name'),
       supabase.from('audit_logs')
         .select('*')
         .eq('user_id', user.id)
@@ -296,6 +313,7 @@ export function useSupportData() {
     supportUsers,
     activityLogs,
     loading,
+    isAdmin,
     reload: loadData,
     // Units
     addUnit,
