@@ -241,9 +241,19 @@ export function useSupportData() {
     device_assign_date?: string | null;
   }) => {
     if (!user) return null;
+    
+    // Clean up empty date strings to null for proper database format
+    const cleanedData = { ...userData };
+    const dateFields = ['device_handover_date', 'device_assign_date'] as const;
+    dateFields.forEach(field => {
+      if (field in cleanedData && cleanedData[field] === '') {
+        (cleanedData as any)[field] = null;
+      }
+    });
+    
     const { data: newUser, error } = await supabase.from('support_users').insert({
       user_id: user.id,
-      ...userData,
+      ...cleanedData,
     }).select().single();
 
     if (error) throw error;
@@ -261,7 +271,17 @@ export function useSupportData() {
 
   const updateSupportUser = async (id: string, updates: Partial<Omit<SupportUser, 'id' | 'created_at' | 'updated_at'>>) => {
     const oldUser = supportUsers.find(u => u.id === id);
-    const { data, error } = await supabase.from('support_users').update(updates).eq('id', id).select().single();
+    
+    // Clean up empty date strings to null for proper database format
+    const cleanedUpdates = { ...updates };
+    const dateFields = ['device_handover_date', 'device_assign_date'] as const;
+    dateFields.forEach(field => {
+      if (field in cleanedUpdates && cleanedUpdates[field] === '') {
+        (cleanedUpdates as any)[field] = null;
+      }
+    });
+    
+    const { data, error } = await supabase.from('support_users').update(cleanedUpdates).eq('id', id).select().single();
     if (error) throw error;
     
     await logActivity('update', 'support_user', id, 

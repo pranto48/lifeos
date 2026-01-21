@@ -41,11 +41,10 @@ export function useTaskCategories() {
     if (!user) return;
     
     setLoading(true);
-    // Load both user's own categories and admin categories
+    // Load ALL categories - RLS policies allow all authenticated users to view all categories
     const { data, error } = await supabase
       .from('task_categories')
       .select('*')
-      .or(`user_id.eq.${user.id},is_admin_category.eq.true`)
       .order('name', { ascending: true });
 
     if (!error && data) {
