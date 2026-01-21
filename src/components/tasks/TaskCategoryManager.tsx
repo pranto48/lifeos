@@ -165,24 +165,26 @@ export function TaskCategoryManager() {
           <FolderOpen className="h-5 w-5" />
           Task Categories
         </CardTitle>
-        <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" className="gap-1">
-              <Plus className="h-4 w-4" />
-              Add Category
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Category</DialogTitle>
-            </DialogHeader>
-            <CategoryForm
-              onSubmit={handleAddCategory}
-              onCancel={() => setIsAddDialogOpen(false)}
-              submitLabel="Create Category"
-            />
-          </DialogContent>
-        </Dialog>
+        {isAdmin && (
+          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gap-1">
+                <Plus className="h-4 w-4" />
+                Add Category
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Category</DialogTitle>
+              </DialogHeader>
+              <CategoryForm
+                onSubmit={handleAddCategory}
+                onCancel={() => setIsAddDialogOpen(false)}
+                submitLabel="Create Category"
+              />
+            </DialogContent>
+          </Dialog>
+        )}
       </CardHeader>
       <CardContent>
         {categories.length === 0 ? (
