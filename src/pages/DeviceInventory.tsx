@@ -114,6 +114,10 @@ export default function DeviceInventoryPage() {
     task_id: '',
   });
 
+  // Quick assign dialog
+  const [quickAssignDialog, setQuickAssignDialog] = useState<{ open: boolean; device: DeviceType | null }>({ open: false, device: null });
+  const [quickAssignUserId, setQuickAssignUserId] = useState<string>('');
+
   // Tasks for linking
   const [availableTasks, setAvailableTasks] = useState<{ id: string; title: string }[]>([]);
 
@@ -357,6 +361,29 @@ export default function DeviceInventoryPage() {
       setServiceHistory(prev => prev.filter(s => s.id !== id));
       toast.success(language === 'bn' ? 'রেকর্ড মুছে ফেলা হয়েছে' : 'Record deleted');
     }
+  };
+
+  // Quick assign handler
+  const handleQuickAssign = async () => {
+    if (!quickAssignDialog.device) return;
+    
+    const success = await updateDevice(quickAssignDialog.device.id, {
+      support_user_id: quickAssignUserId || null,
+      status: quickAssignUserId ? 'assigned' : 'available',
+    });
+    
+    if (success) {
+      toast.success(language === 'bn' ? 'ডিভাইস বরাদ্দ হয়েছে' : 'Device assigned');
+      setQuickAssignDialog({ open: false, device: null });
+      setQuickAssignUserId('');
+    } else {
+      toast.error(language === 'bn' ? 'বরাদ্দ করতে ব্যর্থ' : 'Failed to assign');
+    }
+  };
+
+  const openQuickAssignDialog = (device: DeviceType) => {
+    setQuickAssignUserId(device.support_user_id || '');
+    setQuickAssignDialog({ open: true, device });
   };
 
   // Export to CSV
@@ -630,10 +657,16 @@ export default function DeviceInventoryPage() {
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               {isAdmin && (
-                                <DropdownMenuItem onClick={() => openDeviceDialog(device)}>
-                                  <Pencil className="h-4 w-4 mr-2" />
-                                  {language === 'bn' ? 'সম্পাদনা' : 'Edit'}
-                                </DropdownMenuItem>
+                                <>
+                                  <DropdownMenuItem onClick={() => openDeviceDialog(device)}>
+                                    <Pencil className="h-4 w-4 mr-2" />
+                                    {language === 'bn' ? 'সম্পাদনা' : 'Edit'}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => openQuickAssignDialog(device)}>
+                                    <User className="h-4 w-4 mr-2" />
+                                    {language === 'bn' ? 'দ্রুত বরাদ্দ' : 'Quick Assign'}
+                                  </DropdownMenuItem>
+                                </>
                               )}
                               <DropdownMenuItem onClick={() => openServiceDialog(device)}>
                                 <Wrench className="h-4 w-4 mr-2" />
@@ -1089,12 +1122,12 @@ export default function DeviceInventoryPage() {
 
             <div className="space-y-2">
               <Label className="text-xs">{language === 'bn' ? 'লিংকড টাস্ক' : 'Link to Task'}</Label>
-              <Select value={serviceForm.task_id} onValueChange={(v) => setServiceForm({ ...serviceForm, task_id: v })}>
+              <Select value={serviceForm.task_id || "none"} onValueChange={(v) => setServiceForm({ ...serviceForm, task_id: v === "none" ? "" : v })}>
                 <SelectTrigger className="text-sm">
                   <SelectValue placeholder={language === 'bn' ? 'টাস্ক নির্বাচন (ঐচ্ছিক)' : 'Select task (optional)'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{language === 'bn' ? 'কোন টাস্ক নয়' : 'No task'}</SelectItem>
+                  <SelectItem value="none">{language === 'bn' ? 'কোন টাস্ক নয়' : 'No task'}</SelectItem>
                   {availableTasks.map(task => (
                     <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>
                   ))}
@@ -1109,6 +1142,58 @@ export default function DeviceInventoryPage() {
             </Button>
             <Button onClick={handleAddService}>
               {language === 'bn' ? 'যোগ করুন' : 'Add'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Quick Assign Dialog */}
+      <Dialog open={quickAssignDialog.open} onOpenChange={(open) => setQuickAssignDialog({ open, device: null })}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <User className="h-5 w-5" />
+              {language === 'bn' ? 'ডিভাইস বরাদ্দ করুন' : 'Assign Device'}
+            </DialogTitle>
+            <DialogDescription>
+              {quickAssignDialog.device?.device_name}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-xs">{language === 'bn' ? 'সাপোর্ট ইউজার নির্বাচন করুন' : 'Select Support User'}</Label>
+              <Select value={quickAssignUserId || "none"} onValueChange={(v) => setQuickAssignUserId(v === "none" ? "" : v)}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder={language === 'bn' ? 'ব্যবহারকারী নির্বাচন করুন' : 'Select user'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{language === 'bn' ? 'কেউ নয় (উপলব্ধ)' : 'None (Available)'}</SelectItem>
+                  {supportUsers.filter(u => u.is_active).map(user => {
+                    const dept = departments.find(d => d.id === user.department_id);
+                    const unit = dept ? units.find(u => u.id === dept.unit_id) : null;
+                    return (
+                      <SelectItem key={user.id} value={user.id}>
+                        <div className="flex flex-col">
+                          <span>{user.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {unit?.name} → {dept?.name}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setQuickAssignDialog({ open: false, device: null })}>
+              {language === 'bn' ? 'বাতিল' : 'Cancel'}
+            </Button>
+            <Button onClick={handleQuickAssign}>
+              {language === 'bn' ? 'বরাদ্দ করুন' : 'Assign'}
             </Button>
           </DialogFooter>
         </DialogContent>
