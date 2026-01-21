@@ -733,12 +733,12 @@ export default function DeviceInventoryPage() {
             {/* Assigned To */}
             <div className="space-y-2">
               <Label className="text-xs">{language === 'bn' ? 'বরাদ্দ' : 'Assigned To'}</Label>
-              <Select value={deviceForm.support_user_id} onValueChange={(v) => setDeviceForm({ ...deviceForm, support_user_id: v })}>
+              <Select value={deviceForm.support_user_id || "none"} onValueChange={(v) => setDeviceForm({ ...deviceForm, support_user_id: v === "none" ? "" : v })}>
                 <SelectTrigger className="text-sm">
                   <SelectValue placeholder={language === 'bn' ? 'ব্যবহারকারী নির্বাচন' : 'Select user'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">{language === 'bn' ? 'কেউ নয়' : 'None'}</SelectItem>
+                  <SelectItem value="none">{language === 'bn' ? 'কেউ নয়' : 'None'}</SelectItem>
                   {supportUsers.filter(u => u.is_active).map(user => (
                     <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
                   ))}
