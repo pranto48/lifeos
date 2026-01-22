@@ -3,7 +3,7 @@ import {
   HardDrive, Plus, Pencil, Trash2, Search, Download, 
   Wrench, Calendar, DollarSign, User, Tag, 
   Package, FileText, AlertTriangle, CheckCircle, Clock,
-  MoreVertical, Eye, Filter, Settings2
+  MoreVertical, Eye, Filter, Settings2, QrCode, Users
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +23,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useDeviceInventory, DeviceInventory as DeviceType, DeviceServiceHistory, DeviceCategory } from '@/hooks/useDeviceInventory';
 import { useSupportData, SupportUser } from '@/hooks/useSupportData';
+import { DeviceQRCode } from '@/components/device/DeviceQRCode';
+import { BulkDeviceAssign } from '@/components/device/BulkDeviceAssign';
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available', labelBn: 'উপলব্ধ', color: 'bg-green-500/20 text-green-600' },
@@ -79,6 +81,7 @@ export default function DeviceInventoryPage() {
   const [deviceDialog, setDeviceDialog] = useState<{ open: boolean; editing: DeviceType | null }>({ open: false, editing: null });
   const [deviceForm, setDeviceForm] = useState({
     device_name: '',
+    device_number: '',
     serial_number: '',
     purchase_date: '',
     delivery_date: '',
@@ -93,6 +96,9 @@ export default function DeviceInventoryPage() {
     category_id: '',
     support_user_id: '',
   });
+
+  // Bulk assign dialog
+  const [bulkAssignDialog, setBulkAssignDialog] = useState(false);
 
   // Category dialog
   const [categoryDialog, setCategoryDialog] = useState<{ open: boolean; editing: DeviceCategory | null }>({ open: false, editing: null });
@@ -155,6 +161,7 @@ export default function DeviceInventoryPage() {
     const query = searchQuery.toLowerCase();
     const matchesSearch = !query ||
       device.device_name.toLowerCase().includes(query) ||
+      device.device_number?.toLowerCase().includes(query) ||
       device.serial_number?.toLowerCase().includes(query) ||
       device.supplier_name?.toLowerCase().includes(query) ||
       device.requisition_number?.toLowerCase().includes(query);
@@ -188,6 +195,7 @@ export default function DeviceInventoryPage() {
     if (device) {
       setDeviceForm({
         device_name: device.device_name,
+        device_number: (device as any).device_number || '',
         serial_number: device.serial_number || '',
         purchase_date: device.purchase_date || '',
         delivery_date: device.delivery_date || '',
@@ -206,6 +214,7 @@ export default function DeviceInventoryPage() {
     } else {
       setDeviceForm({
         device_name: '',
+        device_number: '',
         serial_number: '',
         purchase_date: '',
         delivery_date: '',
@@ -232,6 +241,7 @@ export default function DeviceInventoryPage() {
 
     const data = {
       device_name: deviceForm.device_name.trim(),
+      device_number: deviceForm.device_number || null,
       serial_number: deviceForm.serial_number || null,
       purchase_date: deviceForm.purchase_date || null,
       delivery_date: deviceForm.delivery_date || null,
@@ -386,6 +396,22 @@ export default function DeviceInventoryPage() {
     setQuickAssignDialog({ open: true, device });
   };
 
+  // Bulk assign handler
+  const handleBulkAssign = async (deviceIds: string[], userId: string | null): Promise<boolean> => {
+    try {
+      for (const deviceId of deviceIds) {
+        await updateDevice(deviceId, {
+          support_user_id: userId,
+          status: userId ? 'assigned' : 'available',
+        });
+      }
+      reload();
+      return true;
+    } catch (error) {
+      return false;
+    }
+  };
+
   // Export to CSV
   const exportToCSV = () => {
     const headers = ['Device Name', 'Serial Number', 'Category', 'Status', 'Purchase Date', 'Delivery Date', 'Supplier', 'Requisition No', 'BOD No', 'Warranty Date', 'Price', 'Assigned To', 'Notes'];
@@ -463,6 +489,10 @@ export default function DeviceInventoryPage() {
           </Button>
           {isAdmin && (
             <>
+              <Button variant="outline" size="sm" onClick={() => setBulkAssignDialog(true)}>
+                <Users className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">{language === 'bn' ? 'ব্যাচ বরাদ্দ' : 'Bulk Assign'}</span>
+              </Button>
               <Button variant="outline" size="sm" onClick={() => openCategoryDialog()}>
                 <Tag className="h-4 w-4 mr-1" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ক্যাটাগরি' : 'Category'}</span>
@@ -597,9 +627,15 @@ export default function DeviceInventoryPage() {
                     return (
                       <TableRow key={device.id}>
                         <TableCell>
-                          <div className="font-medium text-xs md:text-sm">{device.device_name}</div>
-                          <div className="text-[10px] md:text-xs text-muted-foreground md:hidden">
-                            {device.serial_number || '-'}
+                          <div className="flex items-center gap-2">
+                            <DeviceQRCode device={device} />
+                            <div>
+                              <div className="font-medium text-xs md:text-sm">{device.device_name}</div>
+                              <div className="text-[10px] md:text-xs text-muted-foreground">
+                                {device.device_number && <span className="mr-2">#{device.device_number}</span>}
+                                <span className="md:hidden">{device.serial_number || ''}</span>
+                              </div>
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-xs hidden md:table-cell">
@@ -721,7 +757,16 @@ export default function DeviceInventoryPage() {
               />
             </div>
 
-            {/* Serial Number */}
+            {/* Device Number */}
+            <div className="space-y-2">
+              <Label className="text-xs">{language === 'bn' ? 'ডিভাইস নম্বর' : 'Device Number'}</Label>
+              <Input
+                value={deviceForm.device_number}
+                onChange={(e) => setDeviceForm({ ...deviceForm, device_number: e.target.value })}
+                placeholder={language === 'bn' ? 'DEV-001' : 'DEV-001'}
+                className="text-sm"
+              />
+            </div>
             <div className="space-y-2">
               <Label className="text-xs">{language === 'bn' ? 'সিরিয়াল নম্বর' : 'Serial Number'}</Label>
               <Input
@@ -1198,6 +1243,15 @@ export default function DeviceInventoryPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Assign Dialog */}
+      <BulkDeviceAssign
+        open={bulkAssignDialog}
+        onOpenChange={setBulkAssignDialog}
+        devices={devices}
+        supportUsers={supportUsers}
+        onAssign={handleBulkAssign}
+      />
     </div>
   );
 }

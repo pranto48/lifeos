@@ -29,7 +29,7 @@ import { SmtpSettings } from './SmtpSettings';
 interface UserRole {
   id: string;
   user_id: string;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'inventory_manager' | 'support_manager';
   created_at: string;
 }
 
@@ -70,7 +70,7 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
   
   // Role management state
   const [newUserId, setNewUserId] = useState('');
-  const [newRole, setNewRole] = useState<'admin' | 'user'>('user');
+  const [newRole, setNewRole] = useState<'admin' | 'user' | 'inventory_manager' | 'support_manager'>('user');
   const [addingRole, setAddingRole] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -669,8 +669,8 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                       onChange={(e) => setNewUserId(e.target.value)}
                       className="flex-1 bg-background font-mono text-sm"
                     />
-                    <Select value={newRole} onValueChange={(v: 'admin' | 'user') => setNewRole(v)}>
-                      <SelectTrigger className="w-full sm:w-32 bg-background">
+                    <Select value={newRole} onValueChange={(v: 'admin' | 'user' | 'inventory_manager' | 'support_manager') => setNewRole(v)}>
+                      <SelectTrigger className="w-full sm:w-44 bg-background">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -678,6 +678,18 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                           <span className="flex items-center gap-2">
                             <Crown className="h-3 w-3 text-yellow-500" />
                             Admin
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="inventory_manager">
+                          <span className="flex items-center gap-2">
+                            <Settings className="h-3 w-3 text-green-500" />
+                            {language === 'bn' ? 'ইনভেন্টরি ম্যানেজার' : 'Inventory Manager'}
+                          </span>
+                        </SelectItem>
+                        <SelectItem value="support_manager">
+                          <span className="flex items-center gap-2">
+                            <Users className="h-3 w-3 text-purple-500" />
+                            {language === 'bn' ? 'সাপোর্ট ম্যানেজার' : 'Support Manager'}
                           </span>
                         </SelectItem>
                         <SelectItem value="user">
@@ -728,57 +740,59 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
 
               <ScrollArea className="h-[250px] rounded-lg border border-border">
                 <div className="p-3 space-y-2">
-                  {filteredRoles.map((role) => (
-                    <div key={role.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          role.role === 'admin' ? 'bg-yellow-500/20' : 'bg-blue-500/20'
-                        }`}>
-                          {role.role === 'admin' ? (
-                            <Crown className="h-4 w-4 text-yellow-500" />
-                          ) : (
-                            <Users className="h-4 w-4 text-blue-500" />
-                          )}
-                        </div>
-                        <div>
+                  {filteredRoles.map((role) => {
+                    const getRoleStyle = () => {
+                      switch (role.role) {
+                        case 'admin': return { bg: 'bg-yellow-500/20', icon: <Crown className="h-4 w-4 text-yellow-500" />, label: language === 'bn' ? 'এডমিন' : 'Admin' };
+                        case 'inventory_manager': return { bg: 'bg-green-500/20', icon: <Settings className="h-4 w-4 text-green-500" />, label: language === 'bn' ? 'ইনভেন্টরি ম্যানেজার' : 'Inventory Manager' };
+                        case 'support_manager': return { bg: 'bg-purple-500/20', icon: <Users className="h-4 w-4 text-purple-500" />, label: language === 'bn' ? 'সাপোর্ট ম্যানেজার' : 'Support Manager' };
+                        default: return { bg: 'bg-blue-500/20', icon: <Users className="h-4 w-4 text-blue-500" />, label: language === 'bn' ? 'ইউজার' : 'User' };
+                      }
+                    };
+                    const roleStyle = getRoleStyle();
+                    return (
+                      <div key={role.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center ${roleStyle.bg}`}>
+                            {roleStyle.icon}
+                          </div>
                           <div>
-                            <p className="text-sm font-medium text-foreground truncate max-w-[150px] sm:max-w-[250px]">
-                              {userEmails[role.user_id] || (
-                                <span className="text-muted-foreground italic">
-                                  {language === 'bn' ? 'ইমেইল নেই' : 'No email'}
-                                </span>
-                              )}
-                              {role.user_id === user?.id && (
-                                <span className="ml-2 text-primary text-xs">(you)</span>
-                              )}
-                            </p>
-                            <p className="text-xs text-muted-foreground font-mono truncate max-w-[150px] sm:max-w-[200px]">
-                              {role.user_id}
+                            <div>
+                              <p className="text-sm font-medium text-foreground truncate max-w-[150px] sm:max-w-[250px]">
+                                {userEmails[role.user_id] || (
+                                  <span className="text-muted-foreground italic">
+                                    {language === 'bn' ? 'ইমেইল নেই' : 'No email'}
+                                  </span>
+                                )}
+                                {role.user_id === user?.id && (
+                                  <span className="ml-2 text-primary text-xs">(you)</span>
+                                )}
+                              </p>
+                              <p className="text-xs text-muted-foreground font-mono truncate max-w-[150px] sm:max-w-[200px]">
+                                {role.user_id}
+                              </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(role.created_at).toLocaleDateString()}
                             </p>
                           </div>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(role.created_at).toLocaleDateString()}
-                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={role.role === 'admin' ? 'default' : 'secondary'}>
+                            {roleStyle.label}
+                          </Badge>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => confirmDeleteRole(role)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={role.role === 'admin' ? 'default' : 'secondary'}>
-                          {role.role === 'admin' 
-                            ? (language === 'bn' ? 'এডমিন' : 'Admin') 
-                            : (language === 'bn' ? 'ইউজার' : 'User')
-                          }
-                        </Badge>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => confirmDeleteRole(role)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {filteredRoles.length === 0 && (
                     <div className="text-center py-4 text-muted-foreground text-sm">
                       {searchQuery 
