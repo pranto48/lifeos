@@ -63,7 +63,7 @@ export function useSupportData() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Check admin status
+  // Check admin or support_manager status
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!user) return;
@@ -71,9 +71,8 @@ export function useSupportData() {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-      setIsAdmin(!!data);
+        .in('role', ['admin', 'support_manager']);
+      setIsAdmin(data && data.length > 0);
     };
     checkAdminStatus();
   }, [user]);

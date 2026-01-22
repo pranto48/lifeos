@@ -17,6 +17,7 @@ export interface DeviceInventory {
   support_user_id: string | null;
   category_id: string | null;
   device_name: string;
+  device_number: string | null;
   serial_number: string | null;
   purchase_date: string | null;
   delivery_date: string | null;
@@ -53,7 +54,7 @@ export function useDeviceInventory() {
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Check admin status
+  // Check admin or inventory_manager status
   useEffect(() => {
     const checkAdminStatus = async () => {
       if (!user) return;
@@ -61,9 +62,8 @@ export function useDeviceInventory() {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-      setIsAdmin(!!data);
+        .in('role', ['admin', 'inventory_manager']);
+      setIsAdmin(data && data.length > 0);
     };
     checkAdminStatus();
   }, [user]);
