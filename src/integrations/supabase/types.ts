@@ -388,6 +388,61 @@ export type Database = {
           },
         ]
       }
+      device_transfer_history: {
+        Row: {
+          created_at: string
+          device_id: string
+          from_user_id: string | null
+          id: string
+          notes: string | null
+          to_user_id: string | null
+          transfer_date: string
+          transferred_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          device_id: string
+          from_user_id?: string | null
+          id?: string
+          notes?: string | null
+          to_user_id?: string | null
+          transfer_date?: string
+          transferred_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          device_id?: string
+          from_user_id?: string | null
+          id?: string
+          notes?: string | null
+          to_user_id?: string | null
+          transfer_date?: string
+          transferred_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_transfer_history_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_transfer_history_from_user_id_fkey"
+            columns: ["from_user_id"]
+            isOneToOne: false
+            referencedRelation: "support_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_transfer_history_to_user_id_fkey"
+            columns: ["to_user_id"]
+            isOneToOne: false
+            referencedRelation: "support_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       family_documents: {
         Row: {
           category: string | null
