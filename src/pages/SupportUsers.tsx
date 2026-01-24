@@ -19,6 +19,8 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { PasswordField } from '@/components/support/PasswordField';
 import { DeviceManagement, DeviceEntry } from '@/components/support/DeviceManagement';
+import { UserDeviceAssignment } from '@/components/support/UserDeviceAssignment';
+import { useDeviceInventory } from '@/hooks/useDeviceInventory';
 
 interface SupportUserTask {
   id: string;
@@ -99,10 +101,14 @@ export default function SupportUsers() {
   const [userTasks, setUserTasks] = useState<SupportUserTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
 
-  // Devices for user form
+  // Devices for user form (old manual device entries)
   const [userDevices, setUserDevices] = useState<DeviceEntry[]>([]);
 
-  // Device counts per support user
+  // Device inventory assignment state
+  const { devices: inventoryDevices, categories: deviceCategories, reload: reloadInventory, updateDevice: updateInventoryDevice } = useDeviceInventory();
+  const [selectedInventoryDeviceIds, setSelectedInventoryDeviceIds] = useState<string[]>([]);
+
+  // Device counts per support user (now from device_inventory)
   const [deviceCounts, setDeviceCounts] = useState<Record<string, number>>({});
 
   // Load task and device counts for support users
@@ -124,23 +130,34 @@ export default function SupportUsers() {
         setTaskCounts(counts);
       }
 
-      // Load device counts
-      const { data: devicesData } = await supabase
-        .from('support_user_devices')
-        .select('support_user_id');
+      // Load device counts from both support_user_devices and device_inventory
+      const [manualDevicesRes, inventoryDevicesRes] = await Promise.all([
+        supabase.from('support_user_devices').select('support_user_id'),
+        supabase.from('device_inventory').select('support_user_id').not('support_user_id', 'is', null)
+      ]);
       
-      if (devicesData) {
-        const counts: Record<string, number> = {};
-        devicesData.forEach(device => {
+      const counts: Record<string, number> = {};
+      
+      if (manualDevicesRes.data) {
+        manualDevicesRes.data.forEach(device => {
           if (device.support_user_id) {
             counts[device.support_user_id] = (counts[device.support_user_id] || 0) + 1;
           }
         });
-        setDeviceCounts(counts);
       }
+      
+      if (inventoryDevicesRes.data) {
+        inventoryDevicesRes.data.forEach(device => {
+          if (device.support_user_id) {
+            counts[device.support_user_id] = (counts[device.support_user_id] || 0) + 1;
+          }
+        });
+      }
+      
+      setDeviceCounts(counts);
     };
     loadCounts();
-  }, [supportUsers]);
+  }, [supportUsers, inventoryDevices]);
 
   // Load tasks for a specific support user
   const loadUserTasks = async (userId: string) => {
@@ -321,6 +338,12 @@ export default function SupportUsers() {
       });
       setUserDialog({ open: true, editing: user });
       await loadUserDevices(user.id);
+      
+      // Load inventory devices assigned to this user
+      const assignedInventoryIds = inventoryDevices
+        .filter(d => d.support_user_id === user.id)
+        .map(d => d.id);
+      setSelectedInventoryDeviceIds(assignedInventoryIds);
     } else {
       setUserForm({
         name: '',
@@ -342,6 +365,7 @@ export default function SupportUsers() {
         device_assign_date: '',
       });
       setUserDevices([]);
+      setSelectedInventoryDeviceIds([]);
       setUserDialog({ open: true, editing: null });
     }
   };
@@ -366,6 +390,30 @@ export default function SupportUsers() {
     }
   };
 
+  // Save inventory device assignments
+  const saveInventoryDeviceAssignments = async (supportUserId: string) => {
+    // Get current assignments
+    const currentlyAssigned = inventoryDevices
+      .filter(d => d.support_user_id === supportUserId)
+      .map(d => d.id);
+    
+    // Devices to unassign (were assigned but no longer selected)
+    const toUnassign = currentlyAssigned.filter(id => !selectedInventoryDeviceIds.includes(id));
+    
+    // Devices to assign (selected but not currently assigned)
+    const toAssign = selectedInventoryDeviceIds.filter(id => !currentlyAssigned.includes(id));
+    
+    // Unassign devices
+    for (const deviceId of toUnassign) {
+      await updateInventoryDevice(deviceId, { support_user_id: null, status: 'available' });
+    }
+    
+    // Assign devices
+    for (const deviceId of toAssign) {
+      await updateInventoryDevice(deviceId, { support_user_id: supportUserId, status: 'assigned' });
+    }
+  };
+
   const handleSaveUser = async () => {
     if (!userForm.name.trim() || !userForm.department_id) {
       toast.error('User name and department are required');
@@ -385,6 +433,9 @@ export default function SupportUsers() {
           await saveUserDevices(savedUserId, user.id);
         }
         
+        // Save inventory device assignments
+        await saveInventoryDeviceAssignments(savedUserId);
+        
         toast.success('User updated');
       } else {
         const newUser = await addSupportUser(userForm as any);
@@ -393,12 +444,16 @@ export default function SupportUsers() {
         const { data: { user } } = await supabase.auth.getUser();
         if (user && newUser) {
           await saveUserDevices(newUser.id, user.id);
+          // Save inventory device assignments for new user
+          await saveInventoryDeviceAssignments(newUser.id);
         }
         
         toast.success('User added');
       }
       setUserDialog({ open: false, editing: null });
       setUserDevices([]);
+      setSelectedInventoryDeviceIds([]);
+      reloadInventory(); // Refresh device inventory
     } catch (error: any) {
       toast.error(error.message);
     }
@@ -1547,8 +1602,21 @@ export default function SupportUsers() {
                 />
               </div>
 
-              {/* Device Assignment Section */}
+              {/* Inventory Device Assignment Section */}
               <div className="col-span-2 border-t pt-4 mt-2">
+                <UserDeviceAssignment
+                  devices={inventoryDevices}
+                  categories={deviceCategories}
+                  selectedDeviceIds={selectedInventoryDeviceIds}
+                  onChange={setSelectedInventoryDeviceIds}
+                />
+              </div>
+
+              {/* Manual Device Assignment Section */}
+              <div className="col-span-2 border-t pt-4 mt-2">
+                <p className="text-sm font-medium text-muted-foreground mb-3">
+                  {language === 'bn' ? 'ম্যানুয়াল ডিভাইস এন্ট্রি' : 'Manual Device Entry'}
+                </p>
                 <DeviceManagement
                   devices={userDevices}
                   onChange={setUserDevices}
