@@ -159,13 +159,30 @@ export function useDeviceInventory() {
     return null;
   };
 
-  const updateDevice = async (id: string, updates: Partial<Omit<DeviceInventory, 'id' | 'user_id' | 'created_at' | 'updated_at'>>) => {
+  const updateDevice = async (id: string, updates: Partial<Omit<DeviceInventory, 'id' | 'user_id' | 'created_at' | 'updated_at'>>, recordTransfer = true) => {
+    // Get current device state before update for transfer history
+    const currentDevice = devices.find(d => d.id === id);
+    const oldUserId = currentDevice?.support_user_id || null;
+    const newUserId = updates.support_user_id !== undefined ? updates.support_user_id : oldUserId;
+
     const { error } = await supabase
       .from('device_inventory')
       .update(updates)
       .eq('id', id);
 
     if (!error) {
+      // Record transfer history if support_user_id changed
+      if (recordTransfer && updates.support_user_id !== undefined && oldUserId !== newUserId) {
+        const { data: userData } = await supabase.auth.getUser();
+        await supabase.from('device_transfer_history').insert({
+          device_id: id,
+          from_user_id: oldUserId,
+          to_user_id: newUserId,
+          transfer_date: new Date().toISOString(),
+          transferred_by: userData?.user?.id || null,
+        });
+      }
+
       setDevices(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
       return true;
     }

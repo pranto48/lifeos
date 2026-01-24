@@ -25,6 +25,7 @@ import { useDeviceInventory, DeviceInventory as DeviceType, DeviceServiceHistory
 import { useSupportData, SupportUser } from '@/hooks/useSupportData';
 import { DeviceQRCode } from '@/components/device/DeviceQRCode';
 import { BulkDeviceAssign } from '@/components/device/BulkDeviceAssign';
+import { DeviceDetailsDialog } from '@/components/device/DeviceDetailsDialog';
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available', labelBn: 'উপলব্ধ', color: 'bg-green-500/20 text-green-600' },
@@ -123,6 +124,9 @@ export default function DeviceInventoryPage() {
   // Quick assign dialog
   const [quickAssignDialog, setQuickAssignDialog] = useState<{ open: boolean; device: DeviceType | null }>({ open: false, device: null });
   const [quickAssignUserId, setQuickAssignUserId] = useState<string>('');
+
+  // Device details dialog
+  const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; device: DeviceType | null }>({ open: false, device: null });
 
   // Tasks for linking
   const [availableTasks, setAvailableTasks] = useState<{ id: string; title: string }[]>([]);
@@ -692,6 +696,10 @@ export default function DeviceInventoryPage() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => setDetailsDialog({ open: true, device })}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                {language === 'bn' ? 'বিস্তারিত দেখুন' : 'View Details'}
+                              </DropdownMenuItem>
                               {isAdmin && (
                                 <>
                                   <DropdownMenuItem onClick={() => openDeviceDialog(device)}>
@@ -1251,6 +1259,15 @@ export default function DeviceInventoryPage() {
         devices={devices}
         supportUsers={supportUsers}
         onAssign={handleBulkAssign}
+      />
+
+      {/* Device Details Dialog */}
+      <DeviceDetailsDialog
+        open={detailsDialog.open}
+        onOpenChange={(open) => setDetailsDialog({ open, device: open ? detailsDialog.device : null })}
+        device={detailsDialog.device}
+        category={detailsDialog.device ? categories.find(c => c.id === detailsDialog.device?.category_id) : null}
+        supportUserMap={supportUserMap}
       />
     </div>
   );
