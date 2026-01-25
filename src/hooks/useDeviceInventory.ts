@@ -16,6 +16,7 @@ export interface DeviceInventory {
   user_id: string;
   support_user_id: string | null;
   category_id: string | null;
+  unit_id: string | null;
   device_name: string;
   device_number: string | null;
   serial_number: string | null;
@@ -29,6 +30,15 @@ export interface DeviceInventory {
   bill_details: string | null;
   status: string;
   notes: string | null;
+  // Device specifications (for computers/laptops)
+  ram_info: string | null;
+  storage_info: string | null;
+  has_ups: boolean | null;
+  ups_info: string | null;
+  monitor_info: string | null;
+  webcam_info: string | null;
+  headset_info: string | null;
+  custom_specs: Record<string, string> | null;
   created_at: string;
   updated_at: string;
 }
@@ -89,7 +99,12 @@ export function useDeviceInventory() {
     }
 
     if (!devicesRes.error && devicesRes.data) {
-      setDevices(devicesRes.data);
+      // Cast custom_specs from Json to Record<string, string>
+      const devices = devicesRes.data.map(d => ({
+        ...d,
+        custom_specs: d.custom_specs as Record<string, string> | null,
+      }));
+      setDevices(devices);
     }
 
     setLoading(false);
@@ -144,17 +159,25 @@ export function useDeviceInventory() {
   };
 
   // Device operations
-  const addDevice = async (deviceData: Omit<DeviceInventory, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+  const addDevice = async (deviceData: Partial<Omit<DeviceInventory, 'id' | 'user_id' | 'created_at' | 'updated_at'>> & { device_name: string }) => {
     if (!user) return null;
+    const insertData = {
+      ...deviceData,
+      user_id: user.id,
+    };
     const { data, error } = await supabase
       .from('device_inventory')
-      .insert({ ...deviceData, user_id: user.id })
+      .insert(insertData as any)
       .select()
       .single();
 
     if (!error && data) {
-      setDevices(prev => [data, ...prev]);
-      return data;
+      const device = {
+        ...data,
+        custom_specs: data.custom_specs as Record<string, string> | null,
+      };
+      setDevices(prev => [device, ...prev]);
+      return device;
     }
     return null;
   };

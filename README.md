@@ -156,13 +156,60 @@ volumes:
 
 ## Self-Hosting Guide
 
-### Option 1: Docker (Recommended)
+### Option 1: Docker with Internal Database (Fully Self-Hosted)
 
-1. Clone the repository
-2. Configure environment variables
-3. Run `docker-compose up -d`
+For a completely self-contained installation with internal PostgreSQL database:
 
-### Option 2: Static Hosting
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/lifeos.git
+cd lifeos
+
+# Copy and configure environment
+cp docker/.env.example docker/.env
+# Edit docker/.env with your settings
+
+# Start with internal database
+docker-compose -f docker-compose.selfhosted.yml up -d
+
+# Include optional services (pgAdmin for DB management)
+docker-compose -f docker-compose.selfhosted.yml --profile with-admin up -d
+
+# Include reverse proxy with SSL support
+docker-compose -f docker-compose.selfhosted.yml --profile with-proxy up -d
+```
+
+**Default Admin Credentials**:
+- Email: `admin@lifeos.local`
+- Password: `admin123` (⚠️ Change immediately!)
+
+**Included Services**:
+- PostgreSQL 16 (database)
+- Redis 7 (session cache)
+- LifeOS Application
+- Optional: Nginx reverse proxy with SSL
+- Optional: pgAdmin for database management
+
+### Option 2: Docker with Cloud Backend
+
+Use Docker for the frontend with cloud-hosted Supabase backend:
+
+```bash
+# Clone and configure
+git clone https://github.com/YOUR_USERNAME/lifeos.git
+cd lifeos
+
+# Build and run
+docker-compose up -d
+```
+
+Configure environment variables in `docker-compose.yml` or `.env`:
+```env
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
+```
+
+### Option 3: Static Hosting
 
 1. Build the application:
    ```bash
@@ -176,7 +223,7 @@ volumes:
    - Vercel
    - Cloudflare Pages
 
-### Option 3: Node.js Server
+### Option 4: Node.js Server
 
 1. Build the application:
    ```bash
@@ -188,20 +235,27 @@ volumes:
    npx serve -s dist -l 3000
    ```
 
-## Supabase Setup (Self-Hosted Backend)
+## Self-Hosted Database Schema
 
-If you want to self-host the backend as well:
+If you're running with the internal database (`docker-compose.selfhosted.yml`), the database schema is automatically initialized from `docker/init-db.sql`. This includes:
 
-1. Follow the [Supabase Self-Hosting Guide](https://supabase.com/docs/guides/self-hosting)
+- User authentication tables
+- Role-based access control
+- Device inventory with specifications
+- Support user management
+- All core application tables
 
-2. Run the migrations in the `supabase/migrations` folder
+To customize or extend the schema, modify `docker/init-db.sql` before first startup.
 
-3. Deploy edge functions:
-   ```bash
-   supabase functions deploy
-   ```
+## Backup & Restore (Self-Hosted)
 
-4. Update your environment variables to point to your self-hosted Supabase instance
+```bash
+# Backup database
+docker exec lifeos-db pg_dump -U lifeos lifeos > backup_$(date +%Y%m%d).sql
+
+# Restore database
+docker exec -i lifeos-db psql -U lifeos lifeos < backup_20240101.sql
+```
 
 ## Project Structure
 
