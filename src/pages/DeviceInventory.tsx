@@ -3,7 +3,7 @@ import {
   HardDrive, Plus, Pencil, Trash2, Search, Download, 
   Wrench, Calendar, DollarSign, User, Tag, 
   Package, FileText, AlertTriangle, CheckCircle, Clock,
-  MoreVertical, Eye, Filter, Settings2, QrCode, Users
+  MoreVertical, Eye, Filter, Settings2, QrCode, Users, Building2
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +26,7 @@ import { useSupportData, SupportUser } from '@/hooks/useSupportData';
 import { DeviceQRCode } from '@/components/device/DeviceQRCode';
 import { BulkDeviceAssign } from '@/components/device/BulkDeviceAssign';
 import { DeviceDetailsDialog } from '@/components/device/DeviceDetailsDialog';
+import { DeviceSpecsForm } from '@/components/device/DeviceSpecsForm';
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available', labelBn: 'উপলব্ধ', color: 'bg-green-500/20 text-green-600' },
@@ -96,6 +97,16 @@ export default function DeviceInventoryPage() {
     notes: '',
     category_id: '',
     support_user_id: '',
+    unit_id: '',
+    // Device specs
+    ram_info: '',
+    storage_info: '',
+    has_ups: false,
+    ups_info: '',
+    monitor_info: '',
+    webcam_info: '',
+    headset_info: '',
+    custom_specs: {} as Record<string, string>,
   });
 
   // Bulk assign dialog
@@ -199,7 +210,7 @@ export default function DeviceInventoryPage() {
     if (device) {
       setDeviceForm({
         device_name: device.device_name,
-        device_number: (device as any).device_number || '',
+        device_number: device.device_number || '',
         serial_number: device.serial_number || '',
         purchase_date: device.purchase_date || '',
         delivery_date: device.delivery_date || '',
@@ -213,6 +224,15 @@ export default function DeviceInventoryPage() {
         notes: device.notes || '',
         category_id: device.category_id || '',
         support_user_id: device.support_user_id || '',
+        unit_id: device.unit_id || '',
+        ram_info: device.ram_info || '',
+        storage_info: device.storage_info || '',
+        has_ups: device.has_ups || false,
+        ups_info: device.ups_info || '',
+        monitor_info: device.monitor_info || '',
+        webcam_info: device.webcam_info || '',
+        headset_info: device.headset_info || '',
+        custom_specs: device.custom_specs || {},
       });
       setDeviceDialog({ open: true, editing: device });
     } else {
@@ -232,6 +252,15 @@ export default function DeviceInventoryPage() {
         notes: '',
         category_id: categories[0]?.id || '',
         support_user_id: '',
+        unit_id: '',
+        ram_info: '',
+        storage_info: '',
+        has_ups: false,
+        ups_info: '',
+        monitor_info: '',
+        webcam_info: '',
+        headset_info: '',
+        custom_specs: {},
       });
       setDeviceDialog({ open: true, editing: null });
     }
@@ -259,6 +288,15 @@ export default function DeviceInventoryPage() {
       notes: deviceForm.notes || null,
       category_id: deviceForm.category_id || null,
       support_user_id: deviceForm.support_user_id || null,
+      unit_id: deviceForm.unit_id || null,
+      ram_info: deviceForm.ram_info || null,
+      storage_info: deviceForm.storage_info || null,
+      has_ups: deviceForm.has_ups,
+      ups_info: deviceForm.ups_info || null,
+      monitor_info: deviceForm.monitor_info || null,
+      webcam_info: deviceForm.webcam_info || null,
+      headset_info: deviceForm.headset_info || null,
+      custom_specs: Object.keys(deviceForm.custom_specs).length > 0 ? deviceForm.custom_specs : null,
     };
 
     try {
@@ -832,6 +870,25 @@ export default function DeviceInventoryPage() {
               </Select>
             </div>
 
+            {/* Unit Location */}
+            <div className="space-y-2">
+              <Label className="text-xs flex items-center gap-1.5">
+                <Building2 className="h-3.5 w-3.5" />
+                {language === 'bn' ? 'ইউনিট লোকেশন' : 'Unit Location'}
+              </Label>
+              <Select value={deviceForm.unit_id || "none"} onValueChange={(v) => setDeviceForm({ ...deviceForm, unit_id: v === "none" ? "" : v })}>
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder={language === 'bn' ? 'ইউনিট নির্বাচন করুন' : 'Select unit'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">{language === 'bn' ? 'নির্বাচন করুন' : 'Select'}</SelectItem>
+                  {units.map(unit => (
+                    <SelectItem key={unit.id} value={unit.id}>{unit.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* Purchase Date */}
             <div className="space-y-2">
               <Label className="text-xs">{language === 'bn' ? 'ক্রয়ের তারিখ' : 'Purchase Date'}</Label>
@@ -917,6 +974,22 @@ export default function DeviceInventoryPage() {
                 rows={2}
               />
             </div>
+
+            {/* Device Specifications (conditional based on category) */}
+            <DeviceSpecsForm
+              categoryName={categories.find(c => c.id === deviceForm.category_id)?.name || null}
+              specs={{
+                ram_info: deviceForm.ram_info,
+                storage_info: deviceForm.storage_info,
+                has_ups: deviceForm.has_ups,
+                ups_info: deviceForm.ups_info,
+                monitor_info: deviceForm.monitor_info,
+                webcam_info: deviceForm.webcam_info,
+                headset_info: deviceForm.headset_info,
+                custom_specs: deviceForm.custom_specs,
+              }}
+              onChange={(specs) => setDeviceForm({ ...deviceForm, ...specs })}
+            />
 
             {/* Notes */}
             <div className="space-y-2 md:col-span-2">

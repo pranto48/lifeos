@@ -256,63 +256,90 @@ export type Database = {
           bod_number: string | null
           category_id: string | null
           created_at: string
+          custom_specs: Json | null
           delivery_date: string | null
           device_name: string
           device_number: string | null
+          has_ups: boolean | null
+          headset_info: string | null
           id: string
+          monitor_info: string | null
           notes: string | null
           price: number | null
           purchase_date: string | null
+          ram_info: string | null
           requisition_number: string | null
           serial_number: string | null
           status: string
+          storage_info: string | null
           supplier_name: string | null
           support_user_id: string | null
+          unit_id: string | null
           updated_at: string
+          ups_info: string | null
           user_id: string
           warranty_date: string | null
+          webcam_info: string | null
         }
         Insert: {
           bill_details?: string | null
           bod_number?: string | null
           category_id?: string | null
           created_at?: string
+          custom_specs?: Json | null
           delivery_date?: string | null
           device_name: string
           device_number?: string | null
+          has_ups?: boolean | null
+          headset_info?: string | null
           id?: string
+          monitor_info?: string | null
           notes?: string | null
           price?: number | null
           purchase_date?: string | null
+          ram_info?: string | null
           requisition_number?: string | null
           serial_number?: string | null
           status?: string
+          storage_info?: string | null
           supplier_name?: string | null
           support_user_id?: string | null
+          unit_id?: string | null
           updated_at?: string
+          ups_info?: string | null
           user_id: string
           warranty_date?: string | null
+          webcam_info?: string | null
         }
         Update: {
           bill_details?: string | null
           bod_number?: string | null
           category_id?: string | null
           created_at?: string
+          custom_specs?: Json | null
           delivery_date?: string | null
           device_name?: string
           device_number?: string | null
+          has_ups?: boolean | null
+          headset_info?: string | null
           id?: string
+          monitor_info?: string | null
           notes?: string | null
           price?: number | null
           purchase_date?: string | null
+          ram_info?: string | null
           requisition_number?: string | null
           serial_number?: string | null
           status?: string
+          storage_info?: string | null
           supplier_name?: string | null
           support_user_id?: string | null
+          unit_id?: string | null
           updated_at?: string
+          ups_info?: string | null
           user_id?: string
           warranty_date?: string | null
+          webcam_info?: string | null
         }
         Relationships: [
           {
@@ -327,6 +354,13 @@ export type Database = {
             columns: ["support_user_id"]
             isOneToOne: false
             referencedRelation: "support_users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_inventory_unit_id_fkey"
+            columns: ["unit_id"]
+            isOneToOne: false
+            referencedRelation: "support_units"
             referencedColumns: ["id"]
           },
         ]
