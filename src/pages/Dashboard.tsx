@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   CheckSquare, FileText, Wallet, Target, 
-  Calendar, Clock, ArrowUpRight, ArrowDownRight, Lightbulb
+  Calendar, Clock, ArrowUpRight, ArrowDownRight, Lightbulb, Settings2
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useDashboardMode } from '@/contexts/DashboardModeContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
 import { UpcomingFamilyEvents } from '@/components/dashboard/UpcomingFamilyEvents';
 import { TaskCompletionChart } from '@/components/dashboard/TaskCompletionChart';
@@ -16,12 +17,25 @@ import { ExpenseBreakdownChart } from '@/components/dashboard/ExpenseBreakdownCh
 import { GoalProgressCards } from '@/components/dashboard/GoalProgressCards';
 import { TasksBreakdownChart } from '@/components/dashboard/TasksBreakdownChart';
 import { TaskCategoriesChart } from '@/components/dashboard/TaskCategoriesChart';
+import { DeviceCategoryChart } from '@/components/dashboard/DeviceCategoryChart';
+import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer';
+import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import GoalProgressChart from '@/components/goals/GoalProgressChart';
 
 export default function Dashboard() {
   const { user } = useAuth();
   const { t } = useLanguage();
   const { mode } = useDashboardMode();
+  const { 
+    widgets, 
+    enabledWidgets, 
+    isCustomizing, 
+    setIsCustomizing, 
+    toggleWidget, 
+    reorderWidgets, 
+    resetLayout 
+  } = useDashboardLayout();
+  
   const [stats, setStats] = useState({
     todayTasks: 0,
     completedTasks: 0,
@@ -134,6 +148,136 @@ export default function Dashboard() {
         { title: 'Personal Projects', value: stats.personalProjects, icon: Lightbulb, color: 'text-primary' },
       ];
 
+  // Render widget by ID
+  const renderWidget = (widgetId: string) => {
+    switch (widgetId) {
+      case 'task-completion':
+        return <TaskCompletionChart key={widgetId} />;
+      case 'tasks-breakdown':
+        return <TasksBreakdownChart key={widgetId} />;
+      case 'task-categories':
+        return <TaskCategoriesChart key={widgetId} />;
+      case 'device-categories':
+        return <DeviceCategoryChart key={widgetId} />;
+      case 'expense-breakdown':
+        return <ExpenseBreakdownChart key={widgetId} />;
+      case 'goal-cards':
+        return <GoalProgressCards key={widgetId} />;
+      case 'goal-chart':
+        return <GoalProgressChart key={widgetId} goals={stats.goals} />;
+      case 'goal-progress':
+        return <GoalProgressChart key={widgetId} goals={stats.goals} />;
+      case 'budget-summary':
+        return (
+          <Card key={widgetId} className="bg-card border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Wallet className="h-4 w-4" /> {t('dashboard.thisMonthBudget')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ArrowUpRight className="h-4 w-4 text-green-400" />
+                  <span className="text-sm text-muted-foreground">{t('budget.income')}</span>
+                </div>
+                <span className="font-mono font-semibold text-green-400">৳{stats.monthlyIncome.toLocaleString()}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <ArrowDownRight className="h-4 w-4 text-red-400" />
+                  <span className="text-sm text-muted-foreground">{t('budget.expenses')}</span>
+                </div>
+                <span className="font-mono font-semibold text-red-400">৳{stats.monthlyExpense.toLocaleString()}</span>
+              </div>
+              <div className="pt-2 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{t('budget.balance')}</span>
+                  <span className={`font-mono font-bold ${stats.monthlyIncome - stats.monthlyExpense >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    ৳{(stats.monthlyIncome - stats.monthlyExpense).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      case 'recent-notes':
+        return (
+          <Card key={widgetId} className="bg-card border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <FileText className="h-4 w-4" /> {t('dashboard.recentNotes')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stats.recentNotes.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noNotesYet')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {stats.recentNotes.map(note => (
+                    <div key={note.id} className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                      <p className="text-sm font-medium text-foreground truncate">{note.title}</p>
+                      <p className="text-xs text-muted-foreground">{format(new Date(note.created_at), 'MMM d')}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      case 'upcoming-tasks':
+        return (
+          <Card key={widgetId} className="bg-card border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Calendar className="h-4 w-4" /> {t('dashboard.upcomingTasks')}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {stats.upcomingTasks.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noTasksYet')}</p>
+              ) : (
+                <div className="space-y-2">
+                  {stats.upcomingTasks.map(task => (
+                    <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-2 h-2 rounded-full ${
+                          task.priority === 'urgent' ? 'bg-red-500' :
+                          task.priority === 'high' ? 'bg-orange-500' :
+                          task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
+                        }`} />
+                        <span className="text-sm text-foreground">{task.title}</span>
+                      </div>
+                      {task.due_date && (
+                        <span className="text-xs text-muted-foreground">{format(new Date(task.due_date), 'MMM d')}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        );
+      case 'family-events':
+        return <UpcomingFamilyEvents key={widgetId} />;
+      default:
+        return null;
+    }
+  };
+
+  // Get widgets for grid layout
+  const chartWidgets = enabledWidgets.filter(w => 
+    ['task-completion', 'tasks-breakdown', 'task-categories', 'device-categories', 'expense-breakdown', 'goal-cards'].includes(w.id)
+  );
+  
+  const listWidgets = enabledWidgets.filter(w => 
+    ['recent-notes', 'upcoming-tasks', 'budget-summary', 'family-events'].includes(w.id)
+  );
+
+  const fullWidthWidgets = enabledWidgets.filter(w => 
+    ['goal-chart', 'goal-progress'].includes(w.id)
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -149,6 +293,15 @@ export default function Dashboard() {
             </span>
           </p>
         </div>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => setIsCustomizing(true)}
+          className="gap-2"
+        >
+          <Settings2 className="h-4 w-4" />
+          <span className="hidden sm:inline">Customize</span>
+        </Button>
       </div>
 
       {/* Stats Grid */}
@@ -197,182 +350,43 @@ export default function Dashboard() {
         ))}
       </div>
 
-      {/* Office Mode Content - No Financial Charts */}
-      {mode === 'office' ? (
-        <div className="space-y-6">
-          {/* Charts Row - Task focused only */}
-          <div className="grid md:grid-cols-3 gap-6">
-            <TaskCompletionChart />
-            <TasksBreakdownChart />
-            <TaskCategoriesChart />
+      {/* Customizable Widgets */}
+      <div className="space-y-6">
+        {/* Charts Row */}
+        {chartWidgets.length > 0 && (
+          <div className={`grid gap-6 ${
+            chartWidgets.length === 1 ? 'grid-cols-1' :
+            chartWidgets.length === 2 ? 'md:grid-cols-2' :
+            chartWidgets.length === 3 ? 'md:grid-cols-3' :
+            'md:grid-cols-2 lg:grid-cols-4'
+          }`}>
+            {chartWidgets.map(widget => renderWidget(widget.id))}
           </div>
+        )}
 
-          {/* Notes and Tasks Row */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Recent Notes */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <FileText className="h-4 w-4" /> {t('dashboard.recentNotes')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.recentNotes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noNotesYet')}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {stats.recentNotes.map(note => (
-                      <div key={note.id} className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                        <p className="text-sm font-medium text-foreground truncate">{note.title}</p>
-                        <p className="text-xs text-muted-foreground">{format(new Date(note.created_at), 'MMM d')}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        {/* Full Width Widgets */}
+        {fullWidthWidgets.map(widget => renderWidget(widget.id))}
 
-            {/* Upcoming Tasks */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Calendar className="h-4 w-4" /> {t('dashboard.upcomingTasks')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.upcomingTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noTasksYet')}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {stats.upcomingTasks.map(task => (
-                      <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${
-                            task.priority === 'urgent' ? 'bg-red-500' :
-                            task.priority === 'high' ? 'bg-orange-500' :
-                            task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                          }`} />
-                          <span className="text-sm text-foreground">{task.title}</span>
-                        </div>
-                        {task.due_date && (
-                          <span className="text-xs text-muted-foreground">{format(new Date(task.due_date), 'MMM d')}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+        {/* List Widgets Row */}
+        {listWidgets.length > 0 && (
+          <div className={`grid gap-6 ${
+            listWidgets.length === 1 ? 'grid-cols-1' :
+            'md:grid-cols-2'
+          }`}>
+            {listWidgets.map(widget => renderWidget(widget.id))}
           </div>
-        </div>
-      ) : (
-        /* Personal Mode Content - Shows everything including finances */
-        <div className="space-y-6">
-          {/* Charts Row */}
-          <div className="grid md:grid-cols-3 gap-6">
-            <TaskCompletionChart />
-            <ExpenseBreakdownChart />
-            <GoalProgressCards />
-          </div>
+        )}
+      </div>
 
-          {/* Goal Progress Chart */}
-          <GoalProgressChart goals={stats.goals} />
-
-          {/* Budget Summary + Notes */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Wallet className="h-4 w-4" /> {t('dashboard.thisMonthBudget')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ArrowUpRight className="h-4 w-4 text-green-400" />
-                    <span className="text-sm text-muted-foreground">{t('budget.income')}</span>
-                  </div>
-                  <span className="font-mono font-semibold text-green-400">৳{stats.monthlyIncome.toLocaleString()}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ArrowDownRight className="h-4 w-4 text-red-400" />
-                    <span className="text-sm text-muted-foreground">{t('budget.expenses')}</span>
-                  </div>
-                  <span className="font-mono font-semibold text-red-400">৳{stats.monthlyExpense.toLocaleString()}</span>
-                </div>
-                <div className="pt-2 border-t border-border">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">{t('budget.balance')}</span>
-                    <span className={`font-mono font-bold ${stats.monthlyIncome - stats.monthlyExpense >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      ৳{(stats.monthlyIncome - stats.monthlyExpense).toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Notes */}
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <FileText className="h-4 w-4" /> {t('dashboard.recentNotes')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.recentNotes.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noNotesYet')}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {stats.recentNotes.map(note => (
-                      <div key={note.id} className="p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                        <p className="text-sm font-medium text-foreground truncate">{note.title}</p>
-                        <p className="text-xs text-muted-foreground">{format(new Date(note.created_at), 'MMM d')}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Bottom Grid: Upcoming Tasks + Family Events */}
-          <div className="grid md:grid-cols-2 gap-6">
-            <Card className="bg-card border-border">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <Calendar className="h-4 w-4" /> {t('dashboard.upcomingTasks')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {stats.upcomingTasks.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">{t('dashboard.noTasksYet')}</p>
-                ) : (
-                  <div className="space-y-2">
-                    {stats.upcomingTasks.map(task => (
-                      <div key={task.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${
-                            task.priority === 'urgent' ? 'bg-red-500' :
-                            task.priority === 'high' ? 'bg-orange-500' :
-                            task.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'
-                          }`} />
-                          <span className="text-sm text-foreground">{task.title}</span>
-                        </div>
-                        {task.due_date && (
-                          <span className="text-xs text-muted-foreground">{format(new Date(task.due_date), 'MMM d')}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <UpcomingFamilyEvents />
-          </div>
-        </div>
-      )}
+      {/* Dashboard Customizer Dialog */}
+      <DashboardCustomizer
+        open={isCustomizing}
+        onOpenChange={setIsCustomizing}
+        widgets={widgets}
+        onToggle={toggleWidget}
+        onReorder={reorderWidgets}
+        onReset={resetLayout}
+      />
     </div>
   );
 }

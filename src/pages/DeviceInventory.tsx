@@ -27,6 +27,7 @@ import { DeviceQRCode } from '@/components/device/DeviceQRCode';
 import { BulkDeviceAssign } from '@/components/device/BulkDeviceAssign';
 import { DeviceDetailsDialog } from '@/components/device/DeviceDetailsDialog';
 import { DeviceSpecsForm } from '@/components/device/DeviceSpecsForm';
+import { CascadingAssignment } from '@/components/device/CascadingAssignment';
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available', labelBn: 'উপলব্ধ', color: 'bg-green-500/20 text-green-600' },
@@ -78,6 +79,7 @@ export default function DeviceInventoryPage() {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterSupportUser, setFilterSupportUser] = useState<string>('all');
+  const [filterUnitLocation, setFilterUnitLocation] = useState<string>('all');
 
   // Device dialog
   const [deviceDialog, setDeviceDialog] = useState<{ open: boolean; editing: DeviceType | null }>({ open: false, editing: null });
@@ -185,6 +187,7 @@ export default function DeviceInventoryPage() {
     if (filterCategory !== 'all' && device.category_id !== filterCategory) return false;
     if (filterStatus !== 'all' && device.status !== filterStatus) return false;
     if (filterSupportUser !== 'all' && device.support_user_id !== filterSupportUser) return false;
+    if (filterUnitLocation !== 'all' && device.unit_id !== filterUnitLocation) return false;
 
     return true;
   });
@@ -630,6 +633,17 @@ export default function DeviceInventoryPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={filterUnitLocation} onValueChange={setFilterUnitLocation}>
+              <SelectTrigger className="w-full sm:w-[140px] h-9 text-sm">
+                <SelectValue placeholder={language === 'bn' ? 'ইউনিট' : 'Unit'} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{language === 'bn' ? 'সব ইউনিট' : 'All Units'}</SelectItem>
+                {units.map(unit => (
+                  <SelectItem key={unit.id} value={unit.id}>{unit.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
@@ -854,27 +868,20 @@ export default function DeviceInventoryPage() {
               </Select>
             </div>
 
-            {/* Assigned To */}
-            <div className="space-y-2">
-              <Label className="text-xs">{language === 'bn' ? 'বরাদ্দ' : 'Assigned To'}</Label>
-              <Select value={deviceForm.support_user_id || "none"} onValueChange={(v) => setDeviceForm({ ...deviceForm, support_user_id: v === "none" ? "" : v })}>
-                <SelectTrigger className="text-sm">
-                  <SelectValue placeholder={language === 'bn' ? 'ব্যবহারকারী নির্বাচন' : 'Select user'} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{language === 'bn' ? 'কেউ নয়' : 'None'}</SelectItem>
-                  {supportUsers.filter(u => u.is_active).map(user => (
-                    <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Cascading Assignment: Unit > Department > User */}
+            <CascadingAssignment
+              units={units}
+              departments={departments}
+              supportUsers={supportUsers}
+              selectedUserId={deviceForm.support_user_id}
+              onUserChange={(userId) => setDeviceForm({ ...deviceForm, support_user_id: userId })}
+            />
 
-            {/* Unit Location */}
+            {/* Unit Location (Physical Location) */}
             <div className="space-y-2">
               <Label className="text-xs flex items-center gap-1.5">
                 <Building2 className="h-3.5 w-3.5" />
-                {language === 'bn' ? 'ইউনিট লোকেশন' : 'Unit Location'}
+                {language === 'bn' ? 'ইউনিট লোকেশন (ফিজিক্যাল)' : 'Unit Location (Physical)'}
               </Label>
               <Select value={deviceForm.unit_id || "none"} onValueChange={(v) => setDeviceForm({ ...deviceForm, unit_id: v === "none" ? "" : v })}>
                 <SelectTrigger className="text-sm">
