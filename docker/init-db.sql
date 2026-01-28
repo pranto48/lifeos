@@ -177,12 +177,28 @@ CREATE TABLE IF NOT EXISTS public.device_service_history (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Device Suppliers (for quick selection)
+CREATE TABLE IF NOT EXISTS public.device_suppliers (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    name VARCHAR(255) NOT NULL,
+    contact_person VARCHAR(255),
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    address TEXT,
+    notes TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_device_inventory_user_id ON public.device_inventory(user_id);
 CREATE INDEX IF NOT EXISTS idx_device_inventory_category_id ON public.device_inventory(category_id);
 CREATE INDEX IF NOT EXISTS idx_device_inventory_unit_id ON public.device_inventory(unit_id);
 CREATE INDEX IF NOT EXISTS idx_device_inventory_support_user_id ON public.device_inventory(support_user_id);
 CREATE INDEX IF NOT EXISTS idx_device_inventory_status ON public.device_inventory(status);
+CREATE INDEX IF NOT EXISTS idx_device_inventory_supplier ON public.device_inventory(supplier_name);
 CREATE INDEX IF NOT EXISTS idx_support_users_department_id ON public.support_users(department_id);
 CREATE INDEX IF NOT EXISTS idx_support_departments_unit_id ON public.support_departments(unit_id);
 CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON public.user_sessions(user_id);
@@ -219,25 +235,70 @@ BEGIN
 END;
 $$;
 
--- Insert default admin user (password: admin123 - CHANGE THIS!)
--- Password hash for 'admin123' using bcrypt
-INSERT INTO public.users (id, email, password_hash, full_name, email_verified)
-VALUES (
-    uuid_generate_v4(),
-    'admin@lifeos.local',
-    '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.qcaRQnK.P5p.Ey',
-    'System Administrator',
-    true
-) ON CONFLICT (email) DO NOTHING;
+-- ============================================================
+-- DEFAULT ADMIN USER SETUP
+-- ============================================================
+-- Default credentials (CHANGE IMMEDIATELY AFTER FIRST LOGIN!):
+--   Email:    admin@lifeos.local
+--   Password: LifeOS@2024!
+-- ============================================================
 
--- Assign admin role to default admin user
-INSERT INTO public.user_roles (user_id, role)
-SELECT id, 'admin'::app_role FROM public.users WHERE email = 'admin@lifeos.local'
-ON CONFLICT (user_id, role) DO NOTHING;
+-- Generate admin password hash using pgcrypto
+-- Password: LifeOS@2024!
+DO $$
+DECLARE
+    admin_id UUID;
+    admin_password_hash TEXT;
+BEGIN
+    -- Generate bcrypt hash for default password
+    admin_password_hash := crypt('LifeOS@2024!', gen_salt('bf', 12));
+    
+    -- Insert admin user if not exists
+    INSERT INTO public.users (id, email, password_hash, full_name, email_verified)
+    VALUES (
+        uuid_generate_v4(),
+        'admin@lifeos.local',
+        admin_password_hash,
+        'System Administrator',
+        true
+    )
+    ON CONFLICT (email) DO UPDATE SET
+        password_hash = EXCLUDED.password_hash,
+        updated_at = NOW()
+    RETURNING id INTO admin_id;
+    
+    -- Ensure admin role exists
+    IF admin_id IS NOT NULL THEN
+        INSERT INTO public.user_roles (user_id, role)
+        VALUES (admin_id, 'admin')
+        ON CONFLICT (user_id, role) DO NOTHING;
+        
+        -- Create profile for admin
+        INSERT INTO public.profiles (user_id, full_name, email)
+        VALUES (admin_id, 'System Administrator', 'admin@lifeos.local')
+        ON CONFLICT (user_id) DO UPDATE SET
+            full_name = EXCLUDED.full_name,
+            email = EXCLUDED.email;
+    END IF;
+END $$;
 
--- Create profile for admin user
-INSERT INTO public.profiles (user_id, full_name, email)
-SELECT id, full_name, email FROM public.users WHERE email = 'admin@lifeos.local'
-ON CONFLICT (user_id) DO NOTHING;
+-- Display setup completion message
+DO $$
+BEGIN
+    RAISE NOTICE '';
+    RAISE NOTICE '╔════════════════════════════════════════════════════════════╗';
+    RAISE NOTICE '║           LifeOS Database Initialized Successfully         ║';
+    RAISE NOTICE '╠════════════════════════════════════════════════════════════╣';
+    RAISE NOTICE '║                                                            ║';
+    RAISE NOTICE '║  Default Admin Credentials:                                ║';
+    RAISE NOTICE '║  ──────────────────────────                                ║';
+    RAISE NOTICE '║  Email:    admin@lifeos.local                              ║';
+    RAISE NOTICE '║  Password: LifeOS@2024!                                    ║';
+    RAISE NOTICE '║                                                            ║';
+    RAISE NOTICE '║  ⚠️  IMPORTANT: Change password after first login!         ║';
+    RAISE NOTICE '║                                                            ║';
+    RAISE NOTICE '╚════════════════════════════════════════════════════════════╝';
+    RAISE NOTICE '';
+END $$;
 
 COMMIT;

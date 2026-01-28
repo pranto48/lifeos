@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { 
-  HardDrive, Plus, Pencil, Trash2, Search, Download, 
-  Wrench, Calendar, DollarSign, User, Tag, 
-  Package, FileText, AlertTriangle, CheckCircle, Clock,
-  MoreVertical, Eye, Filter, Settings2, QrCode, Users, Building2
+  HardDrive, Plus, Pencil, Trash2, Download, 
+  Wrench, User, Tag, DollarSign, FileText,
+  MoreVertical, Eye, Users, Building2, Truck
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,16 +18,18 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { format, isAfter, isBefore, addDays } from 'date-fns';
+import { format, isBefore, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useDeviceInventory, DeviceInventory as DeviceType, DeviceServiceHistory, DeviceCategory } from '@/hooks/useDeviceInventory';
-import { useSupportData, SupportUser } from '@/hooks/useSupportData';
+import { useSupportData } from '@/hooks/useSupportData';
 import { DeviceQRCode } from '@/components/device/DeviceQRCode';
 import { BulkDeviceAssign } from '@/components/device/BulkDeviceAssign';
 import { DeviceDetailsDialog } from '@/components/device/DeviceDetailsDialog';
 import { DeviceSpecsForm } from '@/components/device/DeviceSpecsForm';
 import { CascadingAssignment } from '@/components/device/CascadingAssignment';
+import { DeviceFilters } from '@/components/device/DeviceFilters';
+import { AnimatedIcon, LoadingSpinner, PulsingDot } from '@/components/ui/animated-icon';
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available', labelBn: 'উপলব্ধ', color: 'bg-green-500/20 text-green-600' },
@@ -74,12 +76,25 @@ export default function DeviceInventoryPage() {
 
   const { supportUsers, departments, units } = useSupportData();
 
-  // Search and filter
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterSupportUser, setFilterSupportUser] = useState<string>('all');
-  const [filterUnitLocation, setFilterUnitLocation] = useState<string>('all');
+  // Search and filter state
+  const [filters, setFilters] = useState({
+    searchQuery: '',
+    category: 'all',
+    status: 'all',
+    unitLocation: 'all',
+    department: 'all',
+    supportUser: 'all',
+    supplier: 'all',
+  });
+
+  // Extract unique suppliers from devices
+  const suppliers = useMemo(() => {
+    const supplierSet = new Set<string>();
+    devices.forEach(d => {
+      if (d.supplier_name) supplierSet.add(d.supplier_name);
+    });
+    return Array.from(supplierSet).sort();
+  }, [devices]);
 
   // Device dialog
   const [deviceDialog, setDeviceDialog] = useState<{ open: boolean; editing: DeviceType | null }>({ open: false, editing: null });
@@ -173,24 +188,34 @@ export default function DeviceInventoryPage() {
     };
   });
 
-  // Filter devices
-  const filteredDevices = devices.filter(device => {
-    const query = searchQuery.toLowerCase();
-    const matchesSearch = !query ||
-      device.device_name.toLowerCase().includes(query) ||
-      device.device_number?.toLowerCase().includes(query) ||
-      device.serial_number?.toLowerCase().includes(query) ||
-      device.supplier_name?.toLowerCase().includes(query) ||
-      device.requisition_number?.toLowerCase().includes(query);
+  // Filter devices with cascading logic
+  const filteredDevices = useMemo(() => {
+    return devices.filter(device => {
+      const query = filters.searchQuery.toLowerCase();
+      const matchesSearch = !query ||
+        device.device_name.toLowerCase().includes(query) ||
+        device.device_number?.toLowerCase().includes(query) ||
+        device.serial_number?.toLowerCase().includes(query) ||
+        device.supplier_name?.toLowerCase().includes(query) ||
+        device.requisition_number?.toLowerCase().includes(query);
 
-    if (!matchesSearch) return false;
-    if (filterCategory !== 'all' && device.category_id !== filterCategory) return false;
-    if (filterStatus !== 'all' && device.status !== filterStatus) return false;
-    if (filterSupportUser !== 'all' && device.support_user_id !== filterSupportUser) return false;
-    if (filterUnitLocation !== 'all' && device.unit_id !== filterUnitLocation) return false;
+      if (!matchesSearch) return false;
+      if (filters.category !== 'all' && device.category_id !== filters.category) return false;
+      if (filters.status !== 'all' && device.status !== filters.status) return false;
+      if (filters.unitLocation !== 'all' && device.unit_id !== filters.unitLocation) return false;
+      if (filters.supplier !== 'all' && device.supplier_name !== filters.supplier) return false;
+      
+      // Cascading user filter
+      if (filters.supportUser !== 'all') {
+        if (device.support_user_id !== filters.supportUser) return false;
+      } else if (filters.department !== 'all') {
+        const user = supportUsers.find(u => u.id === device.support_user_id);
+        if (!user || user.department_id !== filters.department) return false;
+      }
 
-    return true;
-  });
+      return true;
+    });
+  }, [devices, filters, supportUsers]);
 
   // Check warranty status
   const getWarrantyStatus = (warrantyDate: string | null) => {
@@ -508,19 +533,37 @@ export default function DeviceInventoryPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-muted-foreground">{language === 'bn' ? 'লোড হচ্ছে...' : 'Loading...'}</div>
+      <div className="flex flex-col items-center justify-center h-64 gap-4">
+        <LoadingSpinner size={32} className="text-primary" />
+        <div className="text-muted-foreground animate-pulse">
+          {language === 'bn' ? 'লোড হচ্ছে...' : 'Loading devices...'}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4 md:space-y-6">
+    <motion.div 
+      className="space-y-4 md:space-y-6"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.3 }}
+    >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <motion.div 
+        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <div>
           <h1 className="text-xl md:text-2xl font-bold text-foreground flex items-center gap-2">
-            <HardDrive className="h-5 w-5 md:h-6 md:w-6" />
+            <motion.div
+              whileHover={{ rotate: 15, scale: 1.1 }}
+              transition={{ duration: 0.2 }}
+            >
+              <HardDrive className="h-5 w-5 md:h-6 md:w-6 text-primary" />
+            </motion.div>
             {language === 'bn' ? 'ডিভাইস ইনভেন্টরি' : 'Device Inventory'}
           </h1>
           <p className="text-xs md:text-sm text-muted-foreground">
@@ -528,123 +571,83 @@ export default function DeviceInventoryPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={exportToCSV}>
-            <Download className="h-4 w-4 mr-1" />
-            <span className="hidden sm:inline">{language === 'bn' ? 'রপ্তানি' : 'Export'}</span>
-          </Button>
+          <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+            <Button variant="outline" size="sm" onClick={exportToCSV} className="hover-lift">
+              <Download className="h-4 w-4 mr-1 icon-hover-bounce" />
+              <span className="hidden sm:inline">{language === 'bn' ? 'রপ্তানি' : 'Export'}</span>
+            </Button>
+          </motion.div>
           {isAdmin && (
             <>
-              <Button variant="outline" size="sm" onClick={() => setBulkAssignDialog(true)}>
-                <Users className="h-4 w-4 mr-1" />
-                <span className="hidden sm:inline">{language === 'bn' ? 'ব্যাচ বরাদ্দ' : 'Bulk Assign'}</span>
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => openCategoryDialog()}>
-                <Tag className="h-4 w-4 mr-1" />
-                <span className="hidden sm:inline">{language === 'bn' ? 'ক্যাটাগরি' : 'Category'}</span>
-              </Button>
-              <Button size="sm" onClick={() => openDeviceDialog()}>
-                <Plus className="h-4 w-4 mr-1" />
-                {language === 'bn' ? 'ডিভাইস যোগ' : 'Add Device'}
-              </Button>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button variant="outline" size="sm" onClick={() => setBulkAssignDialog(true)} className="hover-lift">
+                  <Users className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">{language === 'bn' ? 'ব্যাচ বরাদ্দ' : 'Bulk Assign'}</span>
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button variant="outline" size="sm" onClick={() => openCategoryDialog()} className="hover-lift">
+                  <Tag className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">{language === 'bn' ? 'ক্যাটাগরি' : 'Category'}</span>
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button size="sm" onClick={() => openDeviceDialog()} className="hover-glow">
+                  <Plus className="h-4 w-4 mr-1" />
+                  {language === 'bn' ? 'ডিভাইস যোগ' : 'Add Device'}
+                </Button>
+              </motion.div>
             </>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-4">
-        <Card className="bg-card">
-          <CardContent className="p-3 md:p-4 text-center">
-            <div className="text-lg md:text-2xl font-bold text-foreground">{stats.total}</div>
-            <div className="text-[10px] md:text-xs text-muted-foreground">{language === 'bn' ? 'মোট ডিভাইস' : 'Total Devices'}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-green-500/10 border-green-500/20">
-          <CardContent className="p-3 md:p-4 text-center">
-            <div className="text-lg md:text-2xl font-bold text-green-600">{stats.available}</div>
-            <div className="text-[10px] md:text-xs text-muted-foreground">{language === 'bn' ? 'উপলব্ধ' : 'Available'}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-blue-500/10 border-blue-500/20">
-          <CardContent className="p-3 md:p-4 text-center">
-            <div className="text-lg md:text-2xl font-bold text-blue-600">{stats.assigned}</div>
-            <div className="text-[10px] md:text-xs text-muted-foreground">{language === 'bn' ? 'বরাদ্দকৃত' : 'Assigned'}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-yellow-500/10 border-yellow-500/20">
-          <CardContent className="p-3 md:p-4 text-center">
-            <div className="text-lg md:text-2xl font-bold text-yellow-600">{stats.maintenance}</div>
-            <div className="text-[10px] md:text-xs text-muted-foreground">{language === 'bn' ? 'রক্ষণাবেক্ষণে' : 'Maintenance'}</div>
-          </CardContent>
-        </Card>
-        <Card className="bg-orange-500/10 border-orange-500/20">
-          <CardContent className="p-3 md:p-4 text-center">
-            <div className="text-lg md:text-2xl font-bold text-orange-600">{stats.expiringWarranty}</div>
-            <div className="text-[10px] md:text-xs text-muted-foreground">{language === 'bn' ? 'ওয়ারেন্টি শেষ' : 'Warranty Expiring'}</div>
-          </CardContent>
-        </Card>
+        {[
+          { value: stats.total, label: language === 'bn' ? 'মোট ডিভাইস' : 'Total Devices', color: 'text-foreground', bg: 'bg-card' },
+          { value: stats.available, label: language === 'bn' ? 'উপলব্ধ' : 'Available', color: 'text-green-600', bg: 'bg-green-500/10 border-green-500/20' },
+          { value: stats.assigned, label: language === 'bn' ? 'বরাদ্দকৃত' : 'Assigned', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/20' },
+          { value: stats.maintenance, label: language === 'bn' ? 'রক্ষণাবেক্ষণে' : 'Maintenance', color: 'text-yellow-600', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+          { value: stats.expiringWarranty, label: language === 'bn' ? 'ওয়ারেন্টি শেষ' : 'Warranty Expiring', color: 'text-orange-600', bg: 'bg-orange-500/10 border-orange-500/20' },
+        ].map((stat, index) => (
+          <motion.div
+            key={stat.label}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
+            whileHover={{ y: -4, transition: { duration: 0.2 } }}
+          >
+            <Card className={`${stat.bg} hover-glow transition-all duration-200`}>
+              <CardContent className="p-3 md:p-4 text-center">
+                <motion.div 
+                  className={`text-lg md:text-2xl font-bold font-mono-number ${stat.color}`}
+                  initial={{ scale: 0.5 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 300, delay: index * 0.05 + 0.1 }}
+                >
+                  {stat.value}
+                </motion.div>
+                <div className="text-[10px] md:text-xs text-muted-foreground">{stat.label}</div>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </div>
 
       {/* Search and Filters */}
-      <Card className="bg-card">
+      <Card className="bg-card animate-fade-in-up stagger-2">
         <CardContent className="p-3 md:p-4">
-          <div className="flex flex-col sm:flex-row gap-2 md:gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={language === 'bn' ? 'ডিভাইস খুঁজুন...' : 'Search devices...'}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 text-sm"
-              />
-            </div>
-            <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm">
-                <SelectValue placeholder={language === 'bn' ? 'ক্যাটাগরি' : 'Category'} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{language === 'bn' ? 'সব ক্যাটাগরি' : 'All Categories'}</SelectItem>
-                {categories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-full sm:w-[140px] h-9 text-sm">
-                <SelectValue placeholder={language === 'bn' ? 'স্ট্যাটাস' : 'Status'} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{language === 'bn' ? 'সব স্ট্যাটাস' : 'All Status'}</SelectItem>
-                {STATUS_OPTIONS.map(status => (
-                  <SelectItem key={status.value} value={status.value}>
-                    {language === 'bn' ? status.labelBn : status.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterSupportUser} onValueChange={setFilterSupportUser}>
-              <SelectTrigger className="w-full sm:w-[150px] h-9 text-sm">
-                <SelectValue placeholder={language === 'bn' ? 'ব্যবহারকারী' : 'User'} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{language === 'bn' ? 'সব ব্যবহারকারী' : 'All Users'}</SelectItem>
-                {supportUsers.filter(u => u.is_active).map(user => (
-                  <SelectItem key={user.id} value={user.id}>{user.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={filterUnitLocation} onValueChange={setFilterUnitLocation}>
-              <SelectTrigger className="w-full sm:w-[140px] h-9 text-sm">
-                <SelectValue placeholder={language === 'bn' ? 'ইউনিট' : 'Unit'} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{language === 'bn' ? 'সব ইউনিট' : 'All Units'}</SelectItem>
-                {units.map(unit => (
-                  <SelectItem key={unit.id} value={unit.id}>{unit.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <DeviceFilters
+            filters={filters}
+            onFiltersChange={setFilters}
+            categories={categories}
+            units={units}
+            departments={departments}
+            supportUsers={supportUsers}
+            suppliers={suppliers}
+            statusOptions={STATUS_OPTIONS}
+          />
         </CardContent>
       </Card>
 
@@ -1349,6 +1352,6 @@ export default function DeviceInventoryPage() {
         category={detailsDialog.device ? categories.find(c => c.id === detailsDialog.device?.category_id) : null}
         supportUserMap={supportUserMap}
       />
-    </div>
+    </motion.div>
   );
 }

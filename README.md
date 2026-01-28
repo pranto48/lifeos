@@ -156,6 +156,37 @@ volumes:
 
 ## Self-Hosting Guide
 
+### Quick Start (Recommended)
+
+The easiest way to get started with self-hosting:
+
+```bash
+# Clone the repository
+git clone https://github.com/YOUR_USERNAME/lifeos.git
+cd lifeos
+
+# Make the setup script executable
+chmod +x docker/docker-setup.sh
+
+# Run the interactive setup
+./docker/docker-setup.sh
+```
+
+The setup script will:
+- ✅ Check Docker requirements
+- ✅ Auto-generate secure passwords
+- ✅ Create admin credentials
+- ✅ Start all services
+- ✅ Display access URLs
+
+### Default Admin Credentials
+
+After first startup, login with:
+- **Email**: `admin@lifeos.local`
+- **Password**: `LifeOS@2024!`
+
+⚠️ **IMPORTANT**: Change these credentials immediately after first login!
+
 ### Option 1: Docker with Internal Database (Fully Self-Hosted)
 
 For a completely self-contained installation with internal PostgreSQL database:
@@ -167,7 +198,7 @@ cd lifeos
 
 # Copy and configure environment
 cp docker/.env.example docker/.env
-# Edit docker/.env with your settings
+# Edit docker/.env with your settings (or use auto-generated values)
 
 # Start with internal database
 docker-compose -f docker-compose.selfhosted.yml up -d
@@ -179,9 +210,9 @@ docker-compose -f docker-compose.selfhosted.yml --profile with-admin up -d
 docker-compose -f docker-compose.selfhosted.yml --profile with-proxy up -d
 ```
 
-**Default Admin Credentials**:
-- Email: `admin@lifeos.local`
-- Password: `admin123` (⚠️ Change immediately!)
+**Access Points**:
+- LifeOS App: `http://localhost:8080`
+- pgAdmin (if enabled): `http://localhost:5050`
 
 **Included Services**:
 - PostgreSQL 16 (database)
@@ -223,17 +254,43 @@ VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
    - Vercel
    - Cloudflare Pages
 
-### Option 4: Node.js Server
+### Docker Management
 
-1. Build the application:
-   ```bash
-   npm run build
-   ```
+The interactive management script provides easy access to common operations:
 
-2. Serve with a Node.js server:
-   ```bash
-   npx serve -s dist -l 3000
-   ```
+```bash
+./docker/docker-setup.sh
+```
+
+**Available Commands**:
+| Command | Description |
+|---------|-------------|
+| Start services | Start core or all services |
+| Stop services | Stop all running services |
+| Restart services | Restart all services |
+| View logs | View logs for specific services |
+| Show status | Display service status |
+| Backup database | Create database backup |
+| Restore database | Restore from backup |
+| Reset admin password | Generate new admin password |
+| Update application | Pull and rebuild latest version |
+| Cleanup | Remove all containers and data |
+
+### Backup & Restore
+
+```bash
+# Create backup
+docker exec lifeos-db pg_dump -U lifeos lifeos > backup_$(date +%Y%m%d).sql
+
+# Restore database
+docker exec -i lifeos-db psql -U lifeos lifeos < backup_20240101.sql
+```
+
+Or use the management script:
+```bash
+./docker/docker-setup.sh
+# Select option 6 for backup, 7 for restore
+```
 
 ## Self-Hosted Database Schema
 
