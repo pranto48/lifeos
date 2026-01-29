@@ -272,6 +272,7 @@ export type Database = {
           serial_number: string | null
           status: string
           storage_info: string | null
+          supplier_id: string | null
           supplier_name: string | null
           support_user_id: string | null
           unit_id: string | null
@@ -302,6 +303,7 @@ export type Database = {
           serial_number?: string | null
           status?: string
           storage_info?: string | null
+          supplier_id?: string | null
           supplier_name?: string | null
           support_user_id?: string | null
           unit_id?: string | null
@@ -332,6 +334,7 @@ export type Database = {
           serial_number?: string | null
           status?: string
           storage_info?: string | null
+          supplier_id?: string | null
           supplier_name?: string | null
           support_user_id?: string | null
           unit_id?: string | null
@@ -347,6 +350,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "device_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "device_inventory_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "device_suppliers"
             referencedColumns: ["id"]
           },
           {
@@ -421,6 +431,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      device_suppliers: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          created_at: string
+          email: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       device_transfer_history: {
         Row: {

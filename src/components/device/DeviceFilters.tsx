@@ -21,6 +21,12 @@ interface FilterState {
   supplier: string;
 }
 
+interface DeviceSupplier {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
 interface DeviceFiltersProps {
   filters: FilterState;
   onFiltersChange: (filters: FilterState) => void;
@@ -28,7 +34,7 @@ interface DeviceFiltersProps {
   units: { id: string; name: string }[];
   departments: { id: string; name: string; unit_id: string }[];
   supportUsers: { id: string; name: string; department_id: string; is_active: boolean }[];
-  suppliers: string[];
+  suppliers: DeviceSupplier[];
   statusOptions: { value: string; label: string; labelBn: string }[];
 }
 
@@ -163,8 +169,8 @@ export function DeviceFilters({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{language === 'bn' ? 'সব সাপ্লায়ার' : 'All Suppliers'}</SelectItem>
-            {suppliers.map(supplier => (
-              <SelectItem key={supplier} value={supplier}>{supplier}</SelectItem>
+            {suppliers.filter(s => s.is_active).map(supplier => (
+              <SelectItem key={supplier.id} value={supplier.id}>{supplier.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
