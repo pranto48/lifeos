@@ -21,7 +21,7 @@ import { toast } from 'sonner';
 import { format, isBefore, addDays } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useDeviceInventory, DeviceInventory as DeviceType, DeviceServiceHistory, DeviceCategory } from '@/hooks/useDeviceInventory';
+import { useDeviceInventory, DeviceInventory as DeviceType, DeviceServiceHistory, DeviceCategory, DeviceSupplier } from '@/hooks/useDeviceInventory';
 import { useSupportData } from '@/hooks/useSupportData';
 import { DeviceQRCode } from '@/components/device/DeviceQRCode';
 import { BulkDeviceAssign } from '@/components/device/BulkDeviceAssign';
@@ -29,6 +29,7 @@ import { DeviceDetailsDialog } from '@/components/device/DeviceDetailsDialog';
 import { DeviceSpecsForm } from '@/components/device/DeviceSpecsForm';
 import { CascadingAssignment } from '@/components/device/CascadingAssignment';
 import { DeviceFilters } from '@/components/device/DeviceFilters';
+import { SupplierManager } from '@/components/device/SupplierManager';
 import { AnimatedIcon, LoadingSpinner, PulsingDot } from '@/components/ui/animated-icon';
 
 const STATUS_OPTIONS = [
@@ -59,12 +60,16 @@ export default function DeviceInventoryPage() {
   const { language } = useLanguage();
   const {
     categories,
+    suppliers,
     devices,
     loading,
     isAdmin,
     addCategory,
     updateCategory,
     deleteCategory,
+    addSupplier,
+    updateSupplier,
+    deleteSupplier,
     addDevice,
     updateDevice,
     deleteDevice,
@@ -87,14 +92,8 @@ export default function DeviceInventoryPage() {
     supplier: 'all',
   });
 
-  // Extract unique suppliers from devices
-  const suppliers = useMemo(() => {
-    const supplierSet = new Set<string>();
-    devices.forEach(d => {
-      if (d.supplier_name) supplierSet.add(d.supplier_name);
-    });
-    return Array.from(supplierSet).sort();
-  }, [devices]);
+  // Supplier management dialog
+  const [supplierDialog, setSupplierDialog] = useState(false);
 
   // Device dialog
   const [deviceDialog, setDeviceDialog] = useState<{ open: boolean; editing: DeviceType | null }>({ open: false, editing: null });
@@ -104,7 +103,7 @@ export default function DeviceInventoryPage() {
     serial_number: '',
     purchase_date: '',
     delivery_date: '',
-    supplier_name: '',
+    supplier_id: '',
     requisition_number: '',
     bod_number: '',
     warranty_date: '',
@@ -192,18 +191,19 @@ export default function DeviceInventoryPage() {
   const filteredDevices = useMemo(() => {
     return devices.filter(device => {
       const query = filters.searchQuery.toLowerCase();
+      const supplierName = suppliers.find(s => s.id === device.supplier_id)?.name?.toLowerCase() || device.supplier_name?.toLowerCase();
       const matchesSearch = !query ||
         device.device_name.toLowerCase().includes(query) ||
         device.device_number?.toLowerCase().includes(query) ||
         device.serial_number?.toLowerCase().includes(query) ||
-        device.supplier_name?.toLowerCase().includes(query) ||
+        (supplierName && supplierName.includes(query)) ||
         device.requisition_number?.toLowerCase().includes(query);
 
       if (!matchesSearch) return false;
       if (filters.category !== 'all' && device.category_id !== filters.category) return false;
       if (filters.status !== 'all' && device.status !== filters.status) return false;
       if (filters.unitLocation !== 'all' && device.unit_id !== filters.unitLocation) return false;
-      if (filters.supplier !== 'all' && device.supplier_name !== filters.supplier) return false;
+      if (filters.supplier !== 'all' && device.supplier_id !== filters.supplier) return false;
       
       // Cascading user filter
       if (filters.supportUser !== 'all') {
@@ -215,7 +215,7 @@ export default function DeviceInventoryPage() {
 
       return true;
     });
-  }, [devices, filters, supportUsers]);
+  }, [devices, filters, supportUsers, suppliers]);
 
   // Check warranty status
   const getWarrantyStatus = (warrantyDate: string | null) => {
@@ -242,7 +242,7 @@ export default function DeviceInventoryPage() {
         serial_number: device.serial_number || '',
         purchase_date: device.purchase_date || '',
         delivery_date: device.delivery_date || '',
-        supplier_name: device.supplier_name || '',
+        supplier_id: device.supplier_id || '',
         requisition_number: device.requisition_number || '',
         bod_number: device.bod_number || '',
         warranty_date: device.warranty_date || '',
@@ -270,7 +270,7 @@ export default function DeviceInventoryPage() {
         serial_number: '',
         purchase_date: '',
         delivery_date: '',
-        supplier_name: '',
+        supplier_id: '',
         requisition_number: '',
         bod_number: '',
         warranty_date: '',
@@ -306,7 +306,8 @@ export default function DeviceInventoryPage() {
       serial_number: deviceForm.serial_number || null,
       purchase_date: deviceForm.purchase_date || null,
       delivery_date: deviceForm.delivery_date || null,
-      supplier_name: deviceForm.supplier_name || null,
+      supplier_id: deviceForm.supplier_id || null,
+      supplier_name: suppliers.find(s => s.id === deviceForm.supplier_id)?.name || null,
       requisition_number: deviceForm.requisition_number || null,
       bod_number: deviceForm.bod_number || null,
       warranty_date: deviceForm.warranty_date || null,
@@ -583,6 +584,12 @@ export default function DeviceInventoryPage() {
                 <Button variant="outline" size="sm" onClick={() => setBulkAssignDialog(true)} className="hover-lift">
                   <Users className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">{language === 'bn' ? 'ব্যাচ বরাদ্দ' : 'Bulk Assign'}</span>
+                </Button>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+                <Button variant="outline" size="sm" onClick={() => setSupplierDialog(true)} className="hover-lift">
+                  <Truck className="h-4 w-4 mr-1" />
+                  <span className="hidden sm:inline">{language === 'bn' ? 'সাপ্লায়ার' : 'Supplier'}</span>
                 </Button>
               </motion.div>
               <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -921,14 +928,27 @@ export default function DeviceInventoryPage() {
               />
             </div>
 
-            {/* Supplier Name */}
+            {/* Supplier */}
             <div className="space-y-2">
-              <Label className="text-xs">{language === 'bn' ? 'সরবরাহকারীর নাম' : 'Supplier Name'}</Label>
-              <Input
-                value={deviceForm.supplier_name}
-                onChange={(e) => setDeviceForm({ ...deviceForm, supplier_name: e.target.value })}
-                className="text-sm"
-              />
+              <Label className="text-xs">{language === 'bn' ? 'সরবরাহকারী' : 'Supplier'}</Label>
+              <Select
+                value={deviceForm.supplier_id}
+                onValueChange={(value) => setDeviceForm({ ...deviceForm, supplier_id: value })}
+              >
+                <SelectTrigger className="text-sm">
+                  <SelectValue placeholder={language === 'bn' ? 'সরবরাহকারী নির্বাচন করুন' : 'Select supplier'} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">
+                    {language === 'bn' ? 'কোনো সরবরাহকারী নেই' : 'No supplier'}
+                  </SelectItem>
+                  {suppliers.filter(s => s.is_active).map((supplier) => (
+                    <SelectItem key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Requisition Number */}
@@ -1352,6 +1372,31 @@ export default function DeviceInventoryPage() {
         category={detailsDialog.device ? categories.find(c => c.id === detailsDialog.device?.category_id) : null}
         supportUserMap={supportUserMap}
       />
+
+      {/* Supplier Management Dialog */}
+      <Dialog open={supplierDialog} onOpenChange={setSupplierDialog}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Truck className="h-5 w-5 text-primary" />
+              {language === 'bn' ? 'সরবরাহকারী পরিচালনা' : 'Manage Suppliers'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'bn' 
+                ? 'সরবরাহকারী যোগ, সম্পাদনা এবং মুছে ফেলুন'
+                : 'Add, edit and delete device suppliers'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <SupplierManager
+            suppliers={suppliers}
+            isAdmin={isAdmin}
+            onAdd={addSupplier}
+            onUpdate={updateSupplier}
+            onDelete={deleteSupplier}
+          />
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

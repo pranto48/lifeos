@@ -11,12 +11,27 @@ export interface DeviceCategory {
   updated_at: string;
 }
 
+export interface DeviceSupplier {
+  id: string;
+  user_id: string;
+  name: string;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface DeviceInventory {
   id: string;
   user_id: string;
   support_user_id: string | null;
   category_id: string | null;
   unit_id: string | null;
+  supplier_id: string | null;
   device_name: string;
   device_number: string | null;
   serial_number: string | null;
@@ -60,6 +75,7 @@ export interface DeviceServiceHistory {
 export function useDeviceInventory() {
   const { user } = useAuth();
   const [categories, setCategories] = useState<DeviceCategory[]>([]);
+  const [suppliers, setSuppliers] = useState<DeviceSupplier[]>([]);
   const [devices, setDevices] = useState<DeviceInventory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -83,9 +99,13 @@ export function useDeviceInventory() {
     setLoading(true);
 
     // Load ALL data - RLS policies allow all authenticated users to view
-    const [categoriesRes, devicesRes] = await Promise.all([
+    const [categoriesRes, suppliersRes, devicesRes] = await Promise.all([
       supabase
         .from('device_categories')
+        .select('*')
+        .order('name'),
+      supabase
+        .from('device_suppliers')
         .select('*')
         .order('name'),
       supabase
@@ -96,6 +116,10 @@ export function useDeviceInventory() {
 
     if (!categoriesRes.error && categoriesRes.data) {
       setCategories(categoriesRes.data);
+    }
+
+    if (!suppliersRes.error && suppliersRes.data) {
+      setSuppliers(suppliersRes.data);
     }
 
     if (!devicesRes.error && devicesRes.data) {
@@ -271,14 +295,60 @@ export function useDeviceInventory() {
     return !error;
   };
 
+  // Supplier operations
+  const addSupplier = async (supplierData: Omit<DeviceSupplier, 'id' | 'user_id' | 'created_at' | 'updated_at'>) => {
+    if (!user) return null;
+    const { data, error } = await supabase
+      .from('device_suppliers')
+      .insert({ ...supplierData, user_id: user.id })
+      .select()
+      .single();
+
+    if (!error && data) {
+      setSuppliers(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      return data as DeviceSupplier;
+    }
+    return null;
+  };
+
+  const updateSupplier = async (id: string, updates: Partial<DeviceSupplier>) => {
+    const { error } = await supabase
+      .from('device_suppliers')
+      .update(updates)
+      .eq('id', id);
+
+    if (!error) {
+      setSuppliers(prev => prev.map(s => s.id === id ? { ...s, ...updates } : s));
+      return true;
+    }
+    return false;
+  };
+
+  const deleteSupplier = async (id: string) => {
+    const { error } = await supabase
+      .from('device_suppliers')
+      .delete()
+      .eq('id', id);
+
+    if (!error) {
+      setSuppliers(prev => prev.filter(s => s.id !== id));
+      return true;
+    }
+    return false;
+  };
+
   return {
     categories,
+    suppliers,
     devices,
     loading,
     isAdmin,
     addCategory,
     updateCategory,
     deleteCategory,
+    addSupplier,
+    updateSupplier,
+    deleteSupplier,
     addDevice,
     updateDevice,
     deleteDevice,
