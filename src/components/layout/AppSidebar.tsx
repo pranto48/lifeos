@@ -15,7 +15,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  HardDrive
+  HardDrive,
+  Landmark
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +47,7 @@ const navItems: NavItem[] = [
   { titleKey: 'nav.budget', url: '/budget', icon: Wallet, personalOnly: true },
   { titleKey: 'nav.salary', url: '/salary', icon: DollarSign, personalOnly: true },
   { titleKey: 'nav.investments', url: '/investments', icon: TrendingUp, personalOnly: true },
+  { titleKey: 'nav.loans', url: '/loans', icon: Landmark, personalOnly: true },
   { titleKey: 'nav.goals', url: '/goals', icon: Target },
   { titleKey: 'nav.projects', url: '/projects', icon: Lightbulb },
 ];

@@ -10,7 +10,11 @@ import {
   Wallet,
   Repeat,
   Users as UsersIcon,
-  HardDrive
+  HardDrive,
+  DollarSign,
+  TrendingUp,
+  Landmark,
+  Lightbulb
 } from 'lucide-react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -47,7 +51,11 @@ const allNavItems: NavItem[] = [
   { titleKey: 'nav.habits', url: '/habits', icon: Repeat, personalOnly: true },
   { titleKey: 'nav.family', url: '/family', icon: UsersIcon, personalOnly: true },
   { titleKey: 'nav.budget', url: '/budget', icon: Wallet, personalOnly: true },
+  { titleKey: 'nav.salary', url: '/salary', icon: DollarSign, personalOnly: true },
+  { titleKey: 'nav.investments', url: '/investments', icon: TrendingUp, personalOnly: true },
+  { titleKey: 'nav.loans', url: '/loans', icon: Landmark, personalOnly: true },
   { titleKey: 'nav.goals', url: '/goals', icon: Target },
+  { titleKey: 'nav.projects', url: '/projects', icon: Lightbulb },
   { titleKey: 'nav.settings', url: '/settings', icon: Settings },
 ];
 

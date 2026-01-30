@@ -978,6 +978,126 @@ export type Database = {
         }
         Relationships: []
       }
+      loan_payments: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          is_paid: boolean | null
+          loan_id: string
+          notes: string | null
+          paid_at: string | null
+          payment_date: string
+          transaction_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          is_paid?: boolean | null
+          loan_id: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_date: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          is_paid?: boolean | null
+          loan_id?: string
+          notes?: string | null
+          paid_at?: string | null
+          payment_date?: string
+          transaction_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_payments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "loan_payments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loans: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          interest_rate: number | null
+          lender_name: string
+          loan_type: string
+          monthly_payment: number | null
+          next_payment_date: string | null
+          notes: string | null
+          payment_frequency: string
+          principal_amount: number
+          remaining_amount: number
+          reminder_days: number | null
+          start_date: string
+          status: string
+          total_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          interest_rate?: number | null
+          lender_name: string
+          loan_type?: string
+          monthly_payment?: number | null
+          next_payment_date?: string | null
+          notes?: string | null
+          payment_frequency?: string
+          principal_amount: number
+          remaining_amount: number
+          reminder_days?: number | null
+          start_date: string
+          status?: string
+          total_amount: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          interest_rate?: number | null
+          lender_name?: string
+          loan_type?: string
+          monthly_payment?: number | null
+          next_payment_date?: string | null
+          notes?: string | null
+          payment_frequency?: string
+          principal_amount?: number
+          remaining_amount?: number
+          reminder_days?: number | null
+          start_date?: string
+          status?: string
+          total_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       notes: {
         Row: {
           content: string | null

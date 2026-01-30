@@ -26,6 +26,7 @@ const Family = lazy(() => import("./pages/Family"));
 const Budget = lazy(() => import("./pages/Budget"));
 const Salary = lazy(() => import("./pages/Salary"));
 const Investments = lazy(() => import("./pages/Investments"));
+const Loans = lazy(() => import("./pages/Loans"));
 const Goals = lazy(() => import("./pages/Goals"));
 const Projects = lazy(() => import("./pages/Projects"));
 const Calendar = lazy(() => import("./pages/Calendar"));
@@ -82,6 +83,7 @@ const AppContent = () => {
             <Route path="/budget" element={<AppLayout><PersonalPageGuard><Budget /></PersonalPageGuard></AppLayout>} />
             <Route path="/salary" element={<AppLayout><PersonalPageGuard><Salary /></PersonalPageGuard></AppLayout>} />
             <Route path="/investments" element={<AppLayout><PersonalPageGuard><Investments /></PersonalPageGuard></AppLayout>} />
+            <Route path="/loans" element={<AppLayout><PersonalPageGuard><Loans /></PersonalPageGuard></AppLayout>} />
             <Route path="/goals" element={<AppLayout><Goals /></AppLayout>} />
             <Route path="/projects" element={<AppLayout><Projects /></AppLayout>} />
             <Route path="/calendar" element={<AppLayout><Calendar /></AppLayout>} />
