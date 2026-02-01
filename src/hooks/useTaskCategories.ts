@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDashboardMode } from '@/contexts/DashboardModeContext';
 
 export interface TaskCategory {
   id: string;
@@ -9,12 +10,14 @@ export interface TaskCategory {
   icon: string | null;
   user_id: string;
   is_admin_category?: boolean;
+  category_type: 'office' | 'personal';
   created_at: string;
   updated_at: string;
 }
 
 export function useTaskCategories() {
   const { user } = useAuth();
+  const { mode } = useDashboardMode();
   const [categories, setCategories] = useState<TaskCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -24,7 +27,7 @@ export function useTaskCategories() {
       loadCategories();
       checkAdminStatus();
     }
-  }, [user]);
+  }, [user, mode]);
 
   const checkAdminStatus = async () => {
     if (!user) return;
@@ -41,14 +44,15 @@ export function useTaskCategories() {
     if (!user) return;
     
     setLoading(true);
-    // Load ALL categories - RLS policies allow all authenticated users to view all categories
+    // Load categories filtered by current mode
     const { data, error } = await supabase
       .from('task_categories')
       .select('*')
+      .eq('category_type', mode)
       .order('name', { ascending: true });
 
     if (!error && data) {
-      setCategories(data);
+      setCategories(data as TaskCategory[]);
     }
     setLoading(false);
   };
@@ -64,12 +68,13 @@ export function useTaskCategories() {
         color,
         icon: icon || 'Folder',
         is_admin_category: isAdmin,
+        category_type: mode,
       })
       .select()
       .single();
 
     if (!error && data) {
-      setCategories(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+      setCategories(prev => [...prev, data as TaskCategory].sort((a, b) => a.name.localeCompare(b.name)));
       return data;
     }
     return null;
