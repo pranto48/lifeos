@@ -17,3 +17,18 @@ verify_jwt = false
 
 [functions.microsoft-calendar-sync]
 verify_jwt = false
+
+[functions.send-email-notification]
+verify_jwt = false
+
+[functions.send-loan-reminders]
+verify_jwt = false
+
+[functions.send-smtp-email]
+verify_jwt = false
+
+[functions.save-calendar-credentials]
+verify_jwt = false
+
+[functions.send-task-assignment-notification]
+verify_jwt = false

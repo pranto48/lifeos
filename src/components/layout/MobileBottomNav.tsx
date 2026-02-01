@@ -30,6 +30,7 @@ interface NavItem {
   url: string;
   icon: any;
   personalOnly?: boolean;
+  officeOnly?: boolean;
 }
 
 // Primary nav items for bottom bar (max 5)
@@ -46,8 +47,8 @@ const allNavItems: NavItem[] = [
   { titleKey: 'nav.calendar', url: '/calendar', icon: Calendar },
   { titleKey: 'nav.tasks', url: '/tasks', icon: CheckSquare },
   { titleKey: 'nav.notes', url: '/notes', icon: FileText },
-  { titleKey: 'nav.supportUsers', url: '/support-users', icon: HeadsetIcon },
-  { titleKey: 'nav.deviceInventory', url: '/device-inventory', icon: HardDrive },
+  { titleKey: 'nav.supportUsers', url: '/support-users', icon: HeadsetIcon, officeOnly: true },
+  { titleKey: 'nav.deviceInventory', url: '/device-inventory', icon: HardDrive, officeOnly: true },
   { titleKey: 'nav.habits', url: '/habits', icon: Repeat, personalOnly: true },
   { titleKey: 'nav.family', url: '/family', icon: UsersIcon, personalOnly: true },
   { titleKey: 'nav.budget', url: '/budget', icon: Wallet, personalOnly: true },
@@ -73,6 +74,9 @@ export function MobileBottomNav() {
 
   const filteredAllNavItems = allNavItems.filter(item => {
     if (mode === 'office' && item.personalOnly) {
+      return false;
+    }
+    if (mode === 'personal' && item.officeOnly) {
       return false;
     }
     return true;

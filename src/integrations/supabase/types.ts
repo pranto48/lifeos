@@ -1667,6 +1667,7 @@ export type Database = {
       }
       task_categories: {
         Row: {
+          category_type: string
           color: string
           created_at: string
           icon: string | null
@@ -1677,6 +1678,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          category_type?: string
           color?: string
           created_at?: string
           icon?: string | null
@@ -1687,6 +1689,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          category_type?: string
           color?: string
           created_at?: string
           icon?: string | null
