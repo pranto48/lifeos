@@ -258,12 +258,7 @@ export default function Auth() {
 
   // Handle MFA verification
   const handleMfaVerification = async () => {
-    if (!mfaFactorId || mfaCode.length !== 6) {
-      toast({
-        title: 'Invalid Code',
-        description: 'Please enter a valid 6-digit code.',
-        variant: 'destructive',
-      });
+    if (!mfaFactorId || mfaCode.length !== 6 || mfaLoading) {
       return;
     }
 
@@ -321,6 +316,13 @@ export default function Auth() {
       setMfaLoading(false);
     }
   };
+
+  // Auto-verify when 6 digits are entered
+  useEffect(() => {
+    if (mfaCode.length === 6 && showMfaVerification && mfaFactorId && !mfaLoading) {
+      handleMfaVerification();
+    }
+  }, [mfaCode, showMfaVerification, mfaFactorId, mfaLoading]);
 
   const handleCancelMfa = async () => {
     // Sign out since we're cancelling MFA

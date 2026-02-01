@@ -88,12 +88,7 @@ export function MfaGuard({ children }: MfaGuardProps) {
   };
 
   const handleMfaVerification = async () => {
-    if (!mfaFactorId || mfaCode.length !== 6) {
-      toast({
-        title: 'Invalid Code',
-        description: 'Please enter a valid 6-digit code.',
-        variant: 'destructive',
-      });
+    if (!mfaFactorId || mfaCode.length !== 6 || mfaLoading) {
       return;
     }
 
@@ -149,6 +144,13 @@ export function MfaGuard({ children }: MfaGuardProps) {
       setMfaLoading(false);
     }
   };
+
+  // Auto-verify when 6 digits are entered
+  useEffect(() => {
+    if (mfaCode.length === 6 && requiresMfa && mfaFactorId && !mfaLoading) {
+      handleMfaVerification();
+    }
+  }, [mfaCode, requiresMfa, mfaFactorId, mfaLoading]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
