@@ -8,7 +8,8 @@ COPY package*.json ./
 COPY bun.lockb ./
 
 # Install dependencies
-RUN npm ci
+# Ensure devDependencies are installed (vite is a devDependency)
+RUN npm ci --include=dev
 
 # Copy source code
 COPY . .
