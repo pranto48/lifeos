@@ -694,7 +694,14 @@ export default function DeviceInventoryPage() {
                       <TableRow key={device.id}>
                         <TableCell>
                           <div className="flex items-center gap-2">
-                            <DeviceQRCode device={device} />
+                            <DeviceQRCode 
+                              device={device} 
+                              supportUserName={supportUser?.name}
+                              supportUserIp={supportUsers.find(u => u.id === device.support_user_id)?.ip_address || undefined}
+                              departmentName={supportUser?.department_name}
+                              unitName={supportUser?.unit_name}
+                              categoryName={category?.name}
+                            />
                             <div>
                               <div className="font-medium text-xs md:text-sm">{device.device_name}</div>
                               <div className="text-[10px] md:text-xs text-muted-foreground">
