@@ -20,6 +20,7 @@ interface DeviceQRCodeProps {
     storage_info?: string | null;
     monitor_info?: string | null;
     supplier_name?: string | null;
+    // Optional nested objects (may not always be available)
     support_user?: {
       name: string;
       ip_address?: string | null;
@@ -34,11 +35,31 @@ interface DeviceQRCodeProps {
       name: string;
     } | null;
   };
+  // Allow passing related data separately for when device doesn't have nested objects
+  supportUserName?: string;
+  supportUserIp?: string;
+  departmentName?: string;
+  unitName?: string;
+  categoryName?: string;
 }
 
-export function DeviceQRCode({ device }: DeviceQRCodeProps) {
+export function DeviceQRCode({ 
+  device, 
+  supportUserName,
+  supportUserIp,
+  departmentName,
+  unitName,
+  categoryName 
+}: DeviceQRCodeProps) {
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
+
+  // Helper to get values from nested objects or passed props
+  const getUserName = () => device.support_user?.name || supportUserName || null;
+  const getUserIp = () => device.support_user?.ip_address || supportUserIp || null;
+  const getDeptName = () => device.support_user?.department?.name || departmentName || null;
+  const getUnitName = () => device.support_user?.department?.unit?.name || unitName || null;
+  const getCategoryName = () => device.category?.name || categoryName || null;
 
   // Build QR data based on configured fields
   const qrData = useMemo(() => {
@@ -59,16 +80,20 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
           if (device.serial_number) data.serial = device.serial_number;
           break;
         case 'support_user_name':
-          if (device.support_user?.name) data.user = device.support_user.name;
+          const userName = getUserName();
+          if (userName) data.user = userName;
           break;
         case 'unit_name':
-          if (device.support_user?.department?.unit?.name) data.unit = device.support_user.department.unit.name;
+          const uName = getUnitName();
+          if (uName) data.unit = uName;
           break;
         case 'department_name':
-          if (device.support_user?.department?.name) data.dept = device.support_user.department.name;
+          const dName = getDeptName();
+          if (dName) data.dept = dName;
           break;
         case 'ip_address':
-          if (device.support_user?.ip_address) data.ip = device.support_user.ip_address;
+          const ip = getUserIp();
+          if (ip) data.ip = ip;
           break;
         case 'warranty_date':
           if (device.warranty_date) data.warranty = format(new Date(device.warranty_date), 'dd/MM/yyyy');
@@ -77,7 +102,8 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
           if (device.purchase_date) data.purchased = format(new Date(device.purchase_date), 'dd/MM/yyyy');
           break;
         case 'category_name':
-          if (device.category?.name) data.category = device.category.name;
+          const catName = getCategoryName();
+          if (catName) data.category = catName;
           break;
         case 'status':
           if (device.status) data.status = device.status;
@@ -101,7 +127,7 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
     data.id = device.id;
     
     return JSON.stringify(data);
-  }, [device, open]); // Re-compute when dialog opens
+  }, [device, supportUserName, supportUserIp, departmentName, unitName, categoryName, open]);
 
   // Build display info for the dialog
   const displayInfo = useMemo(() => {
@@ -124,16 +150,16 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
           value = device.serial_number || null;
           break;
         case 'support_user_name':
-          value = device.support_user?.name || null;
+          value = getUserName();
           break;
         case 'unit_name':
-          value = device.support_user?.department?.unit?.name || null;
+          value = getUnitName();
           break;
         case 'department_name':
-          value = device.support_user?.department?.name || null;
+          value = getDeptName();
           break;
         case 'ip_address':
-          value = device.support_user?.ip_address || null;
+          value = getUserIp();
           break;
         case 'warranty_date':
           value = device.warranty_date ? format(new Date(device.warranty_date), 'dd MMM yyyy') : null;
@@ -142,7 +168,7 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
           value = device.purchase_date ? format(new Date(device.purchase_date), 'dd MMM yyyy') : null;
           break;
         case 'category_name':
-          value = device.category?.name || null;
+          value = getCategoryName();
           break;
         case 'status':
           value = device.status || null;
@@ -167,7 +193,7 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
     });
 
     return info;
-  }, [device, language, open]);
+  }, [device, language, supportUserName, supportUserIp, departmentName, unitName, categoryName, open]);
 
   const handleDownload = () => {
     const svg = document.getElementById(`qr-${device.id}`);
