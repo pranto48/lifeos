@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { QrCode, Download, Printer } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getQRCodeFieldsConfig, QRCodeFieldsEditor } from './QRCodeFieldsEditor';
+import { format } from 'date-fns';
 
 interface DeviceQRCodeProps {
   device: {
@@ -11,6 +13,26 @@ interface DeviceQRCodeProps {
     device_name: string;
     device_number?: string | null;
     serial_number?: string | null;
+    warranty_date?: string | null;
+    purchase_date?: string | null;
+    status?: string;
+    ram_info?: string | null;
+    storage_info?: string | null;
+    monitor_info?: string | null;
+    supplier_name?: string | null;
+    support_user?: {
+      name: string;
+      ip_address?: string | null;
+      department?: {
+        name: string;
+        unit?: {
+          name: string;
+        };
+      };
+    } | null;
+    category?: {
+      name: string;
+    } | null;
   };
 }
 
@@ -18,13 +40,134 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
 
-  // Generate QR data - includes device ID, number, and serial for identification
-  const qrData = JSON.stringify({
-    id: device.id,
-    device_number: device.device_number || '',
-    serial_number: device.serial_number || '',
-    name: device.device_name,
-  });
+  // Build QR data based on configured fields
+  const qrData = useMemo(() => {
+    const fields = getQRCodeFieldsConfig();
+    const enabledFields = fields.filter(f => f.enabled);
+    
+    const data: Record<string, string> = {};
+    
+    enabledFields.forEach(field => {
+      switch (field.key) {
+        case 'device_name':
+          data.name = device.device_name;
+          break;
+        case 'device_number':
+          if (device.device_number) data.device_no = device.device_number;
+          break;
+        case 'serial_number':
+          if (device.serial_number) data.serial = device.serial_number;
+          break;
+        case 'support_user_name':
+          if (device.support_user?.name) data.user = device.support_user.name;
+          break;
+        case 'unit_name':
+          if (device.support_user?.department?.unit?.name) data.unit = device.support_user.department.unit.name;
+          break;
+        case 'department_name':
+          if (device.support_user?.department?.name) data.dept = device.support_user.department.name;
+          break;
+        case 'ip_address':
+          if (device.support_user?.ip_address) data.ip = device.support_user.ip_address;
+          break;
+        case 'warranty_date':
+          if (device.warranty_date) data.warranty = format(new Date(device.warranty_date), 'dd/MM/yyyy');
+          break;
+        case 'purchase_date':
+          if (device.purchase_date) data.purchased = format(new Date(device.purchase_date), 'dd/MM/yyyy');
+          break;
+        case 'category_name':
+          if (device.category?.name) data.category = device.category.name;
+          break;
+        case 'status':
+          if (device.status) data.status = device.status;
+          break;
+        case 'supplier_name':
+          if (device.supplier_name) data.supplier = device.supplier_name;
+          break;
+        case 'ram_info':
+          if (device.ram_info) data.ram = device.ram_info;
+          break;
+        case 'storage_info':
+          if (device.storage_info) data.storage = device.storage_info;
+          break;
+        case 'monitor_info':
+          if (device.monitor_info) data.monitor = device.monitor_info;
+          break;
+      }
+    });
+
+    // Always include ID for identification
+    data.id = device.id;
+    
+    return JSON.stringify(data);
+  }, [device, open]); // Re-compute when dialog opens
+
+  // Build display info for the dialog
+  const displayInfo = useMemo(() => {
+    const fields = getQRCodeFieldsConfig();
+    const enabledFields = fields.filter(f => f.enabled);
+    const info: { label: string; value: string }[] = [];
+
+    enabledFields.forEach(field => {
+      const label = language === 'bn' ? field.labelBn : field.label;
+      let value: string | null = null;
+
+      switch (field.key) {
+        case 'device_name':
+          value = device.device_name;
+          break;
+        case 'device_number':
+          value = device.device_number || null;
+          break;
+        case 'serial_number':
+          value = device.serial_number || null;
+          break;
+        case 'support_user_name':
+          value = device.support_user?.name || null;
+          break;
+        case 'unit_name':
+          value = device.support_user?.department?.unit?.name || null;
+          break;
+        case 'department_name':
+          value = device.support_user?.department?.name || null;
+          break;
+        case 'ip_address':
+          value = device.support_user?.ip_address || null;
+          break;
+        case 'warranty_date':
+          value = device.warranty_date ? format(new Date(device.warranty_date), 'dd MMM yyyy') : null;
+          break;
+        case 'purchase_date':
+          value = device.purchase_date ? format(new Date(device.purchase_date), 'dd MMM yyyy') : null;
+          break;
+        case 'category_name':
+          value = device.category?.name || null;
+          break;
+        case 'status':
+          value = device.status || null;
+          break;
+        case 'supplier_name':
+          value = device.supplier_name || null;
+          break;
+        case 'ram_info':
+          value = device.ram_info || null;
+          break;
+        case 'storage_info':
+          value = device.storage_info || null;
+          break;
+        case 'monitor_info':
+          value = device.monitor_info || null;
+          break;
+      }
+
+      if (value) {
+        info.push({ label, value });
+      }
+    });
+
+    return info;
+  }, [device, language, open]);
 
   const handleDownload = () => {
     const svg = document.getElementById(`qr-${device.id}`);
@@ -57,6 +200,9 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
     if (!svg) return;
 
     const svgData = new XMLSerializer().serializeToString(svg);
+    const infoHtml = displayInfo
+      .map(item => `<p><strong>${item.label}:</strong> ${item.value}</p>`)
+      .join('');
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -80,14 +226,14 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
             h2 { margin-bottom: 10px; font-size: 18px; }
             p { margin: 5px 0; font-size: 14px; color: #666; }
             .qr { margin: 20px 0; }
+            .info { text-align: left; max-width: 300px; margin: 0 auto; }
           </style>
         </head>
         <body>
           <div class="container">
             <h2>${device.device_name}</h2>
-            ${device.device_number ? `<p><strong>Device #:</strong> ${device.device_number}</p>` : ''}
-            ${device.serial_number ? `<p><strong>Serial:</strong> ${device.serial_number}</p>` : ''}
             <div class="qr">${svgData}</div>
+            <div class="info">${infoHtml}</div>
           </div>
           <script>
             window.onload = function() { window.print(); window.close(); }
@@ -113,9 +259,12 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <QrCode className="h-5 w-5" />
-              {language === 'bn' ? 'ডিভাইস QR কোড' : 'Device QR Code'}
+            <DialogTitle className="flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <QrCode className="h-5 w-5" />
+                {language === 'bn' ? 'ডিভাইস QR কোড' : 'Device QR Code'}
+              </span>
+              <QRCodeFieldsEditor />
             </DialogTitle>
           </DialogHeader>
 
@@ -130,16 +279,16 @@ export function DeviceQRCode({ device }: DeviceQRCodeProps) {
               />
             </div>
 
-            <div className="text-center space-y-1">
+            <div className="text-center space-y-1 w-full">
               <p className="font-medium text-sm">{device.device_name}</p>
-              {device.device_number && (
-                <p className="text-xs text-muted-foreground">
-                  {language === 'bn' ? 'ডিভাইস নম্বর' : 'Device #'}: {device.device_number}
+              {displayInfo.slice(1, 4).map((item, idx) => (
+                <p key={idx} className="text-xs text-muted-foreground">
+                  {item.label}: {item.value}
                 </p>
-              )}
-              {device.serial_number && (
+              ))}
+              {displayInfo.length > 4 && (
                 <p className="text-xs text-muted-foreground">
-                  {language === 'bn' ? 'সিরিয়াল' : 'Serial'}: {device.serial_number}
+                  +{displayInfo.length - 4} {language === 'bn' ? 'আরও ফিল্ড' : 'more fields'}
                 </p>
               )}
             </div>
