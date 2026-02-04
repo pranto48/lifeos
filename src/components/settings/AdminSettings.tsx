@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { SmtpSettings } from './SmtpSettings';
+import { ResendSettings } from './ResendSettings';
 
 interface UserRole {
   id: string;
@@ -1002,7 +1003,11 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
             </TabsContent>
 
             {/* Email/SMTP Settings */}
-            <TabsContent value="email" className="space-y-4 mt-4">
+            <TabsContent value="email" className="space-y-6 mt-4">
+              {/* Resend API Settings */}
+              <ResendSettings />
+              
+              {/* SMTP Settings */}
               <SmtpSettings />
             </TabsContent>
 
