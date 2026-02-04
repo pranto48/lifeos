@@ -939,14 +939,14 @@ export default function DeviceInventoryPage() {
             <div className="space-y-2">
               <Label className="text-xs">{language === 'bn' ? 'সরবরাহকারী' : 'Supplier'}</Label>
               <Select
-                value={deviceForm.supplier_id}
-                onValueChange={(value) => setDeviceForm({ ...deviceForm, supplier_id: value })}
+                value={deviceForm.supplier_id || "none"}
+                onValueChange={(value) => setDeviceForm({ ...deviceForm, supplier_id: value === "none" ? "" : value })}
               >
                 <SelectTrigger className="text-sm">
                   <SelectValue placeholder={language === 'bn' ? 'সরবরাহকারী নির্বাচন করুন' : 'Select supplier'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">
+                  <SelectItem value="none">
                     {language === 'bn' ? 'কোনো সরবরাহকারী নেই' : 'No supplier'}
                   </SelectItem>
                   {suppliers.filter(s => s.is_active).map((supplier) => (
