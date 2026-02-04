@@ -14,12 +14,37 @@ interface EmailPayload {
   text?: string;
 }
 
-async function sendWithResend(payload: EmailPayload): Promise<{ success: boolean; error?: string }> {
-  const resendApiKey = Deno.env.get("RESEND_API_KEY");
+async function getResendApiKey(supabase: any): Promise<string | null> {
+  // First try environment variable
+  const envKey = Deno.env.get("RESEND_API_KEY");
+  if (envKey) {
+    return envKey;
+  }
+
+  // Then try app_secrets table (admin-configured key)
+  try {
+    const { data } = await supabase
+      .from("app_secrets")
+      .select("value")
+      .eq("id", "resend_api_key")
+      .maybeSingle();
+
+    if (data?.value) {
+      return data.value;
+    }
+  } catch (error) {
+    console.error("Error fetching Resend API key from app_secrets:", error);
+  }
+
+  return null;
+}
+
+async function sendWithResend(payload: EmailPayload, supabase: any): Promise<{ success: boolean; error?: string }> {
+  const resendApiKey = await getResendApiKey(supabase);
   
   if (!resendApiKey) {
-    console.error("RESEND_API_KEY not configured");
-    return { success: false, error: "Email service not configured" };
+    console.error("RESEND_API_KEY not configured (neither in env nor in app_secrets)");
+    return { success: false, error: "Email service not configured. Please configure Resend API key in Admin Settings." };
   }
 
   try {
@@ -278,7 +303,7 @@ serve(async (req) => {
       subject,
       html: emailContent.html,
       text: emailContent.text,
-    });
+    }, supabase);
 
     console.log(`Email notification sent (${type}):`, { to, subject, success: result.success });
 
