@@ -18,6 +18,7 @@ import { GoalProgressCards } from '@/components/dashboard/GoalProgressCards';
 import { TasksBreakdownChart } from '@/components/dashboard/TasksBreakdownChart';
 import { TaskCategoriesChart } from '@/components/dashboard/TaskCategoriesChart';
 import { DeviceCategoryChart } from '@/components/dashboard/DeviceCategoryChart';
+import { DeviceInventoryReport } from '@/components/dashboard/DeviceInventoryReport';
 import { DashboardCustomizer } from '@/components/dashboard/DashboardCustomizer';
 import { useDashboardLayout } from '@/hooks/useDashboardLayout';
 import GoalProgressChart from '@/components/goals/GoalProgressChart';
@@ -159,6 +160,8 @@ export default function Dashboard() {
         return <TaskCategoriesChart key={widgetId} />;
       case 'device-categories':
         return <DeviceCategoryChart key={widgetId} />;
+      case 'device-report':
+        return <DeviceInventoryReport key={widgetId} />;
       case 'expense-breakdown':
         return <ExpenseBreakdownChart key={widgetId} />;
       case 'goal-cards':
@@ -275,7 +278,7 @@ export default function Dashboard() {
   );
 
   const fullWidthWidgets = enabledWidgets.filter(w => 
-    ['goal-chart', 'goal-progress'].includes(w.id)
+    ['goal-chart', 'goal-progress', 'device-report'].includes(w.id)
   );
 
   return (

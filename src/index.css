@@ -227,6 +227,12 @@
   .text-balance {
     text-wrap: balance;
   }
+
+  /* Monospace number styling */
+  .font-mono-number {
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
 }
 
 /* Animations */
