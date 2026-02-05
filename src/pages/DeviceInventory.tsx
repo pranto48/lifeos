@@ -300,9 +300,25 @@ export default function DeviceInventoryPage() {
       return;
     }
 
+     // Validate device number uniqueness if provided
+     if (deviceForm.device_number.trim()) {
+       const existingDevice = devices.find(
+         d => d.device_number?.toLowerCase() === deviceForm.device_number.trim().toLowerCase() &&
+              d.id !== deviceDialog.editing?.id
+       );
+       if (existingDevice) {
+         toast.error(
+           language === 'bn' 
+             ? `এই ডিভাইস নম্বর (${deviceForm.device_number}) ইতিমধ্যে ব্যবহৃত হয়েছে "${existingDevice.device_name}" এ` 
+             : `Device number "${deviceForm.device_number}" is already used by "${existingDevice.device_name}"`
+         );
+         return;
+       }
+     }
+ 
     const data = {
       device_name: deviceForm.device_name.trim(),
-      device_number: deviceForm.device_number || null,
+       device_number: deviceForm.device_number.trim() || null,
       serial_number: deviceForm.serial_number || null,
       purchase_date: deviceForm.purchase_date || null,
       delivery_date: deviceForm.delivery_date || null,
@@ -836,13 +852,33 @@ export default function DeviceInventoryPage() {
 
             {/* Device Number */}
             <div className="space-y-2">
-              <Label className="text-xs">{language === 'bn' ? 'ডিভাইস নম্বর' : 'Device Number'}</Label>
+               <Label className="text-xs">
+                 {language === 'bn' ? 'ডিভাইস নম্বর' : 'Device Number'}
+                 <span className="text-muted-foreground ml-1">
+                   ({language === 'bn' ? 'QR লিঙ্কের জন্য আবশ্যক' : 'Required for QR link'})
+                 </span>
+               </Label>
               <Input
                 value={deviceForm.device_number}
-                onChange={(e) => setDeviceForm({ ...deviceForm, device_number: e.target.value })}
+                 onChange={(e) => setDeviceForm({ ...deviceForm, device_number: e.target.value.toUpperCase() })}
                 placeholder={language === 'bn' ? 'DEV-001' : 'DEV-001'}
-                className="text-sm"
+                 className={`text-sm font-mono ${
+                   deviceForm.device_number.trim() && 
+                   devices.some(d => 
+                     d.device_number?.toLowerCase() === deviceForm.device_number.trim().toLowerCase() &&
+                     d.id !== deviceDialog.editing?.id
+                   ) ? 'border-destructive focus-visible:ring-destructive' : ''
+                 }`}
               />
+               {deviceForm.device_number.trim() && 
+                devices.some(d => 
+                  d.device_number?.toLowerCase() === deviceForm.device_number.trim().toLowerCase() &&
+                  d.id !== deviceDialog.editing?.id
+                ) && (
+                 <p className="text-xs text-destructive">
+                   {language === 'bn' ? 'এই নম্বর ইতিমধ্যে ব্যবহৃত' : 'This number is already in use'}
+                 </p>
+               )}
             </div>
             <div className="space-y-2">
               <Label className="text-xs">{language === 'bn' ? 'সিরিয়াল নম্বর' : 'Serial Number'}</Label>
