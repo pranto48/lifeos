@@ -2,7 +2,7 @@ import { useState, useMemo, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { QrCode, Download, Printer } from 'lucide-react';
+ import { QrCode, Download, Printer, ExternalLink } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getQRCodeFieldsConfig, QRCodeFieldsEditor } from './QRCodeFieldsEditor';
 import { format } from 'date-fns';
@@ -59,6 +59,13 @@ export function DeviceQRCode({
     setSettingsVersion(v => v + 1);
   }, []);
 
+   // Build device profile URL
+   const getDeviceProfileUrl = () => {
+     if (!device.device_number) return null;
+     const baseUrl = window.location.origin;
+     return `${baseUrl}/device/${encodeURIComponent(device.device_number)}`;
+   };
+ 
   // Helper to get values from nested objects or passed props
   const getUserName = () => device.support_user?.name || supportUserName || null;
   const getUserIp = () => device.support_user?.ip_address || supportUserIp || null;
@@ -66,8 +73,15 @@ export function DeviceQRCode({
   const getUnitName = () => device.support_user?.department?.unit?.name || unitName || null;
   const getCategoryName = () => device.category?.name || categoryName || null;
 
-  // Build QR data based on configured fields
+   // Build QR data - now uses URL instead of JSON
   const qrData = useMemo(() => {
+     // If device has a device_number, use URL format
+     const profileUrl = getDeviceProfileUrl();
+     if (profileUrl) {
+       return profileUrl;
+     }
+ 
+     // Fallback to JSON format if no device number
     const fields = getQRCodeFieldsConfig();
     const enabledFields = fields.filter(f => f.enabled);
     
@@ -134,6 +148,8 @@ export function DeviceQRCode({
     return JSON.stringify(data);
   }, [device, supportUserName, supportUserIp, departmentName, unitName, categoryName, open, settingsVersion]);
 
+   const profileUrl = getDeviceProfileUrl();
+ 
   // Build display info for the dialog
   const displayInfo = useMemo(() => {
     const fields = getQRCodeFieldsConfig();
@@ -311,6 +327,17 @@ export function DeviceQRCode({
             </div>
 
             <div className="text-center space-y-1 w-full">
+               {profileUrl && (
+                 <a 
+                   href={profileUrl} 
+                   target="_blank" 
+                   rel="noopener noreferrer"
+                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline mb-2"
+                 >
+                   <ExternalLink className="h-3 w-3" />
+                   {language === 'bn' ? 'প্রোফাইল দেখুন' : 'View Profile'}
+                 </a>
+               )}
               <p className="font-medium text-sm">{device.device_name}</p>
               {displayInfo.slice(1, 4).map((item, idx) => (
                 <p key={idx} className="text-xs text-muted-foreground">
@@ -325,6 +352,16 @@ export function DeviceQRCode({
             </div>
 
             <div className="flex gap-2">
+               {profileUrl && (
+                 <Button 
+                   variant="outline" 
+                   size="sm" 
+                   onClick={() => window.open(profileUrl, '_blank')}
+                 >
+                   <ExternalLink className="h-4 w-4 mr-1" />
+                   {language === 'bn' ? 'খুলুন' : 'Open'}
+                 </Button>
+               )}
               <Button variant="outline" size="sm" onClick={handleDownload}>
                 <Download className="h-4 w-4 mr-1" />
                 {language === 'bn' ? 'ডাউনলোড' : 'Download'}
