@@ -65,9 +65,10 @@ export function saveQRCodeFieldsConfig(fields: QRCodeField[]) {
 
 interface QRCodeFieldsEditorProps {
   trigger?: React.ReactNode;
+  onSettingsChange?: () => void;
 }
 
-export function QRCodeFieldsEditor({ trigger }: QRCodeFieldsEditorProps) {
+export function QRCodeFieldsEditor({ trigger, onSettingsChange }: QRCodeFieldsEditorProps) {
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
   const [fields, setFields] = useState<QRCodeField[]>([]);
@@ -88,6 +89,7 @@ export function QRCodeFieldsEditor({ trigger }: QRCodeFieldsEditorProps) {
     saveQRCodeFieldsConfig(fields);
     toast.success(language === 'bn' ? 'QR কোড সেটিংস সংরক্ষিত হয়েছে' : 'QR code settings saved');
     setOpen(false);
+    onSettingsChange?.();
   };
 
   const handleReset = () => {

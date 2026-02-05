@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -53,6 +53,11 @@ export function DeviceQRCode({
 }: DeviceQRCodeProps) {
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
+  const [settingsVersion, setSettingsVersion] = useState(0);
+
+  const handleSettingsChange = useCallback(() => {
+    setSettingsVersion(v => v + 1);
+  }, []);
 
   // Helper to get values from nested objects or passed props
   const getUserName = () => device.support_user?.name || supportUserName || null;
@@ -127,7 +132,7 @@ export function DeviceQRCode({
     data.id = device.id;
     
     return JSON.stringify(data);
-  }, [device, supportUserName, supportUserIp, departmentName, unitName, categoryName, open]);
+  }, [device, supportUserName, supportUserIp, departmentName, unitName, categoryName, open, settingsVersion]);
 
   // Build display info for the dialog
   const displayInfo = useMemo(() => {
@@ -193,7 +198,7 @@ export function DeviceQRCode({
     });
 
     return info;
-  }, [device, language, supportUserName, supportUserIp, departmentName, unitName, categoryName, open]);
+  }, [device, language, supportUserName, supportUserIp, departmentName, unitName, categoryName, open, settingsVersion]);
 
   const handleDownload = () => {
     const svg = document.getElementById(`qr-${device.id}`);
@@ -290,7 +295,7 @@ export function DeviceQRCode({
                 <QrCode className="h-5 w-5" />
                 {language === 'bn' ? 'ডিভাইস QR কোড' : 'Device QR Code'}
               </span>
-              <QRCodeFieldsEditor />
+              <QRCodeFieldsEditor onSettingsChange={handleSettingsChange} />
             </DialogTitle>
           </DialogHeader>
 
