@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Shield, Users, Key, Loader2, Crown, UserPlus, Trash2, Search, Briefcase, Home, Settings, Calendar, AlertTriangle, Mail } from 'lucide-react';
+import { Shield, Users, Key, Loader2, Crown, UserPlus, Trash2, Search, Briefcase, Home, Settings, Calendar, AlertTriangle, Mail, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -100,6 +100,10 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
   const [addingPermission, setAddingPermission] = useState(false);
   const [updatingPermission, setUpdatingPermission] = useState<string | null>(null);
 
+  // App settings state
+  const [onboardingEnabled, setOnboardingEnabled] = useState(true);
+  const [savingSettings, setSavingSettings] = useState(false);
+
   useEffect(() => {
     checkAdminStatus();
   }, [user]);
@@ -128,11 +132,57 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
         await loadUserRoles();
         await loadOAuthCredentials();
         await loadWorkspacePermissions();
+        await loadAppSettings();
       }
     } catch (error) {
       console.error('Failed to check admin status:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadAppSettings = async () => {
+    try {
+      const { data } = await supabase
+        .from('app_settings')
+        .select('onboarding_enabled')
+        .eq('id', 'default')
+        .maybeSingle();
+      
+      if (data) {
+        setOnboardingEnabled(data.onboarding_enabled);
+      }
+    } catch (error) {
+      console.error('Failed to load app settings:', error);
+    }
+  };
+
+  const updateOnboardingSetting = async (enabled: boolean) => {
+    setSavingSettings(true);
+    try {
+      const { error } = await supabase
+        .from('app_settings')
+        .update({ onboarding_enabled: enabled })
+        .eq('id', 'default');
+
+      if (error) throw error;
+
+      setOnboardingEnabled(enabled);
+      toast({
+        title: language === 'bn' ? 'সফল' : 'Success',
+        description: language === 'bn' 
+          ? `ওয়েলকাম স্ক্রিন ${enabled ? 'সক্রিয়' : 'নিষ্ক্রিয়'} করা হয়েছে।`
+          : `Welcome screen ${enabled ? 'enabled' : 'disabled'}.`,
+      });
+    } catch (error: any) {
+      console.error('Failed to update setting:', error);
+      toast({
+        title: language === 'bn' ? 'ত্রুটি' : 'Error',
+        description: error.message || (language === 'bn' ? 'সেটিং আপডেট ব্যর্থ।' : 'Failed to update setting.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -579,8 +629,12 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
           </CardDescription>
         </CardHeader>
         <CardContent className="p-4 md:p-6 pt-0 md:pt-0">
-          <Tabs defaultValue="users" className="w-full">
-            <TabsList className="grid w-full grid-cols-5">
+          <Tabs defaultValue="general" className="w-full">
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="general" className="flex items-center gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3">
+                <Settings className="h-3 w-3 md:h-4 md:w-4" />
+                <span className="hidden sm:inline">{language === 'bn' ? 'সাধারণ' : 'General'}</span>
+              </TabsTrigger>
               <TabsTrigger value="users" className="flex items-center gap-1 md:gap-2 text-[10px] md:text-sm px-1 md:px-3">
                 <Users className="h-3 w-3 md:h-4 md:w-4" />
                 <span className="hidden sm:inline">{language === 'bn' ? 'ইউজার' : 'Users'}</span>
@@ -602,6 +656,49 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
                 <span className="hidden sm:inline">{language === 'bn' ? 'ইন্টিগ্রেশন' : 'Integrations'}</span>
               </TabsTrigger>
             </TabsList>
+
+            {/* General Settings */}
+            <TabsContent value="general" className="space-y-4 mt-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50 border border-border">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium text-foreground">
+                        {language === 'bn' ? 'ওয়েলকাম স্ক্রিন' : 'Welcome Screen'}
+                      </h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {language === 'bn' 
+                          ? 'নতুন ইউজারদের জন্য স্টার্টআপ ওয়েলকাম/অনবোর্ডিং স্ক্রিন দেখানো হবে।'
+                          : 'Show startup welcome/onboarding screen for new users.'
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {savingSettings && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+                    <Switch
+                      id="onboarding-toggle"
+                      checked={onboardingEnabled}
+                      onCheckedChange={updateOnboardingSetting}
+                      disabled={savingSettings}
+                    />
+                  </div>
+                </div>
+
+                <Alert>
+                  <Settings className="h-4 w-4" />
+                  <AlertDescription>
+                    {language === 'bn' 
+                      ? 'এই সেটিংস সব ইউজারের জন্য প্রযোজ্য হবে। সাবধানে পরিবর্তন করুন।'
+                      : 'These settings apply to all users. Change with caution.'
+                    }
+                  </AlertDescription>
+                </Alert>
+              </div>
+            </TabsContent>
 
             {/* Users & Role Management */}
             <TabsContent value="users" className="space-y-4 mt-4">

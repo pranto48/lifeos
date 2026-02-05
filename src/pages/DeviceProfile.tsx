@@ -1,11 +1,11 @@
  import { useState, useEffect } from 'react';
- import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
  import { motion } from 'framer-motion';
  import { 
    HardDrive, Calendar, DollarSign, User, Tag, 
    Package, FileText, AlertTriangle, CheckCircle, Clock,
-   Wrench, ArrowRightLeft, Building2, Users, ArrowLeft,
-   Loader2, AlertCircle
+  Wrench, ArrowRightLeft, Building2, Users, ArrowLeft, Lock,
+  Loader2, AlertCircle, LogIn
  } from 'lucide-react';
  import { Badge } from '@/components/ui/badge';
  import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@
  import { format, isBefore, addDays } from 'date-fns';
  import { supabase } from '@/integrations/supabase/client';
  import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
  
  const STATUS_OPTIONS = [
    { value: 'available', label: 'Available', labelBn: 'উপলব্ধ', color: 'bg-green-500/20 text-green-600' },
@@ -58,14 +59,23 @@
  
  export default function DeviceProfile() {
    const { deviceNumber } = useParams<{ deviceNumber: string }>();
+  const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
    const { language } = useLanguage();
    const [device, setDevice] = useState<DeviceData | null>(null);
    const [loading, setLoading] = useState(true);
    const [error, setError] = useState<string | null>(null);
  
    useEffect(() => {
-     loadDevice();
-   }, [deviceNumber]);
+    // Wait for auth to finish loading before checking
+    if (!authLoading) {
+      if (user) {
+        loadDevice();
+      } else {
+        setLoading(false);
+      }
+    }
+  }, [deviceNumber, user, authLoading]);
  
    const loadDevice = async () => {
      if (!deviceNumber) {
@@ -145,7 +155,7 @@
      return { status: 'valid', label: language === 'bn' ? 'সক্রিয়' : 'Active', color: 'bg-green-500/20 text-green-600' };
    };
  
-   if (loading) {
+  if (loading || authLoading) {
      return (
        <div className="min-h-screen flex items-center justify-center bg-background">
          <motion.div
@@ -162,6 +172,43 @@
      );
    }
  
+  // Not authenticated - show login prompt
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center space-y-6 max-w-md"
+        >
+          <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
+            <Lock className="h-10 w-10 text-primary" />
+          </div>
+          <h1 className="text-2xl font-bold">
+            {language === 'bn' ? 'লগইন প্রয়োজন' : 'Login Required'}
+          </h1>
+          <p className="text-muted-foreground">
+            {language === 'bn' 
+              ? 'ডিভাইসের তথ্য দেখতে আপনাকে লগইন করতে হবে।' 
+              : 'You need to log in to view device details.'}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button onClick={() => navigate('/auth', { state: { returnTo: `/device/${deviceNumber}` } })}>
+              <LogIn className="h-4 w-4 mr-2" />
+              {language === 'bn' ? 'লগইন করুন' : 'Log In'}
+            </Button>
+            <Button variant="outline" asChild>
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                {language === 'bn' ? 'হোমে ফিরুন' : 'Back to Home'}
+              </Link>
+            </Button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
    if (error || !device) {
      return (
        <div className="min-h-screen flex items-center justify-center bg-background p-4">

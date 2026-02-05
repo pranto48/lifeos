@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,6 +53,8 @@ export default function Auth() {
 
   const { signIn, signUp, user, session } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = (location.state as { returnTo?: string })?.returnTo || '/';
   const {
     isLocked,
     remainingAttempts,
@@ -72,9 +74,9 @@ export default function Auth() {
 
   useEffect(() => {
     if (user && authGate === 'idle') {
-      navigate('/');
+      navigate(returnTo);
     }
-  }, [user, authGate, navigate]);
+  }, [user, authGate, navigate, returnTo]);
 
   // Handle biometric login
   const handleBiometricLogin = async () => {
@@ -151,7 +153,7 @@ export default function Auth() {
                 title: 'Welcome back!',
                 description: 'Signed in from trusted device.',
               });
-              navigate('/');
+              navigate(returnTo);
               return;
             }
             
@@ -181,7 +183,7 @@ export default function Auth() {
               description: 'Successfully signed in.',
             });
           }
-          navigate('/');
+          navigate(returnTo);
         }
       } else {
         const result = signupSchema.safeParse({ email, password, confirmPassword, fullName });
@@ -215,7 +217,7 @@ export default function Auth() {
             title: 'Account created!',
             description: 'Welcome to your Life OS.',
           });
-          navigate('/');
+          navigate(returnTo);
         }
       }
     } finally {
@@ -311,7 +313,7 @@ export default function Auth() {
       setTrustThisDevice(false);
       setPendingMfaUserId(null);
       setAuthGate('idle');
-      navigate('/');
+      navigate(returnTo);
     } finally {
       setMfaLoading(false);
     }
