@@ -32,6 +32,27 @@ export type Database = {
         }
         Relationships: []
       }
+      app_settings: {
+        Row: {
+          created_at: string
+          id: string
+          onboarding_enabled: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          onboarding_enabled?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          onboarding_enabled?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       attachments: {
         Row: {
           created_at: string

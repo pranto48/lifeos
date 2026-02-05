@@ -14,7 +14,7 @@ const LANGUAGE_STORAGE_KEY = 'app-language';
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
     const stored = localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    return (stored === 'en' || stored === 'bn') ? stored : 'bn'; // Default to Bangla
+    return (stored === 'en' || stored === 'bn') ? stored : 'en'; // Default to English
   });
 
   useEffect(() => {
