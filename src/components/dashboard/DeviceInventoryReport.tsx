@@ -1,17 +1,18 @@
 import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  HardDrive, Laptop, Monitor, AlertTriangle, CheckCircle2, 
-  Wrench, Package, TrendingUp, Calendar, DollarSign,
-  Users, Building2, BarChart3, PieChart
+  HardDrive, AlertTriangle, CheckCircle2, 
+  Wrench, Package, TrendingUp, DollarSign,
+  Users, Building2, BarChart3, PieChart, Sparkles
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { format, isBefore, addDays } from 'date-fns';
+import { addDays, isBefore } from 'date-fns';
+import { AnimatedReportCard } from './AnimatedReportCard';
+import { AnimatedCounter } from './AnimatedCounter';
+import { AnimatedProgressBar, SegmentedProgressBar } from './AnimatedProgressBar';
 
 interface DeviceStats {
   total: number;
@@ -154,244 +155,431 @@ export function DeviceInventoryReport() {
     { label: language === 'bn' ? 'অবসর' : 'Retired', count: stats.retired, color: STATUS_COLORS.retired, icon: Package },
   ], [stats, language]);
 
+  const statusSegments = useMemo(() => [
+    { value: stats.available, color: 'bg-green-500', label: language === 'bn' ? 'উপলব্ধ' : 'Available' },
+    { value: stats.assigned, color: 'bg-blue-500', label: language === 'bn' ? 'বরাদ্দ' : 'Assigned' },
+    { value: stats.maintenance, color: 'bg-yellow-500', label: language === 'bn' ? 'রক্ষণাবেক্ষণ' : 'Maintenance' },
+    { value: stats.retired, color: 'bg-gray-500', label: language === 'bn' ? 'অবসর' : 'Retired' },
+  ], [stats, language]);
+
   if (loading) {
     return (
-      <Card className="col-span-full animate-pulse">
-        <CardContent className="h-64 flex items-center justify-center">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <HardDrive className="h-5 w-5 animate-spin" />
-            <span>{language === 'bn' ? 'লোড হচ্ছে...' : 'Loading...'}</span>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="col-span-full"
+      >
+        <div className="rounded-lg border bg-card p-8">
+          <div className="flex flex-col items-center justify-center gap-4">
+            <motion.div
+              animate={{ 
+                rotate: 360,
+                scale: [1, 1.2, 1]
+              }}
+              transition={{ 
+                rotate: { duration: 2, repeat: Infinity, ease: "linear" },
+                scale: { duration: 1, repeat: Infinity }
+              }}
+            >
+              <HardDrive className="h-8 w-8 text-primary" />
+            </motion.div>
+            <motion.div
+              className="flex gap-1"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="w-2 h-2 rounded-full bg-primary"
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{
+                    duration: 0.6,
+                    repeat: Infinity,
+                    delay: i * 0.1,
+                  }}
+                />
+              ))}
+            </motion.div>
+            <span className="text-sm text-muted-foreground">
+              {language === 'bn' ? 'লোড হচ্ছে...' : 'Loading inventory data...'}
+            </span>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </motion.div>
     );
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="col-span-full space-y-4"
+    <AnimatedReportCard
+      title={language === 'bn' ? 'ডিভাইস ইনভেন্টরি রিপোর্ট' : 'Device Inventory Report'}
+      icon={HardDrive}
+      iconColor="text-primary"
+      delay={0.1}
     >
-      <Card className="overflow-hidden">
-        <CardHeader className="pb-2 bg-gradient-to-r from-primary/5 to-transparent">
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+      <div className="space-y-6">
+        {/* Quick Stats Row with Animated Counters */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Total Devices */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: 0.2, type: "spring", stiffness: 100 }}
+            whileHover={{ scale: 1.05, y: -2 }}
+            className="p-4 rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 border border-primary/20 relative overflow-hidden group"
+          >
             <motion.div
-              animate={{ rotate: [0, 10, -10, 0] }}
-              transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-            >
-              <HardDrive className="h-5 w-5 text-primary" />
-            </motion.div>
-            {language === 'bn' ? 'ডিভাইস ইনভেন্টরি রিপোর্ট' : 'Device Inventory Report'}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-6">
-          {/* Quick Stats Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="p-3 rounded-lg bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20"
-            >
-              <div className="flex items-center justify-between">
-                <HardDrive className="h-5 w-5 text-primary" />
-                <span className="text-2xl font-bold text-primary">{stats.total}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {language === 'bn' ? 'মোট ডিভাইস' : 'Total Devices'}
-              </p>
-            </motion.div>
+              className="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-primary/10"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 3, repeat: Infinity }}
+            />
+            <div className="flex items-center justify-between relative">
+              <motion.div
+                whileHover={{ rotate: 360 }}
+                transition={{ duration: 0.5 }}
+              >
+                <HardDrive className="h-6 w-6 text-primary" />
+              </motion.div>
+              <span className="text-3xl font-bold text-primary font-mono">
+                <AnimatedCounter value={stats.total} delay={0.3} />
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              {language === 'bn' ? 'মোট ডিভাইস' : 'Total Devices'}
+            </p>
+          </motion.div>
 
+          {/* Total Value */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: 0.3, type: "spring", stiffness: 100 }}
+            whileHover={{ scale: 1.05, y: -2 }}
+            className="p-4 rounded-xl bg-gradient-to-br from-green-500/15 to-green-500/5 border border-green-500/20 relative overflow-hidden group"
+          >
             <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="p-3 rounded-lg bg-gradient-to-br from-green-500/10 to-green-500/5 border border-green-500/20"
-            >
-              <div className="flex items-center justify-between">
-                <DollarSign className="h-5 w-5 text-green-500" />
-                <span className="text-lg font-bold text-green-600">৳{(stats.totalValue / 1000).toFixed(0)}k</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {language === 'bn' ? 'মোট মূল্য' : 'Total Value'}
-              </p>
-            </motion.div>
+              className="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-green-500/10"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 3, repeat: Infinity, delay: 0.5 }}
+            />
+            <div className="flex items-center justify-between relative">
+              <motion.div
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                <DollarSign className="h-6 w-6 text-green-500" />
+              </motion.div>
+              <span className="text-2xl font-bold text-green-500 font-mono">
+                ৳<AnimatedCounter value={stats.totalValue / 1000} delay={0.4} decimals={0} suffix="k" />
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              {language === 'bn' ? 'মোট মূল্য' : 'Total Value'}
+            </p>
+          </motion.div>
 
+          {/* Warranty Warning */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: 0.4, type: "spring", stiffness: 100 }}
+            whileHover={{ scale: 1.05, y: -2 }}
+            className="p-4 rounded-xl bg-gradient-to-br from-yellow-500/15 to-yellow-500/5 border border-yellow-500/20 relative overflow-hidden group"
+          >
+            {stats.warningCount > 0 && (
+              <motion.div
+                className="absolute inset-0 bg-yellow-500/5"
+                animate={{ opacity: [0, 0.5, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+            )}
+            <div className="flex items-center justify-between relative">
+              <motion.div
+                animate={stats.warningCount > 0 ? { 
+                  rotate: [0, -10, 10, -10, 10, 0],
+                  scale: [1, 1.1, 1]
+                } : {}}
+                transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 2 }}
+              >
+                <AlertTriangle className="h-6 w-6 text-yellow-500" />
+              </motion.div>
+              <span className="text-3xl font-bold text-yellow-500 font-mono">
+                <AnimatedCounter value={stats.warningCount} delay={0.5} />
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              {language === 'bn' ? 'ওয়ারেন্টি সতর্কতা' : 'Warranty Warning'}
+            </p>
+          </motion.div>
+
+          {/* Recently Added */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: 0.5, type: "spring", stiffness: 100 }}
+            whileHover={{ scale: 1.05, y: -2 }}
+            className="p-4 rounded-xl bg-gradient-to-br from-blue-500/15 to-blue-500/5 border border-blue-500/20 relative overflow-hidden group"
+          >
             <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="p-3 rounded-lg bg-gradient-to-br from-yellow-500/10 to-yellow-500/5 border border-yellow-500/20"
-            >
-              <div className="flex items-center justify-between">
-                <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                <span className="text-2xl font-bold text-yellow-600">{stats.warningCount}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {language === 'bn' ? 'ওয়ারেন্টি সতর্কতা' : 'Warranty Warning'}
-              </p>
-            </motion.div>
+              className="absolute -right-4 -top-4 w-16 h-16 rounded-full bg-blue-500/10"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 3, repeat: Infinity, delay: 1 }}
+            />
+            <div className="flex items-center justify-between relative">
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                <TrendingUp className="h-6 w-6 text-blue-500" />
+              </motion.div>
+              <span className="text-3xl font-bold text-blue-500 font-mono">
+                +<AnimatedCounter value={stats.recentlyAdded} delay={0.6} />
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">
+              {language === 'bn' ? 'এই সপ্তাহে' : 'This Week'}
+            </p>
+            {stats.recentlyAdded > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 1 }}
+              >
+                <Sparkles className="absolute top-2 right-2 h-4 w-4 text-blue-400" />
+              </motion.div>
+            )}
+          </motion.div>
+        </div>
 
+        {/* Status Distribution */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+          className="space-y-4"
+        >
+          <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
             <motion.div
-              whileHover={{ scale: 1.02 }}
-              className="p-3 rounded-lg bg-gradient-to-br from-blue-500/10 to-blue-500/5 border border-blue-500/20"
+              animate={{ rotate: [0, 360] }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
             >
-              <div className="flex items-center justify-between">
-                <TrendingUp className="h-5 w-5 text-blue-500" />
-                <span className="text-2xl font-bold text-blue-600">+{stats.recentlyAdded}</span>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                {language === 'bn' ? 'এই সপ্তাহে' : 'This Week'}
-              </p>
-            </motion.div>
-          </div>
-
-          {/* Status Distribution */}
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
               <BarChart3 className="h-4 w-4" />
-              {language === 'bn' ? 'স্ট্যাটাস বিতরণ' : 'Status Distribution'}
-            </h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <AnimatePresence>
-                {statusData.map((status, idx) => (
+            </motion.div>
+            {language === 'bn' ? 'স্ট্যাটাস বিতরণ' : 'Status Distribution'}
+          </h4>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <AnimatePresence>
+              {statusData.map((status, idx) => (
+                <motion.div
+                  key={status.label}
+                  initial={{ opacity: 0, x: -30, rotateY: -20 }}
+                  animate={{ opacity: 1, x: 0, rotateY: 0 }}
+                  transition={{ 
+                    delay: 0.7 + idx * 0.1,
+                    type: "spring",
+                    stiffness: 100
+                  }}
+                  whileHover={{ 
+                    scale: 1.05,
+                    boxShadow: "0 10px 30px -10px rgba(0,0,0,0.3)"
+                  }}
+                  className="flex items-center gap-3 p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-all cursor-default border border-transparent hover:border-primary/20"
+                >
+                  <motion.div 
+                    className={`p-2.5 rounded-xl ${status.color}/20`}
+                    whileHover={{ rotate: [0, -10, 10, 0] }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <status.icon className={`h-5 w-5 ${status.color.replace('bg-', 'text-')}`} />
+                  </motion.div>
+                  <div>
+                    <p className="text-xl font-bold font-mono">
+                      <AnimatedCounter value={status.count} delay={0.8 + idx * 0.1} />
+                    </p>
+                    <p className="text-xs text-muted-foreground">{status.label}</p>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+          
+          {/* Animated Status Bar */}
+          {stats.total > 0 && (
+            <motion.div
+              initial={{ opacity: 0, scaleX: 0 }}
+              animate={{ opacity: 1, scaleX: 1 }}
+              transition={{ delay: 1.1, duration: 0.5 }}
+              style={{ transformOrigin: 'left' }}
+            >
+              <SegmentedProgressBar
+                segments={statusSegments}
+                total={stats.total}
+                delay={1.2}
+                className="h-4"
+              />
+            </motion.div>
+          )}
+        </motion.div>
+
+        {/* Category & Unit Breakdown */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.3 }}
+          className="grid md:grid-cols-2 gap-6"
+        >
+          {/* Category Breakdown */}
+          {stats.categoryBreakdown.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <motion.div
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 3, repeat: Infinity }}
+                >
+                  <PieChart className="h-4 w-4" />
+                </motion.div>
+                {language === 'bn' ? 'ক্যাটাগরি অনুসারে' : 'By Category'}
+              </h4>
+              <div className="space-y-3">
+                {stats.categoryBreakdown.slice(0, 5).map((cat, idx) => (
                   <motion.div
-                    key={status.label}
+                    key={cat.name}
                     initial={{ opacity: 0, x: -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                    transition={{ delay: 1.4 + idx * 0.1 }}
+                    whileHover={{ x: 4 }}
+                    className="flex items-center gap-3 group"
                   >
-                    <div className={`p-2 rounded-lg ${status.color}/20`}>
-                      <status.icon className={`h-4 w-4 ${status.color.replace('bg-', 'text-')}`} />
-                    </div>
-                    <div>
-                      <p className="text-lg font-bold">{status.count}</p>
-                      <p className="text-xs text-muted-foreground">{status.label}</p>
+                    <div 
+                      className="w-3 h-3 rounded-full ring-2 ring-offset-2 ring-offset-background ring-current"
+                      style={{ backgroundColor: cat.color, color: cat.color }}
+                    />
+                    <span className="text-sm flex-1 truncate group-hover:text-foreground transition-colors">{cat.name}</span>
+                    <Badge variant="secondary" className="text-xs font-mono tabular-nums">
+                      <AnimatedCounter value={cat.count} delay={1.5 + idx * 0.1} />
+                    </Badge>
+                    <div className="w-24">
+                      <AnimatedProgressBar 
+                        value={cat.count}
+                        max={stats.total}
+                        delay={1.5 + idx * 0.1}
+                        height="h-2"
+                        showGlow={false}
+                      />
                     </div>
                   </motion.div>
                 ))}
-              </AnimatePresence>
+              </div>
             </div>
-            
-            {/* Status Bar */}
-            {stats.total > 0 && (
-              <div className="h-3 rounded-full overflow-hidden flex bg-muted/50">
-                {statusData.map((status, idx) => {
-                  const percentage = (status.count / stats.total) * 100;
-                  return percentage > 0 ? (
-                    <motion.div
-                      key={status.label}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${percentage}%` }}
-                      transition={{ duration: 0.8, delay: idx * 0.1 }}
-                      className={`${status.color} first:rounded-l-full last:rounded-r-full`}
-                      title={`${status.label}: ${status.count} (${percentage.toFixed(1)}%)`}
-                    />
-                  ) : null;
-                })}
-              </div>
-            )}
-          </div>
+          )}
 
-          {/* Category & Unit Breakdown */}
-          <div className="grid md:grid-cols-2 gap-4">
-            {/* Category Breakdown */}
-            {stats.categoryBreakdown.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                  <PieChart className="h-4 w-4" />
-                  {language === 'bn' ? 'ক্যাটাগরি অনুসারে' : 'By Category'}
-                </h4>
-                <div className="space-y-2">
-                  {stats.categoryBreakdown.slice(0, 5).map((cat, idx) => (
-                    <motion.div
-                      key={cat.name}
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: '100%' }}
-                      transition={{ delay: idx * 0.1 }}
-                      className="flex items-center gap-2"
-                    >
-                      <div 
-                        className="w-3 h-3 rounded-full" 
-                        style={{ backgroundColor: cat.color }}
-                      />
-                      <span className="text-sm flex-1 truncate">{cat.name}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {cat.count}
-                      </Badge>
-                      <div className="w-20">
-                        <Progress 
-                          value={(cat.count / stats.total) * 100} 
-                          className="h-1.5"
-                        />
-                      </div>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Unit Breakdown */}
-            {stats.unitBreakdown.length > 0 && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+          {/* Unit Breakdown */}
+          {stats.unitBreakdown.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <motion.div
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
                   <Building2 className="h-4 w-4" />
-                  {language === 'bn' ? 'ইউনিট অনুসারে' : 'By Unit'}
-                </h4>
-                <div className="space-y-2">
-                  {stats.unitBreakdown.slice(0, 5).map((unit, idx) => (
+                </motion.div>
+                {language === 'bn' ? 'ইউনিট অনুসারে' : 'By Unit'}
+              </h4>
+              <div className="space-y-3">
+                {stats.unitBreakdown.slice(0, 5).map((unit, idx) => (
+                  <motion.div
+                    key={unit.name}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 1.6 + idx * 0.1 }}
+                    whileHover={{ x: 4 }}
+                    className="flex items-center gap-3 group"
+                  >
                     <motion.div
-                      key={unit.name}
-                      initial={{ opacity: 0, width: 0 }}
-                      animate={{ opacity: 1, width: '100%' }}
-                      transition={{ delay: idx * 0.1 + 0.3 }}
-                      className="flex items-center gap-2"
+                      whileHover={{ rotate: 10 }}
                     >
                       <Building2 className="w-3 h-3 text-primary" />
-                      <span className="text-sm flex-1 truncate">{unit.name}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {unit.count}
-                      </Badge>
-                      <div className="w-20">
-                        <Progress 
-                          value={(unit.count / stats.total) * 100} 
-                          className="h-1.5"
-                        />
-                      </div>
                     </motion.div>
-                  ))}
-                </div>
+                    <span className="text-sm flex-1 truncate group-hover:text-foreground transition-colors">{unit.name}</span>
+                    <Badge variant="outline" className="text-xs font-mono tabular-nums">
+                      <AnimatedCounter value={unit.count} delay={1.7 + idx * 0.1} />
+                    </Badge>
+                    <div className="w-24">
+                      <AnimatedProgressBar 
+                        value={unit.count}
+                        max={stats.total}
+                        color="bg-primary"
+                        delay={1.7 + idx * 0.1}
+                        height="h-2"
+                        showGlow={false}
+                      />
+                    </div>
+                  </motion.div>
+                ))}
               </div>
-            )}
-          </div>
-
-          {/* Warranty Alerts */}
-          {(stats.warningCount > 0 || stats.expiredCount > 0) && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 flex items-center gap-3"
-            >
-              <AlertTriangle className="h-5 w-5 text-yellow-500 shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium">
-                  {language === 'bn' ? 'ওয়ারেন্টি সতর্কতা' : 'Warranty Alerts'}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {stats.warningCount > 0 && (
-                    <span className="text-yellow-600">
-                      {stats.warningCount} {language === 'bn' ? 'টি শীঘ্রই শেষ হবে' : 'expiring soon'}
-                    </span>
-                  )}
-                  {stats.warningCount > 0 && stats.expiredCount > 0 && ' • '}
-                  {stats.expiredCount > 0 && (
-                    <span className="text-red-500">
-                      {stats.expiredCount} {language === 'bn' ? 'টি মেয়াদ উত্তীর্ণ' : 'expired'}
-                    </span>
-                  )}
-                </p>
-              </div>
-            </motion.div>
+            </div>
           )}
-        </CardContent>
-      </Card>
-    </motion.div>
+        </motion.div>
+
+        {/* Warranty Alerts */}
+        {(stats.warningCount > 0 || stats.expiredCount > 0) && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 2, type: "spring" }}
+            className="p-4 rounded-xl bg-gradient-to-r from-yellow-500/10 via-yellow-500/5 to-transparent border border-yellow-500/30 flex items-center gap-4 relative overflow-hidden"
+          >
+            {/* Animated warning pulse */}
+            <motion.div
+              className="absolute inset-0 bg-yellow-500/5"
+              animate={{ opacity: [0, 0.3, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
+            
+            <motion.div
+              animate={{ 
+                rotate: [0, -15, 15, -15, 15, 0],
+                scale: [1, 1.1, 1]
+              }}
+              transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
+            >
+              <AlertTriangle className="h-6 w-6 text-yellow-500 shrink-0" />
+            </motion.div>
+            
+            <div className="flex-1 relative">
+              <p className="text-sm font-semibold text-yellow-600">
+                {language === 'bn' ? 'ওয়ারেন্টি সতর্কতা' : 'Warranty Alerts'}
+              </p>
+              <p className="text-sm text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
+                {stats.warningCount > 0 && (
+                  <motion.span 
+                    className="text-yellow-500 font-medium"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 2.2 }}
+                  >
+                    <AnimatedCounter value={stats.warningCount} delay={2.2} /> {language === 'bn' ? 'টি শীঘ্রই শেষ হবে' : 'expiring soon'}
+                  </motion.span>
+                )}
+                {stats.warningCount > 0 && stats.expiredCount > 0 && (
+                  <span className="text-muted-foreground">•</span>
+                )}
+                {stats.expiredCount > 0 && (
+                  <motion.span 
+                    className="text-red-500 font-medium"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 2.4 }}
+                  >
+                    <AnimatedCounter value={stats.expiredCount} delay={2.4} /> {language === 'bn' ? 'টি মেয়াদ উত্তীর্ণ' : 'expired'}
+                  </motion.span>
+                )}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </div>
+    </AnimatedReportCard>
   );
 }
