@@ -32,7 +32,9 @@ const Projects = lazy(() => import("./pages/Projects"));
 const Calendar = lazy(() => import("./pages/Calendar"));
 const SupportUsers = lazy(() => import("./pages/SupportUsers"));
 const DeviceInventory = lazy(() => import("./pages/DeviceInventory"));
- const DeviceProfile = lazy(() => import("./pages/DeviceProfile"));
+const DeviceProfile = lazy(() => import("./pages/DeviceProfile"));
+const SupportTickets = lazy(() => import("./pages/SupportTickets"));
+const SubmitTicket = lazy(() => import("./pages/SubmitTicket"));
 const Settings = lazy(() => import("./pages/Settings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -90,7 +92,9 @@ const AppContent = () => {
             <Route path="/calendar" element={<AppLayout><Calendar /></AppLayout>} />
             <Route path="/support-users" element={<AppLayout><SupportUsers /></AppLayout>} />
             <Route path="/device-inventory" element={<AppLayout><DeviceInventory /></AppLayout>} />
-             <Route path="/device/:deviceNumber" element={<DeviceProfile />} />
+            <Route path="/device/:deviceNumber" element={<DeviceProfile />} />
+            <Route path="/support-tickets" element={<AppLayout><SupportTickets /></AppLayout>} />
+            <Route path="/submit-ticket" element={<SubmitTicket />} />
             <Route path="/settings" element={<AppLayout><Settings /></AppLayout>} />
             <Route path="*" element={<NotFound />} />
           </Routes>

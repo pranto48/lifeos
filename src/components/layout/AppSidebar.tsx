@@ -16,7 +16,8 @@ import {
   ChevronRight,
   Calendar,
   HardDrive,
-  Landmark
+  Landmark,
+  Ticket
 } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -43,6 +44,7 @@ const navItems: NavItem[] = [
   { titleKey: 'nav.notes', url: '/notes', icon: FileText },
   { titleKey: 'nav.supportUsers', url: '/support-users', icon: HeadsetIcon, officeOnly: true },
   { titleKey: 'nav.deviceInventory', url: '/device-inventory', icon: HardDrive, officeOnly: true },
+  { titleKey: 'nav.supportTickets', url: '/support-tickets', icon: Ticket, officeOnly: true },
   { titleKey: 'nav.habits', url: '/habits', icon: Repeat, personalOnly: true },
   { titleKey: 'nav.family', url: '/family', icon: Users, personalOnly: true },
   { titleKey: 'nav.budget', url: '/budget', icon: Wallet, personalOnly: true },

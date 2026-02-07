@@ -1461,6 +1461,82 @@ export type Database = {
           },
         ]
       }
+      support_tickets: {
+        Row: {
+          assigned_to: string | null
+          category_id: string | null
+          closed_at: string | null
+          created_at: string
+          custom_fields: Json | null
+          description: string
+          device_id: string | null
+          id: string
+          priority: string
+          requester_id: string | null
+          resolved_at: string | null
+          status: string
+          ticket_number: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          description: string
+          device_id?: string | null
+          id?: string
+          priority?: string
+          requester_id?: string | null
+          resolved_at?: string | null
+          status?: string
+          ticket_number: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category_id?: string | null
+          closed_at?: string | null
+          created_at?: string
+          custom_fields?: Json | null
+          description?: string
+          device_id?: string | null
+          id?: string
+          priority?: string
+          requester_id?: string | null
+          resolved_at?: string | null
+          status?: string
+          ticket_number?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "support_tickets_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "support_tickets_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_requesters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       support_units: {
         Row: {
           created_at: string
@@ -1847,6 +1923,237 @@ export type Database = {
           },
           {
             foreignKeyName: "tasks_support_user_id_fkey"
+            columns: ["support_user_id"]
+            isOneToOne: false
+            referencedRelation: "support_users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_activity_log: {
+        Row: {
+          action: string
+          created_at: string
+          details: Json | null
+          id: string
+          new_value: string | null
+          old_value: string | null
+          ticket_id: string
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          ticket_id: string
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          details?: Json | null
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          ticket_id?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_activity_log_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ticket_comments: {
+        Row: {
+          author_id: string | null
+          author_type: string
+          content: string
+          created_at: string
+          id: string
+          is_internal: boolean | null
+          ticket_id: string
+          updated_at: string
+        }
+        Insert: {
+          author_id?: string | null
+          author_type?: string
+          content: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean | null
+          ticket_id: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string | null
+          author_type?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_internal?: boolean | null
+          ticket_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_comments_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "support_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_form_fields: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          default_value: string | null
+          field_label: string
+          field_name: string
+          field_options: Json | null
+          field_type: string
+          id: string
+          is_active: boolean | null
+          is_required: boolean | null
+          placeholder: string | null
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          default_value?: string | null
+          field_label: string
+          field_name: string
+          field_options?: Json | null
+          field_type?: string
+          id?: string
+          is_active?: boolean | null
+          is_required?: boolean | null
+          placeholder?: string | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          default_value?: string | null
+          field_label?: string
+          field_name?: string
+          field_options?: Json | null
+          field_type?: string
+          id?: string
+          is_active?: boolean | null
+          is_required?: boolean | null
+          placeholder?: string | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_form_fields_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "ticket_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ticket_requesters: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          email: string
+          email_verified: boolean | null
+          id: string
+          name: string
+          phone: string | null
+          support_user_id: string | null
+          updated_at: string
+          verification_expires_at: string | null
+          verification_token: string | null
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          email: string
+          email_verified?: boolean | null
+          id?: string
+          name: string
+          phone?: string | null
+          support_user_id?: string | null
+          updated_at?: string
+          verification_expires_at?: string | null
+          verification_token?: string | null
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          email?: string
+          email_verified?: boolean | null
+          id?: string
+          name?: string
+          phone?: string | null
+          support_user_id?: string | null
+          updated_at?: string
+          verification_expires_at?: string | null
+          verification_token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_requesters_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_inventory"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_requesters_support_user_id_fkey"
             columns: ["support_user_id"]
             isOneToOne: false
             referencedRelation: "support_users"
