@@ -5,7 +5,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
    HardDrive, Calendar, DollarSign, User, Tag, 
    Package, FileText, AlertTriangle, CheckCircle, Clock,
   Wrench, ArrowRightLeft, Building2, Users, ArrowLeft, Lock,
-  Loader2, AlertCircle, LogIn
+  Loader2, AlertCircle, LogIn, Ticket
  } from 'lucide-react';
  import { Badge } from '@/components/ui/badge';
  import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -261,13 +261,22 @@ import { useAuth } from '@/contexts/AuthContext';
            {device.device_number && (
              <p className="text-lg text-muted-foreground font-mono">#{device.device_number}</p>
            )}
-           <div className="flex items-center justify-center gap-2 flex-wrap">
-             <Badge className={status?.color}>{language === 'bn' ? status?.labelBn : status?.label}</Badge>
-             {device.category?.name && (
-               <Badge variant="outline">{device.category.name}</Badge>
-             )}
-           </div>
-         </div>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <Badge className={status?.color}>{language === 'bn' ? status?.labelBn : status?.label}</Badge>
+              {device.category?.name && (
+                <Badge variant="outline">{device.category.name}</Badge>
+              )}
+            </div>
+            {/* Submit Ticket Button */}
+            <div className="pt-4">
+              <Button asChild>
+                <Link to={`/submit-ticket?device=${device.device_number}`}>
+                  <Ticket className="h-4 w-4 mr-2" />
+                  {language === 'bn' ? 'সাপোর্ট টিকেট জমা দিন' : 'Submit Support Ticket'}
+                </Link>
+              </Button>
+            </div>
+          </div>
  
          {/* Assignment Info */}
          {device.support_user && (
