@@ -61,22 +61,65 @@ VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
 ```
 
-## Docker Deployment
+## Self-Hosted Deployment (Docker)
 
-### Quick Start with Docker Compose
+### Quick Start with Setup Wizard
 
 ```bash
-# Build and run
-docker-compose up -d
+# Clone the repo
+git clone https://github.com/YOUR_USERNAME/lifeos.git
+cd lifeos
 
-# View logs
-docker-compose logs -f
-
-# Stop
-docker-compose down
+# Run the interactive setup
+chmod +x docker/docker-setup.sh
+./docker/docker-setup.sh
 ```
 
-The app will be available at `http://localhost:8080`
+Choose your database (PostgreSQL or MySQL), and the setup wizard at `http://localhost:8080/setup` will guide you through configuring the database connection and creating your admin account.
+
+### Docker Compose (PostgreSQL)
+
+```bash
+# Start with built-in PostgreSQL
+docker-compose -f docker-compose.selfhosted.yml --profile with-postgres up -d
+```
+
+### Docker Compose (MySQL - XAMPP compatible)
+
+```bash
+# Start with MySQL
+docker-compose -f docker-compose.selfhosted.yml --profile with-mysql up -d
+```
+
+### External Database (XAMPP, etc.)
+
+```bash
+# Start without bundled database - configure via setup wizard
+docker-compose -f docker-compose.selfhosted.yml up -d
+
+# Then open http://localhost:8080/setup and enter your DB credentials
+```
+
+### Environment Variables (.env)
+
+Copy `docker/.env.example` to `docker/.env` and configure:
+
+```env
+DB_TYPE=postgresql        # or mysql
+DB_HOST=localhost          # your DB server
+DB_PORT=5432              # 5432 for PostgreSQL, 3306 for MySQL
+DB_NAME=lifeos
+DB_USER=lifeos
+DB_PASSWORD=your_password
+JWT_SECRET=change-this-to-random-string
+```
+
+### Cloud Deployment (Supabase)
+
+```bash
+# Build and run with Supabase backend
+docker-compose up -d
+```
 
 ### Manual Docker Build
 

@@ -1,51 +1,4 @@
-version: '3.8'
-
-# Self-hosted LifeOS with internal PostgreSQL database
-# This configuration is for running LifeOS independently without cloud services
-
 services:
-  # PostgreSQL Database
-  postgres:
-    image: postgres:16-alpine
-    container_name: lifeos-db
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-lifeos}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lifeos_secret_password}
-      POSTGRES_DB: ${POSTGRES_DB:-lifeos}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "5432:5432"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lifeos} -d ${POSTGRES_DB:-lifeos}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-    networks:
-      - lifeos-network
-
-  # Redis Cache (optional, for session management)
-  redis:
-    image: redis:7-alpine
-    container_name: lifeos-redis
-    command: redis-server --appendonly yes
-    volumes:
-      - redis_data:/data
-    ports:
-      - "6379:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - lifeos-network
-
-  # LifeOS Application
   lifeos:
     build:
       context: .
@@ -55,16 +8,8 @@ services:
       - "${APP_PORT:-8080}:80"
     environment:
       - NODE_ENV=production
-      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
-      - VITE_SUPABASE_PUBLISHABLE_KEY=${VITE_SUPABASE_PUBLISHABLE_KEY:-}
-      # Self-hosted database connection (for future backend integration)
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-lifeos}:${POSTGRES_PASSWORD:-lifeos_secret_password}@postgres:5432/${POSTGRES_DB:-lifeos}
-      - REDIS_URL=redis://redis:6379
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
@@ -74,6 +19,113 @@ services:
       start_period: 40s
     networks:
       - lifeos-network
+
+  # Backend API server
+  backend:
+    build:
+      context: ./docker/backend
+      dockerfile: Dockerfile
+    container_name: lifeos-backend
+    environment:
+      - API_PORT=3001
+      - DB_TYPE=${DB_TYPE:-postgresql}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-lifeos}
+      - DB_USER=${DB_USER:-lifeos}
+      - DB_PASSWORD=${DB_PASSWORD:-}
+      - JWT_SECRET=${JWT_SECRET:-lifeos-change-this-secret}
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+    networks:
+      - lifeos-network
+
+  # PostgreSQL Database (optional - use if you want built-in PostgreSQL)
+  postgres:
+    image: postgres:16-alpine
+    container_name: lifeos-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-lifeos}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-lifeos_secret_password}
+      POSTGRES_DB: ${DB_NAME:-lifeos}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-lifeos} -d ${DB_NAME:-lifeos}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - lifeos-network
+    profiles:
+      - with-postgres
+
+  # MySQL Database (optional - use for XAMPP-style setups)
+  mysql:
+    image: mysql:8.0
+    container_name: lifeos-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${DB_NAME:-lifeos}
+      MYSQL_USER: ${DB_USER:-lifeos}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-lifeos_secret_password}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${DB_PORT:-3306}:3306"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - lifeos-network
+    profiles:
+      - with-mysql
+
+  # Redis Cache (optional)
+  redis:
+    image: redis:7-alpine
+    container_name: lifeos-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - lifeos-network
+    profiles:
+      - with-redis
+
+  # pgAdmin (optional)
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: lifeos-pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@lifeos.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - lifeos-network
+    profiles:
+      - with-admin
 
   # Nginx Reverse Proxy with SSL (optional)
   nginx-proxy:
@@ -93,29 +145,10 @@ services:
     profiles:
       - with-proxy
 
-  # pgAdmin for database management (optional)
-  pgadmin:
-    image: dpage/pgadmin4:latest
-    container_name: lifeos-pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@lifeos.local}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-    volumes:
-      - pgadmin_data:/var/lib/pgadmin
-    ports:
-      - "5050:80"
-    depends_on:
-      postgres:
-        condition: service_healthy
-    restart: unless-stopped
-    networks:
-      - lifeos-network
-    profiles:
-      - with-admin
-
 volumes:
   postgres_data:
+    driver: local
+  mysql_data:
     driver: local
   redis_data:
     driver: local

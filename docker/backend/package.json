@@ -1,0 +1,13 @@
+{
+  "name": "lifeos-backend",
+  "version": "1.0.0",
+  "description": "LifeOS Self-Hosted Backend API",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.0",
+    "mysql2": "^3.11.0"
+  }
+}

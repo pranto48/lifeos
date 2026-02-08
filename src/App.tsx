@@ -18,6 +18,7 @@ import { AnimatePresence } from "framer-motion";
 
 // Lazy load pages for code splitting
 const Auth = lazy(() => import("./pages/Auth"));
+const Setup = lazy(() => import("./pages/Setup"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const Notes = lazy(() => import("./pages/Notes"));
@@ -77,6 +78,7 @@ const AppContent = () => {
       {!showOnboarding && (
         <Suspense fallback={<PageLoader />}>
           <Routes>
+            <Route path="/setup" element={<Setup />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/" element={<AppLayout><Dashboard /></AppLayout>} />
             <Route path="/tasks" element={<AppLayout><Tasks /></AppLayout>} />
