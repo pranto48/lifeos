@@ -166,29 +166,45 @@ start_services() {
     local profile=""
     
     echo ""
-    echo "Select which services to start:"
-    echo "  1) Core services only (App + PostgreSQL + Redis)"
-    echo "  2) Core + pgAdmin (Database management UI)"
-    echo "  3) Core + Nginx Proxy (SSL support)"
-    echo "  4) All services"
+    echo "Select database type:"
+    echo "  1) PostgreSQL (recommended)"
+    echo "  2) MySQL / MariaDB (XAMPP compatible)"
+    echo "  3) External database (configure via .env or setup wizard)"
     echo ""
-    read -p "Enter choice [1-4] (default: 1): " choice
+    read -p "Enter choice [1-3] (default: 1): " db_choice
     
-    case $choice in
+    case $db_choice in
         2)
-            profile="--profile with-admin"
-            log_info "Starting core services with pgAdmin..."
+            profile="--profile with-mysql"
+            log_info "Using MySQL database..."
             ;;
         3)
-            profile="--profile with-proxy"
-            log_info "Starting core services with Nginx proxy..."
-            ;;
-        4)
-            profile="--profile with-admin --profile with-proxy"
-            log_info "Starting all services..."
+            log_info "Using external database. Configure via setup wizard at http://localhost:8080/setup"
             ;;
         *)
-            log_info "Starting core services..."
+            profile="--profile with-postgres"
+            log_info "Using PostgreSQL database..."
+            ;;
+    esac
+
+    echo ""
+    echo "Select additional services:"
+    echo "  1) Core only (App + Backend + Database)"
+    echo "  2) Core + pgAdmin (Database management UI)"
+    echo "  3) Core + Nginx Proxy (SSL support)"
+    echo "  4) All extras"
+    echo ""
+    read -p "Enter choice [1-4] (default: 1): " extras_choice
+    
+    case $extras_choice in
+        2)
+            profile="$profile --profile with-admin"
+            ;;
+        3)
+            profile="$profile --profile with-proxy"
+            ;;
+        4)
+            profile="$profile --profile with-admin --profile with-proxy --profile with-redis"
             ;;
     esac
     
@@ -198,9 +214,11 @@ start_services() {
     log_success "Services started successfully!"
     echo ""
     echo -e "${CYAN}Access Points:${NC}"
-    echo -e "  • LifeOS App:  ${GREEN}http://localhost:8080${NC}"
-    if [[ "$choice" == "2" || "$choice" == "4" ]]; then
-        echo -e "  • pgAdmin:     ${GREEN}http://localhost:5050${NC}"
+    echo -e "  • LifeOS App:     ${GREEN}http://localhost:8080${NC}"
+    echo -e "  • Setup Wizard:   ${GREEN}http://localhost:8080/setup${NC}"
+    echo -e "  • Backend API:    ${GREEN}http://localhost:3001${NC}"
+    if [[ "$extras_choice" == "2" || "$extras_choice" == "4" ]]; then
+        echo -e "  • pgAdmin:        ${GREEN}http://localhost:5050${NC}"
     fi
     echo ""
 }
