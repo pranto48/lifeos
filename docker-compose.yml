@@ -5,9 +5,12 @@ services:
       dockerfile: Dockerfile
     container_name: lifeos-app
     ports:
-      - "8080:80"
+      - "3377:80"
     environment:
       - NODE_ENV=production
+    depends_on:
+      backend:
+        condition: service_started
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
@@ -15,19 +18,55 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - lifeos-network
 
-  # Optional: Add a reverse proxy with SSL
-  # nginx-proxy:
-  #   image: jwilder/nginx-proxy
-  #   container_name: nginx-proxy
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   volumes:
-  #     - /var/run/docker.sock:/tmp/docker.sock:ro
-  #     - ./certs:/etc/nginx/certs
-  #   restart: unless-stopped
+  backend:
+    build:
+      context: ./docker/backend
+      dockerfile: Dockerfile
+    container_name: lifeos-backend
+    environment:
+      - API_PORT=3001
+      - DB_TYPE=postgresql
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=lifeos
+      - DB_USER=lifeos
+      - DB_PASSWORD=lifeos_secret_password
+      - JWT_SECRET=lifeos-change-this-secret
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - lifeos-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: lifeos-db
+    environment:
+      POSTGRES_USER: lifeos
+      POSTGRES_PASSWORD: lifeos_secret_password
+      POSTGRES_DB: lifeos
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lifeos -d lifeos"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - lifeos-network
+
+volumes:
+  postgres_data:
+    driver: local
 
 networks:
-  default:
+  lifeos-network:
     name: lifeos-network
+    driver: bridge
