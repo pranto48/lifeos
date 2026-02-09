@@ -9,12 +9,12 @@ export interface SelfHostedConfig {
 }
 
 export function detectMode(): SelfHostedConfig {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
   const selfHostedApi = import.meta.env.VITE_SELFHOSTED_API_URL;
 
-  // If Supabase env vars are set and valid, use cloud mode
-  if (supabaseUrl && supabaseKey && supabaseUrl.includes('supabase')) {
+  // If Supabase env vars are set, non-empty, and valid, use cloud mode
+  if (supabaseUrl.length > 0 && supabaseKey.length > 0 && supabaseUrl.includes('supabase')) {
     return {
       mode: 'cloud',
       apiUrl: supabaseUrl,

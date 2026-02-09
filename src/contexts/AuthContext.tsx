@@ -1,9 +1,17 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { isSelfHosted, selfHostedApi } from '@/lib/selfHostedConfig';
+
+interface AuthUser {
+  id: string;
+  email?: string;
+  user_metadata?: Record<string, any>;
+  roles?: string[];
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
@@ -13,25 +21,101 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+// Self-hosted auth provider using local backend API
+function SelfHostedAuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check for existing session token
+    const token = localStorage.getItem('lifeos_token');
+    if (token) {
+      selfHostedApi.getSession().then((result) => {
+        if (result?.user) {
+          setUser({
+            id: result.user.id,
+            email: result.user.email,
+            user_metadata: { full_name: result.user.full_name },
+            roles: result.user.roles,
+          });
+        }
+        setLoading(false);
+      }).catch(() => {
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+  }, []);
+
+  const signIn = async (email: string, password: string) => {
+    try {
+      const result = await selfHostedApi.login(email, password);
+      setUser({
+        id: result.user.id,
+        email: result.user.email,
+        user_metadata: { full_name: result.user.full_name },
+        roles: result.user.roles,
+      });
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  };
+
+  const signUp = async (email: string, password: string, fullName: string) => {
+    try {
+      const result = await selfHostedApi.register(email, password, fullName);
+      setUser({
+        id: result.user.id,
+        email: result.user.email,
+        user_metadata: { full_name: result.user.full_name },
+        roles: result.user.roles,
+      });
+      return { error: null };
+    } catch (err) {
+      return { error: err as Error };
+    }
+  };
+
+  const signOut = async () => {
+    await selfHostedApi.logout();
+    setUser(null);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, session: null, loading, signIn, signUp, signOut }}>
+      {children}
+    </AuthContext.Provider>
+  );
+}
+
+// Cloud auth provider using Supabase
+function CloudAuthProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
-        setUser(session?.user ?? null);
+        setUser(session?.user ? {
+          id: session.user.id,
+          email: session.user.email,
+          user_metadata: session.user.user_metadata,
+        } : null);
         setLoading(false);
       }
     );
 
-    // THEN check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      setUser(session?.user ?? null);
+      setUser(session?.user ? {
+        id: session.user.id,
+        email: session.user.email,
+        user_metadata: session.user.user_metadata,
+      } : null);
       setLoading(false);
     });
 
@@ -65,6 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       {children}
     </AuthContext.Provider>
   );
+}
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+  if (isSelfHosted()) {
+    return <SelfHostedAuthProvider>{children}</SelfHostedAuthProvider>;
+  }
+  return <CloudAuthProvider>{children}</CloudAuthProvider>;
 }
 
 export function useAuth() {
