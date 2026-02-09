@@ -68,5 +68,4 @@ volumes:
 
 networks:
   lifeos-network:
-    name: lifeos-network
     driver: bridge
