@@ -14,6 +14,13 @@ RUN npm ci --include=dev
 # Copy source code
 COPY . .
 
+# Clear Supabase env vars so self-hosted mode is detected at runtime
+RUN rm -f .env
+
+# Build with empty Supabase vars to force self-hosted mode
+ENV VITE_SUPABASE_URL=""
+ENV VITE_SUPABASE_PUBLISHABLE_KEY=""
+
 # Build the application
 RUN ./node_modules/.bin/vite build
 
