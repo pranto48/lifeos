@@ -473,6 +473,48 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// --- Seed Default Admin ---
+async function seedDefaultAdmin() {
+  try {
+    // Check if admin user already exists
+    const existing = await query("SELECT id FROM users WHERE email = 'admin@lifeos.local'");
+    if (existing.length > 0) {
+      // Update password hash to use our format so login works
+      const passwordHash = hashPassword('LifeOS@2024!');
+      await query("UPDATE users SET password_hash = $1 WHERE email = 'admin@lifeos.local'", [passwordHash]);
+      console.log('Default admin password hash updated for compatibility');
+      return;
+    }
+
+    // Create admin user with our hashing
+    const adminId = uuid();
+    const passwordHash = hashPassword('LifeOS@2024!');
+
+    await query(
+      `INSERT INTO users (id, email, password_hash, full_name, email_verified) 
+       VALUES ($1, 'admin@lifeos.local', $2, 'System Administrator', true)`,
+      [adminId, passwordHash]
+    );
+    await query(
+      `INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, 'admin') ON CONFLICT DO NOTHING`,
+      [uuid(), adminId]
+    );
+    await query(
+      `INSERT INTO profiles (id, user_id, full_name, email) VALUES ($1, $2, 'System Administrator', 'admin@lifeos.local')
+       ON CONFLICT (user_id) DO NOTHING`,
+      [uuid(), adminId]
+    );
+    // Mark setup as complete
+    await query(
+      `INSERT INTO app_settings (id, setup_complete, db_type) VALUES ($1, true, $2) ON CONFLICT DO NOTHING`,
+      [uuid(), dbType]
+    );
+    console.log('Default admin user seeded: admin@lifeos.local / LifeOS@2024!');
+  } catch (err) {
+    console.error('Error seeding admin:', err.message);
+  }
+}
+
 // --- Startup ---
 async function start() {
   // Try to connect with environment variables
@@ -480,6 +522,8 @@ async function start() {
     try {
       dbClient = await connectDatabase({});
       console.log(`Connected to ${dbType} database`);
+      // Seed admin user so default credentials work
+      await seedDefaultAdmin();
     } catch (err) {
       console.log('No database configured yet. Waiting for setup...');
     }
