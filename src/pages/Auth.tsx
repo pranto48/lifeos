@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone, AlertTriangle, KeyRound, Monitor } from 'lucide-react';
+import { Loader2, Shield, Lock, Mail, User, Fingerprint, Smartphone, AlertTriangle, KeyRound, Monitor, ArrowLeft } from 'lucide-react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
 
 const loginSchema = z.object({
@@ -49,6 +49,10 @@ export default function Auth() {
   const [mfaCode, setMfaCode] = useState('');
   const [mfaLoading, setMfaLoading] = useState(false);
   const [trustThisDevice, setTrustThisDevice] = useState(false);
+  const [mfaMethod, setMfaMethod] = useState<'choose' | 'totp' | 'email'>('choose');
+  const [hasEmailOtp, setHasEmailOtp] = useState(false);
+  const [emailOtpSending, setEmailOtpSending] = useState(false);
+  const [emailOtpSent, setEmailOtpSent] = useState(false);
   const [pendingMfaUserId, setPendingMfaUserId] = useState<string | null>(null);
 
   const { signIn, signUp, user, session } = useAuth();
@@ -143,27 +147,60 @@ export default function Auth() {
           const verifiedFactor = factorsData?.totp.find(f => f.status === 'verified');
           
           if (verifiedFactor && currentUser) {
-            // Check if this device is trusted (checks database for device + IP)
             const isDeviceTrusted = await checkTrustedDevice(currentUser.id);
             if (isDeviceTrusted) {
-              // Device is trusted and IP matches, skip MFA
               setAuthGate('idle');
               resetRateLimit();
-              toast({
-                title: 'Welcome back!',
-                description: 'Signed in from trusted device.',
-              });
+              toast({ title: 'Welcome back!', description: 'Signed in from trusted device.' });
               navigate(returnTo);
               return;
             }
             
-            // User has MFA enabled and device is not trusted or IP changed, show verification screen
+            // Check if email OTP is also enabled
+            const { data: mfaSettings } = await supabase
+              .from('user_mfa_settings')
+              .select('email_otp_enabled')
+              .eq('user_id', currentUser.id)
+              .single();
+            
+            const emailOtpOn = mfaSettings?.email_otp_enabled || false;
+            setHasEmailOtp(emailOtpOn);
+            
             setAuthGate('mfa');
             setMfaFactorId(verifiedFactor.id);
             setPendingMfaUserId(currentUser.id);
+            setMfaMethod(emailOtpOn ? 'choose' : 'totp');
             setShowMfaVerification(true);
             setLoading(false);
             return;
+          }
+
+          // Check email OTP only (no TOTP)
+          if (currentUser) {
+            const { data: mfaSettings } = await supabase
+              .from('user_mfa_settings')
+              .select('email_otp_enabled')
+              .eq('user_id', currentUser.id)
+              .single();
+            
+            if (mfaSettings?.email_otp_enabled) {
+              const isDeviceTrusted = await checkTrustedDevice(currentUser.id);
+              if (isDeviceTrusted) {
+                setAuthGate('idle');
+                resetRateLimit();
+                toast({ title: 'Welcome back!', description: 'Signed in from trusted device.' });
+                navigate(returnTo);
+                return;
+              }
+              
+              setHasEmailOtp(true);
+              setAuthGate('mfa');
+              setPendingMfaUserId(currentUser.id);
+              setMfaMethod('email');
+              setShowMfaVerification(true);
+              setLoading(false);
+              return;
+            }
           }
           
           // Reset rate limit on successful login
@@ -258,82 +295,118 @@ export default function Auth() {
     setShowBiometricPrompt(false);
   };
 
-  // Handle MFA verification
-  const handleMfaVerification = async () => {
-    if (!mfaFactorId || mfaCode.length !== 6 || mfaLoading) {
-      return;
-    }
-
-    setMfaLoading(true);
+  // Send email OTP
+  const sendEmailOtp = async () => {
+    setEmailOtpSending(true);
     try {
-      // Create a challenge for the factor
-      const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
-        factorId: mfaFactorId,
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      const response = await supabase.functions.invoke('send-email-otp', {
+        body: { action: 'send' },
       });
-
-      if (challengeError) {
-        toast({
-          title: 'Verification Failed',
-          description: challengeError.message,
-          variant: 'destructive',
-        });
-        return;
+      if (response.error) {
+        toast({ title: 'Error', description: 'Failed to send verification code.', variant: 'destructive' });
+      } else {
+        setEmailOtpSent(true);
+        toast({ title: 'Code Sent', description: 'A 6-digit code has been sent to your email.' });
       }
-
-      // Verify the code
-      const { error: verifyError } = await supabase.auth.mfa.verify({
-        factorId: mfaFactorId,
-        challengeId: challengeData.id,
-        code: mfaCode,
-      });
-
-      if (verifyError) {
-        toast({
-          title: 'Invalid Code',
-          description: 'The verification code is incorrect. Please try again.',
-          variant: 'destructive',
-        });
-        setMfaCode('');
-        return;
-      }
-
-      // MFA verification successful - trust device if requested (stored in database)
-      if (trustThisDevice && pendingMfaUserId) {
-        await trustDevice(pendingMfaUserId);
-      }
-
-      resetRateLimit();
-      toast({
-        title: 'Welcome back!',
-        description: trustThisDevice 
-          ? 'Signed in with 2FA. This device is now trusted for 90 days.'
-          : 'Successfully signed in with 2FA.',
-      });
-      setShowMfaVerification(false);
-      setTrustThisDevice(false);
-      setPendingMfaUserId(null);
-      setAuthGate('idle');
-      navigate(returnTo);
-    } finally {
-      setMfaLoading(false);
+    } catch {
+      toast({ title: 'Error', description: 'Failed to send verification code.', variant: 'destructive' });
     }
+    setEmailOtpSending(false);
+  };
+
+  // Handle TOTP MFA verification
+  const handleMfaVerification = async () => {
+    if (mfaMethod === 'totp') {
+      if (!mfaFactorId || mfaCode.length !== 6 || mfaLoading) return;
+
+      setMfaLoading(true);
+      try {
+        const { data: challengeData, error: challengeError } = await supabase.auth.mfa.challenge({
+          factorId: mfaFactorId,
+        });
+
+        if (challengeError) {
+          toast({ title: 'Verification Failed', description: challengeError.message, variant: 'destructive' });
+          return;
+        }
+
+        const { error: verifyError } = await supabase.auth.mfa.verify({
+          factorId: mfaFactorId,
+          challengeId: challengeData.id,
+          code: mfaCode,
+        });
+
+        if (verifyError) {
+          toast({ title: 'Invalid Code', description: 'The verification code is incorrect.', variant: 'destructive' });
+          setMfaCode('');
+          return;
+        }
+
+        await completeMfaSuccess();
+      } finally {
+        setMfaLoading(false);
+      }
+    } else if (mfaMethod === 'email') {
+      if (mfaCode.length !== 6 || mfaLoading) return;
+
+      setMfaLoading(true);
+      try {
+        const response = await supabase.functions.invoke('send-email-otp', {
+          body: { action: 'verify', code: mfaCode },
+        });
+
+        if (response.error || !response.data?.verified) {
+          toast({ title: 'Invalid Code', description: 'The verification code is incorrect or expired.', variant: 'destructive' });
+          setMfaCode('');
+          return;
+        }
+
+        await completeMfaSuccess();
+      } finally {
+        setMfaLoading(false);
+      }
+    }
+  };
+
+  const completeMfaSuccess = async () => {
+    if (trustThisDevice && pendingMfaUserId) {
+      await trustDevice(pendingMfaUserId);
+    }
+
+    resetRateLimit();
+    toast({
+      title: 'Welcome back!',
+      description: trustThisDevice
+        ? 'Signed in with 2FA. This device is now trusted for 90 days.'
+        : 'Successfully signed in with 2FA.',
+    });
+    setShowMfaVerification(false);
+    setTrustThisDevice(false);
+    setPendingMfaUserId(null);
+    setMfaCode('');
+    setMfaMethod('choose');
+    setEmailOtpSent(false);
+    setAuthGate('idle');
+    navigate(returnTo);
   };
 
   // Auto-verify when 6 digits are entered
   useEffect(() => {
-    if (mfaCode.length === 6 && showMfaVerification && mfaFactorId && !mfaLoading) {
+    if (mfaCode.length === 6 && showMfaVerification && (mfaMethod === 'totp' || mfaMethod === 'email') && !mfaLoading) {
       handleMfaVerification();
     }
-  }, [mfaCode, showMfaVerification, mfaFactorId, mfaLoading]);
+  }, [mfaCode, showMfaVerification, mfaMethod, mfaLoading]);
 
   const handleCancelMfa = async () => {
-    // Sign out since we're cancelling MFA
     await supabase.auth.signOut();
     setShowMfaVerification(false);
     setMfaFactorId(null);
     setMfaCode('');
     setTrustThisDevice(false);
     setPendingMfaUserId(null);
+    setMfaMethod('choose');
+    setEmailOtpSent(false);
     setAuthGate('idle');
   };
 
@@ -659,85 +732,178 @@ export default function Auth() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="glass-card rounded-2xl p-6 max-w-sm w-full"
             >
-              <div className="text-center mb-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
-                  <KeyRound className="w-8 h-8 text-primary" />
-                </div>
-                <h2 className="text-xl font-semibold text-foreground mb-2">
-                  Two-Factor Authentication
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  Enter the 6-digit code from your authenticator app
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    value={mfaCode}
-                    onChange={setMfaCode}
-                    disabled={mfaLoading}
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-
-                {/* Trust Device Option */}
-                <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 border border-border">
-                  <Checkbox
-                    id="trustDevice"
-                    checked={trustThisDevice}
-                    onCheckedChange={(checked) => setTrustThisDevice(checked === true)}
-                    disabled={mfaLoading}
-                  />
-                  <div className="flex-1">
-                    <Label 
-                      htmlFor="trustDevice" 
-                      className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-2"
-                    >
-                      <Monitor className="w-4 h-4 text-muted-foreground" />
-                      Trust this device
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Skip 2FA for 90 days on this browser
+              {/* Method chooser */}
+              {mfaMethod === 'choose' && (
+                <>
+                  <div className="text-center mb-6">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                      <Shield className="w-8 h-8 text-primary" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-foreground mb-2">
+                      Two-Factor Authentication
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Choose your verification method
                     </p>
                   </div>
-                </div>
+                  <div className="space-y-3">
+                    {mfaFactorId && (
+                      <Button
+                        variant="outline"
+                        className="w-full h-14 justify-start gap-3"
+                        onClick={() => { setMfaMethod('totp'); setMfaCode(''); }}
+                      >
+                        <Smartphone className="w-5 h-5 text-primary" />
+                        <div className="text-left">
+                          <p className="text-sm font-medium">Authenticator App</p>
+                          <p className="text-xs text-muted-foreground">6-digit code from your app</p>
+                        </div>
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      className="w-full h-14 justify-start gap-3"
+                      onClick={() => { setMfaMethod('email'); setMfaCode(''); sendEmailOtp(); }}
+                    >
+                      <Mail className="w-5 h-5 text-primary" />
+                      <div className="text-left">
+                        <p className="text-sm font-medium">Email Code</p>
+                        <p className="text-xs text-muted-foreground">6-digit code sent to your email</p>
+                      </div>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleCancelMfa}
+                      className="w-full text-muted-foreground"
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              )}
 
-                <Button
-                  onClick={handleMfaVerification}
-                  className="w-full"
-                  disabled={mfaCode.length !== 6 || mfaLoading}
-                >
-                  {mfaLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="mr-2 h-4 w-4" />
-                      Verify & Sign In
-                    </>
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={handleCancelMfa}
-                  className="w-full text-muted-foreground"
-                  disabled={mfaLoading}
-                >
-                  Cancel
-                </Button>
-              </div>
+              {/* TOTP verification */}
+              {mfaMethod === 'totp' && (
+                <>
+                  <div className="text-center mb-6">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                      <KeyRound className="w-8 h-8 text-primary" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-foreground mb-2">
+                      Authenticator Code
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      Enter the 6-digit code from your authenticator app
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    <div className="flex justify-center">
+                      <InputOTP maxLength={6} value={mfaCode} onChange={setMfaCode} disabled={mfaLoading}>
+                        <InputOTPGroup>
+                          <InputOTPSlot index={0} />
+                          <InputOTPSlot index={1} />
+                          <InputOTPSlot index={2} />
+                          <InputOTPSlot index={3} />
+                          <InputOTPSlot index={4} />
+                          <InputOTPSlot index={5} />
+                        </InputOTPGroup>
+                      </InputOTP>
+                    </div>
+
+                    <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 border border-border">
+                      <Checkbox id="trustDevice" checked={trustThisDevice} onCheckedChange={(checked) => setTrustThisDevice(checked === true)} disabled={mfaLoading} />
+                      <div className="flex-1">
+                        <Label htmlFor="trustDevice" className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-2">
+                          <Monitor className="w-4 h-4 text-muted-foreground" />
+                          Trust this device
+                        </Label>
+                        <p className="text-xs text-muted-foreground mt-0.5">Skip 2FA for 90 days on this browser</p>
+                      </div>
+                    </div>
+
+                    <Button onClick={handleMfaVerification} className="w-full" disabled={mfaCode.length !== 6 || mfaLoading}>
+                      {mfaLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</>) : (<><Shield className="mr-2 h-4 w-4" />Verify & Sign In</>)}
+                    </Button>
+                    {hasEmailOtp && (
+                      <Button variant="ghost" onClick={() => { setMfaMethod('choose'); setMfaCode(''); }} className="w-full text-muted-foreground" disabled={mfaLoading}>
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Other methods
+                      </Button>
+                    )}
+                    <Button variant="ghost" onClick={handleCancelMfa} className="w-full text-muted-foreground" disabled={mfaLoading}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              )}
+
+              {/* Email OTP verification */}
+              {mfaMethod === 'email' && (
+                <>
+                  <div className="text-center mb-6">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-primary/10 mb-4">
+                      <Mail className="w-8 h-8 text-primary" />
+                    </div>
+                    <h2 className="text-xl font-semibold text-foreground mb-2">
+                      Email Verification
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {emailOtpSent
+                        ? 'Enter the 6-digit code sent to your email'
+                        : 'Sending verification code to your email...'}
+                    </p>
+                  </div>
+                  <div className="space-y-4">
+                    {emailOtpSending && (
+                      <div className="flex justify-center py-4">
+                        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      </div>
+                    )}
+                    {emailOtpSent && !emailOtpSending && (
+                      <>
+                        <div className="flex justify-center">
+                          <InputOTP maxLength={6} value={mfaCode} onChange={setMfaCode} disabled={mfaLoading}>
+                            <InputOTPGroup>
+                              <InputOTPSlot index={0} />
+                              <InputOTPSlot index={1} />
+                              <InputOTPSlot index={2} />
+                              <InputOTPSlot index={3} />
+                              <InputOTPSlot index={4} />
+                              <InputOTPSlot index={5} />
+                            </InputOTPGroup>
+                          </InputOTP>
+                        </div>
+
+                        <div className="flex items-center space-x-3 p-3 rounded-lg bg-muted/50 border border-border">
+                          <Checkbox id="trustDeviceEmail" checked={trustThisDevice} onCheckedChange={(checked) => setTrustThisDevice(checked === true)} disabled={mfaLoading} />
+                          <div className="flex-1">
+                            <Label htmlFor="trustDeviceEmail" className="text-sm font-medium text-foreground cursor-pointer flex items-center gap-2">
+                              <Monitor className="w-4 h-4 text-muted-foreground" />
+                              Trust this device
+                            </Label>
+                            <p className="text-xs text-muted-foreground mt-0.5">Skip 2FA for 90 days on this browser</p>
+                          </div>
+                        </div>
+
+                        <Button onClick={handleMfaVerification} className="w-full" disabled={mfaCode.length !== 6 || mfaLoading}>
+                          {mfaLoading ? (<><Loader2 className="mr-2 h-4 w-4 animate-spin" />Verifying...</>) : (<><Shield className="mr-2 h-4 w-4" />Verify & Sign In</>)}
+                        </Button>
+
+                        <Button variant="link" onClick={sendEmailOtp} className="w-full text-sm" disabled={emailOtpSending}>
+                          Resend code
+                        </Button>
+                      </>
+                    )}
+                    {mfaFactorId && (
+                      <Button variant="ghost" onClick={() => { setMfaMethod('choose'); setMfaCode(''); }} className="w-full text-muted-foreground" disabled={mfaLoading}>
+                        <ArrowLeft className="mr-2 h-4 w-4" /> Other methods
+                      </Button>
+                    )}
+                    <Button variant="ghost" onClick={handleCancelMfa} className="w-full text-muted-foreground" disabled={mfaLoading}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
