@@ -69,14 +69,14 @@ export function PushNotificationSettings() {
       const registration = await navigator.serviceWorker.ready;
       
       // Check if already subscribed
-      let subscription = await registration.pushManager.getSubscription();
+      let subscription = await (registration as any).pushManager.getSubscription();
       
       if (!subscription) {
         // Get VAPID public key from environment
         const vapidKey = 'BG1h7v3LFX6J1eY8O5tFg_Qx0Y6nUKQv1q7m0xHc0w8v2KJb_L5nP8rM2sT3yU4w6A9oZ1dC3eF5gH7iJ9kL0m';
         
         try {
-          subscription = await registration.pushManager.subscribe({
+          subscription = await (registration as any).pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
           });
@@ -148,7 +148,7 @@ export function PushNotificationSettings() {
     try {
       // Get service worker registration
       const registration = await navigator.serviceWorker.ready;
-      const subscription = await registration.pushManager.getSubscription();
+      const subscription = await (registration as any).pushManager.getSubscription();
 
       if (subscription) {
         await subscription.unsubscribe();
