@@ -2,7 +2,8 @@ import { useState, useMemo, useCallback } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
- import { QrCode, Download, Printer, ExternalLink } from 'lucide-react';
+import { QrCode, Download, Printer, ExternalLink } from 'lucide-react';
+import { QRCodePrintDialog } from './QRCodePrintDialog';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getQRCodeFieldsConfig, QRCodeFieldsEditor } from './QRCodeFieldsEditor';
 import { format } from 'date-fns';
@@ -53,6 +54,7 @@ export function DeviceQRCode({
 }: DeviceQRCodeProps) {
   const { language } = useLanguage();
   const [open, setOpen] = useState(false);
+  const [printOpen, setPrintOpen] = useState(false);
   const [settingsVersion, setSettingsVersion] = useState(0);
 
   const handleSettingsChange = useCallback(() => {
@@ -240,55 +242,7 @@ export function DeviceQRCode({
   };
 
   const handlePrint = () => {
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const svg = document.getElementById(`qr-${device.id}`);
-    if (!svg) return;
-
-    const svgData = new XMLSerializer().serializeToString(svg);
-    const infoHtml = displayInfo
-      .map(item => `<p><strong>${item.label}:</strong> ${item.value}</p>`)
-      .join('');
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>QR Code - ${device.device_name}</title>
-          <style>
-            body { 
-              display: flex; 
-              flex-direction: column; 
-              align-items: center; 
-              justify-content: center; 
-              min-height: 100vh; 
-              margin: 0;
-              font-family: system-ui, sans-serif;
-            }
-            .container {
-              text-align: center;
-              padding: 20px;
-            }
-            h2 { margin-bottom: 10px; font-size: 18px; }
-            p { margin: 5px 0; font-size: 14px; color: #666; }
-            .qr { margin: 20px 0; }
-            .info { text-align: left; max-width: 300px; margin: 0 auto; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <h2>${device.device_name}</h2>
-            <div class="qr">${svgData}</div>
-            <div class="info">${infoHtml}</div>
-          </div>
-          <script>
-            window.onload = function() { window.print(); window.close(); }
-          </script>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
+    setPrintOpen(true);
   };
 
   return (
@@ -374,6 +328,13 @@ export function DeviceQRCode({
           </div>
         </DialogContent>
       </Dialog>
+      <QRCodePrintDialog
+        open={printOpen}
+        onOpenChange={setPrintOpen}
+        deviceName={device.device_name}
+        qrSvgId={`qr-${device.id}`}
+        displayInfo={displayInfo}
+      />
     </>
   );
 }
