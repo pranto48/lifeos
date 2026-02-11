@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History, ListTodo, Eye, CheckSquare, Clock, AlertCircle, HardDrive } from 'lucide-react';
+import { Building2, Users, Briefcase, Plus, Pencil, Trash2, Monitor, Globe, Phone, Mail, User, Search, X, Download, Upload, Printer, BarChart3, History, ListTodo, Eye, CheckSquare, Clock, AlertCircle, HardDrive, Flag } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,7 @@ import { PasswordField } from '@/components/support/PasswordField';
 import { DeviceManagement, DeviceEntry } from '@/components/support/DeviceManagement';
 import { UserDeviceAssignment } from '@/components/support/UserDeviceAssignment';
 import { useDeviceInventory } from '@/hooks/useDeviceInventory';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SupportUserTask {
   id: string;
@@ -30,9 +31,12 @@ interface SupportUserTask {
   status: string | null;
   due_date: string | null;
   created_at: string;
+  needs_follow_up: boolean | null;
+  follow_up_date: string | null;
 }
 
 export default function SupportUsers() {
+  const { user } = useAuth();
   const { t, language } = useLanguage();
   const {
     units,
@@ -100,6 +104,8 @@ export default function SupportUsers() {
   const [taskDetailsDialog, setTaskDetailsDialog] = useState<{ open: boolean; user: SupportUser | null }>({ open: false, user: null });
   const [userTasks, setUserTasks] = useState<SupportUserTask[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
+  const [creatingTask, setCreatingTask] = useState(false);
+  const [newTaskForm, setNewTaskForm] = useState({ title: '', description: '', priority: 'medium' });
 
   // Devices for user form (old manual device entries)
   const [userDevices, setUserDevices] = useState<DeviceEntry[]>([]);
@@ -164,7 +170,7 @@ export default function SupportUsers() {
     setLoadingTasks(true);
     const { data, error } = await supabase
       .from('tasks')
-      .select('id, title, description, priority, status, due_date, created_at')
+      .select('id, title, description, priority, status, due_date, created_at, needs_follow_up, follow_up_date')
       .eq('support_user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -176,8 +182,38 @@ export default function SupportUsers() {
     setLoadingTasks(false);
   };
 
+  const createTaskForUser = async (supportUserId: string) => {
+    if (!user || !newTaskForm.title.trim()) return;
+    setCreatingTask(true);
+    try {
+      const { error } = await supabase.from('tasks').insert({
+        user_id: user.id,
+        title: newTaskForm.title.trim(),
+        description: newTaskForm.description.trim() || null,
+        priority: newTaskForm.priority,
+        status: 'todo',
+        task_type: 'office',
+        support_user_id: supportUserId,
+      });
+      if (error) throw error;
+      toast.success(language === 'bn' ? 'টাস্ক তৈরি হয়েছে' : 'Task created');
+      setNewTaskForm({ title: '', description: '', priority: 'medium' });
+      loadUserTasks(supportUserId);
+      // Update task counts
+      setTaskCounts(prev => ({
+        ...prev,
+        [supportUserId]: (prev[supportUserId] || 0) + 1,
+      }));
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setCreatingTask(false);
+    }
+  };
+
   const openTaskDetailsDialog = (user: SupportUser) => {
     setTaskDetailsDialog({ open: true, user });
+    setNewTaskForm({ title: '', description: '', priority: 'medium' });
     loadUserTasks(user.id);
   };
 
@@ -1768,8 +1804,48 @@ export default function SupportUsers() {
               })()}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Quick Create Task Form */}
+          <div className="p-3 rounded-lg border border-border bg-muted/30 space-y-3">
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              {language === 'bn' ? 'নতুন টাস্ক তৈরি করুন' : 'Create New Task'}
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                placeholder={language === 'bn' ? 'টাস্কের শিরোনাম...' : 'Task title...'}
+                value={newTaskForm.title}
+                onChange={(e) => setNewTaskForm(f => ({ ...f, title: e.target.value }))}
+                className="flex-1 bg-background"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && taskDetailsDialog.user) {
+                    e.preventDefault();
+                    createTaskForUser(taskDetailsDialog.user.id);
+                  }
+                }}
+              />
+              <Select value={newTaskForm.priority} onValueChange={(v) => setNewTaskForm(f => ({ ...f, priority: v }))}>
+                <SelectTrigger className="w-[120px] bg-background">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">{language === 'bn' ? 'নিম্ন' : 'Low'}</SelectItem>
+                  <SelectItem value="medium">{language === 'bn' ? 'মাঝারি' : 'Medium'}</SelectItem>
+                  <SelectItem value="high">{language === 'bn' ? 'উচ্চ' : 'High'}</SelectItem>
+                  <SelectItem value="urgent">{language === 'bn' ? 'জরুরি' : 'Urgent'}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                size="sm"
+                disabled={!newTaskForm.title.trim() || creatingTask}
+                onClick={() => taskDetailsDialog.user && createTaskForUser(taskDetailsDialog.user.id)}
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
           
-          <ScrollArea className="max-h-[50vh]">
+          <ScrollArea className="max-h-[40vh]">
             {loadingTasks ? (
               <div className="py-8 text-center text-muted-foreground">
                 {language === 'bn' ? 'লোড হচ্ছে...' : 'Loading tasks...'}
@@ -1816,6 +1892,12 @@ export default function SupportUsers() {
                                   {task.status}
                                 </Badge>
                               )}
+                              {task.needs_follow_up && (
+                                <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-500 flex items-center gap-1">
+                                  <Flag className="h-3 w-3" />
+                                  {task.follow_up_date ? format(new Date(task.follow_up_date), 'dd MMM') : 'Follow-up'}
+                                </Badge>
+                              )}
                               {task.due_date && (
                                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                                   <Clock className="h-3 w-3" />
@@ -1843,6 +1925,12 @@ export default function SupportUsers() {
                 <>
                   {' • '}
                   {userTasks.filter(t => t.status === 'completed').length} {language === 'bn' ? 'সম্পন্ন' : 'completed'}
+                  {userTasks.filter(t => t.needs_follow_up).length > 0 && (
+                    <>
+                      {' • '}
+                      <span className="text-amber-500">{userTasks.filter(t => t.needs_follow_up).length} follow-up</span>
+                    </>
+                  )}
                 </>
               )}
             </div>
