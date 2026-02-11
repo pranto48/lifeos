@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen, Settings2, CheckCheck, UserPlus } from 'lucide-react';
+import { CheckSquare, Pencil, Trash2, GripVertical, MoreVertical, ChevronDown, ChevronUp, ArrowRightLeft, Repeat, FolderOpen, Settings2, CheckCheck, UserPlus, Flag, CalendarClock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -27,6 +27,7 @@ import { TaskAssignDialog } from '@/components/tasks/TaskAssignDialog';
 import { PendingTaskAssignments } from '@/components/tasks/PendingTaskAssignments';
 import { OutgoingTaskAssignments } from '@/components/tasks/OutgoingTaskAssignments';
 import { TaskAssignmentHistory } from '@/components/tasks/TaskAssignmentHistory';
+import { TaskFollowUp } from '@/components/tasks/TaskFollowUp';
 import {
   DndContext,
   closestCenter,
@@ -65,6 +66,8 @@ interface Task {
   recurring_pattern: string | null;
   category_id: string | null;
   support_user_id: string | null;
+  needs_follow_up: boolean | null;
+  follow_up_date: string | null;
 }
 
 interface SupportUserInfo {
@@ -176,6 +179,14 @@ function SortableTask({ task, checklists, categories, supportUserInfo, onToggle,
               {getPatternLabel(task.recurring_pattern || 'weekly')}
             </Badge>
           )}
+          {task.needs_follow_up && (
+            <Badge variant="outline" className="text-[10px] md:text-xs flex items-center gap-1 border-amber-500/50 text-amber-500">
+              <Flag className="h-3 w-3" />
+              <span className="hidden md:inline">
+                {task.follow_up_date ? format(new Date(task.follow_up_date), 'MMM d') : 'Follow-up'}
+              </span>
+            </Badge>
+          )}
           {task.priority && (
             <Badge className={`text-[10px] md:text-xs ${priorityColors[task.priority] || 'bg-muted text-muted-foreground'}`}>
               {task.priority}
@@ -271,6 +282,8 @@ export default function Tasks() {
     recurring_pattern: 'weekly',
     category_id: '',
     support_user_id: '',
+    needs_follow_up: false,
+    follow_up_date: '',
   });
   
   // Support users for office mode task editing
@@ -441,6 +454,8 @@ export default function Tasks() {
       recurring_pattern: task.recurring_pattern || 'weekly',
       category_id: task.category_id || '',
       support_user_id: task.support_user_id || '',
+      needs_follow_up: task.needs_follow_up || false,
+      follow_up_date: task.follow_up_date || '',
     });
     setEditDialogOpen(true);
   };
@@ -458,6 +473,8 @@ export default function Tasks() {
       recurring_pattern: formData.is_recurring ? formData.recurring_pattern : null,
       category_id: formData.category_id || null,
       support_user_id: mode === 'office' ? (formData.support_user_id || null) : null,
+      needs_follow_up: formData.needs_follow_up,
+      follow_up_date: formData.needs_follow_up && formData.follow_up_date ? formData.follow_up_date : null,
     };
 
     const { error } = await supabase.from('tasks').update(updatedData).eq('id', editingTask.id);
@@ -541,6 +558,7 @@ export default function Tasks() {
     // Status filter
     if (filter === 'completed' && t.status !== 'completed') return false;
     if (filter === 'active' && t.status === 'completed') return false;
+    if (filter === 'follow-up' && !t.needs_follow_up) return false;
     // Category filter
     if (categoryFilter !== 'all') {
       if (categoryFilter === 'uncategorized') return !t.category_id;
@@ -565,6 +583,7 @@ export default function Tasks() {
     all: t('common.all'),
     active: t('tasks.active'),
     completed: t('tasks.completed'),
+    'follow-up': 'Follow-Up',
   };
 
   return (
@@ -593,13 +612,15 @@ export default function Tasks() {
             <Settings2 className="h-4 w-4" />
             Categories
           </Button>
-          {['all', 'active', 'completed'].map((f) => (
+          {['all', 'active', 'completed', 'follow-up'].map((f) => (
             <Button
               key={f}
               variant={filter === f ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setFilter(f)}
+              className={f === 'follow-up' ? 'gap-1' : ''}
             >
+              {f === 'follow-up' && <Flag className="h-3 w-3" />}
               {filterLabels[f]}
             </Button>
           ))}
@@ -847,6 +868,18 @@ export default function Tasks() {
               recurringPattern={formData.recurring_pattern}
               onRecurringPatternChange={(v) => setFormData((f) => ({ ...f, recurring_pattern: v }))}
             />
+            {editingTask && (
+              <TaskFollowUp
+                taskId={editingTask.id}
+                needsFollowUp={formData.needs_follow_up}
+                followUpDate={formData.follow_up_date || null}
+                onUpdate={(data) => setFormData((f) => ({
+                  ...f,
+                  needs_follow_up: data.needs_follow_up,
+                  follow_up_date: data.follow_up_date || '',
+                }))}
+              />
+            )}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setEditDialogOpen(false)}>
                 Cancel

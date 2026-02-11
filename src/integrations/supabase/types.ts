@@ -1866,6 +1866,38 @@ export type Database = {
           },
         ]
       }
+      task_follow_up_notes: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          task_id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          task_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          task_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "task_follow_up_notes_task_id_fkey"
+            columns: ["task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tasks: {
         Row: {
           category_id: string | null
@@ -1875,8 +1907,10 @@ export type Database = {
           due_date: string | null
           due_time: string | null
           estimated_time: number | null
+          follow_up_date: string | null
           id: string
           is_recurring: boolean | null
+          needs_follow_up: boolean | null
           priority: string | null
           project_id: string | null
           recurring_pattern: string | null
@@ -1897,8 +1931,10 @@ export type Database = {
           due_date?: string | null
           due_time?: string | null
           estimated_time?: number | null
+          follow_up_date?: string | null
           id?: string
           is_recurring?: boolean | null
+          needs_follow_up?: boolean | null
           priority?: string | null
           project_id?: string | null
           recurring_pattern?: string | null
@@ -1919,8 +1955,10 @@ export type Database = {
           due_date?: string | null
           due_time?: string | null
           estimated_time?: number | null
+          follow_up_date?: string | null
           id?: string
           is_recurring?: boolean | null
+          needs_follow_up?: boolean | null
           priority?: string | null
           project_id?: string | null
           recurring_pattern?: string | null
