@@ -85,10 +85,14 @@ export function QRCodePrintDialog({
 
   const handlePrint = () => {
     const svg = document.getElementById(qrSvgId);
-    if (!svg) return;
+    if (!svg) {
+      console.error('QR SVG element not found:', qrSvgId);
+      return;
+    }
 
     const config = PRINT_SIZES[size];
-    const svgData = new XMLSerializer().serializeToString(svg);
+    const svgClone = svg.cloneNode(true) as Element;
+    const svgData = new XMLSerializer().serializeToString(svgClone);
 
     const visibleInfo = displayInfo.slice(0, config.maxInfoLines);
     const infoHtml = config.showInfo
@@ -100,11 +104,7 @@ export function QRCodePrintDialog({
           .join('')
       : '';
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
+    const htmlContent = `<!DOCTYPE html>
       <html>
         <head>
           <title>QR - ${deviceName}</title>
@@ -155,11 +155,36 @@ export function QRCodePrintDialog({
               ${infoHtml}
             </div>
           </div>
-          <script>window.onload=function(){window.print();window.close();}<\/script>
         </body>
-      </html>
-    `);
-    printWindow.document.close();
+      </html>`;
+
+    // Use iframe approach to avoid popup blockers
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      document.body.removeChild(iframe);
+      return;
+    }
+
+    iframeDoc.open();
+    iframeDoc.write(htmlContent);
+    iframeDoc.close();
+
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 250);
+
     onOpenChange(false);
   };
 
