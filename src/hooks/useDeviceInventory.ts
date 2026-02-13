@@ -54,6 +54,7 @@ export interface DeviceInventory {
   webcam_info: string | null;
   headset_info: string | null;
   custom_specs: Record<string, string> | null;
+  processor_info: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -127,6 +128,7 @@ export function useDeviceInventory() {
       const devices = devicesRes.data.map(d => ({
         ...d,
         custom_specs: d.custom_specs as Record<string, string> | null,
+        processor_info: (d as any).processor_info as string | null,
       }));
       setDevices(devices);
     }
