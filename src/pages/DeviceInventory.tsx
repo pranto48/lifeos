@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { 
   HardDrive, Plus, Pencil, Trash2, Download, 
   Wrench, User, Tag, DollarSign, FileText,
-  MoreVertical, Eye, Users, Building2, Truck
+  MoreVertical, Eye, Users, Building2, Truck, PackageX
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
@@ -30,6 +30,7 @@ import { DeviceSpecsForm } from '@/components/device/DeviceSpecsForm';
 import { CascadingAssignment } from '@/components/device/CascadingAssignment';
 import { DeviceFilters } from '@/components/device/DeviceFilters';
 import { SupplierManager } from '@/components/device/SupplierManager';
+import { DeviceDisposalDialog } from '@/components/device/DeviceDisposalDialog';
 import { AnimatedIcon, LoadingSpinner, PulsingDot } from '@/components/ui/animated-icon';
 
 const STATUS_OPTIONS = [
@@ -158,6 +159,9 @@ export default function DeviceInventoryPage() {
 
   // Device details dialog
   const [detailsDialog, setDetailsDialog] = useState<{ open: boolean; device: DeviceType | null }>({ open: false, device: null });
+
+  // Disposal dialog
+  const [disposalDialog, setDisposalDialog] = useState<{ open: boolean; device: DeviceType | null }>({ open: false, device: null });
 
   // Tasks for linking
   const [availableTasks, setAvailableTasks] = useState<{ id: string; title: string }[]>([]);
@@ -602,6 +606,7 @@ export default function DeviceInventoryPage() {
     available: devices.filter(d => d.status === 'available').length,
     assigned: devices.filter(d => d.status === 'assigned').length,
     maintenance: devices.filter(d => d.status === 'maintenance').length,
+    disposed: devices.filter(d => d.status === 'disposed').length,
     expiringWarranty: devices.filter(d => {
       const status = getWarrantyStatus(d.warranty_date);
       return status?.status === 'expiring';
@@ -686,12 +691,13 @@ export default function DeviceInventoryPage() {
       </motion.div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 md:gap-4">
+      <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-6 gap-2 md:gap-4">
         {[
           { value: stats.total, label: language === 'bn' ? 'মোট ডিভাইস' : 'Total Devices', color: 'text-foreground', bg: 'bg-card' },
           { value: stats.available, label: language === 'bn' ? 'উপলব্ধ' : 'Available', color: 'text-green-600', bg: 'bg-green-500/10 border-green-500/20' },
           { value: stats.assigned, label: language === 'bn' ? 'বরাদ্দকৃত' : 'Assigned', color: 'text-blue-600', bg: 'bg-blue-500/10 border-blue-500/20' },
           { value: stats.maintenance, label: language === 'bn' ? 'রক্ষণাবেক্ষণে' : 'Maintenance', color: 'text-yellow-600', bg: 'bg-yellow-500/10 border-yellow-500/20' },
+          { value: stats.disposed, label: language === 'bn' ? 'বাতিল' : 'Disposed', color: 'text-red-600', bg: 'bg-red-500/10 border-red-500/20' },
           { value: stats.expiringWarranty, label: language === 'bn' ? 'ওয়ারেন্টি শেষ' : 'Warranty Expiring', color: 'text-orange-600', bg: 'bg-orange-500/10 border-orange-500/20' },
         ].map((stat, index) => (
           <motion.div
@@ -864,6 +870,13 @@ export default function DeviceInventoryPage() {
                               {isAdmin && (
                                 <>
                                   <DropdownMenuSeparator />
+                                  <DropdownMenuItem 
+                                    onClick={() => setDisposalDialog({ open: true, device })}
+                                    className="text-orange-600 focus:text-orange-600"
+                                  >
+                                    <PackageX className="h-4 w-4 mr-2" />
+                                    {language === 'bn' ? 'বাতিল করুন' : 'Dispose'}
+                                  </DropdownMenuItem>
                                   <DropdownMenuItem 
                                     onClick={() => handleDeleteDevice(device.id)}
                                     className="text-destructive focus:text-destructive"
@@ -1501,6 +1514,14 @@ export default function DeviceInventoryPage() {
           />
         </DialogContent>
       </Dialog>
+
+      {/* Device Disposal Dialog */}
+      <DeviceDisposalDialog
+        open={disposalDialog.open}
+        onOpenChange={(open) => setDisposalDialog({ open, device: open ? disposalDialog.device : null })}
+        device={disposalDialog.device}
+        onDeviceDisposed={reload}
+      />
     </motion.div>
   );
 }

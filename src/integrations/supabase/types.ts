@@ -271,6 +271,62 @@ export type Database = {
         }
         Relationships: []
       }
+      device_disposals: {
+        Row: {
+          approved_by: string | null
+          buyer_info: string | null
+          certificate_number: string | null
+          created_at: string
+          device_id: string
+          disposal_date: string
+          disposal_method: string
+          disposal_reason: string | null
+          disposal_value: number | null
+          id: string
+          notes: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_by?: string | null
+          buyer_info?: string | null
+          certificate_number?: string | null
+          created_at?: string
+          device_id: string
+          disposal_date?: string
+          disposal_method?: string
+          disposal_reason?: string | null
+          disposal_value?: number | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_by?: string | null
+          buyer_info?: string | null
+          certificate_number?: string | null
+          created_at?: string
+          device_id?: string
+          disposal_date?: string
+          disposal_method?: string
+          disposal_reason?: string | null
+          disposal_value?: number | null
+          id?: string
+          notes?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "device_disposals_device_id_fkey"
+            columns: ["device_id"]
+            isOneToOne: false
+            referencedRelation: "device_inventory"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       device_inventory: {
         Row: {
           bill_details: string | null
