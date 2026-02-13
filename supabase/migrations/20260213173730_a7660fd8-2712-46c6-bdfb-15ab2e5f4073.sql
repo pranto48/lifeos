@@ -1,0 +1,1 @@
+ALTER TABLE public.device_inventory ADD COLUMN IF NOT EXISTS processor_info text;

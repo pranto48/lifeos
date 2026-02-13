@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 interface DeviceSpecs {
   ram_info: string;
   storage_info: string;
+  processor_info: string;
   has_ups: boolean;
   ups_info: string;
   monitor_info: string;
@@ -114,6 +115,20 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
               value={specs.storage_info}
               onChange={(e) => onChange({ ...specs, storage_info: e.target.value })}
               placeholder={language === 'bn' ? '256GB SSD + 1TB HDD' : '256GB SSD + 1TB HDD'}
+              className="text-sm"
+            />
+          </div>
+
+          {/* Processor */}
+          <div className="space-y-2">
+            <Label className="text-xs flex items-center gap-1.5">
+              <Cpu className="h-3.5 w-3.5" />
+              {language === 'bn' ? 'প্রসেসর' : 'Processor'}
+            </Label>
+            <Input
+              value={specs.processor_info}
+              onChange={(e) => onChange({ ...specs, processor_info: e.target.value })}
+              placeholder={language === 'bn' ? 'Intel Core i5-12th Gen' : 'Intel Core i5-12th Gen'}
               className="text-sm"
             />
           </div>

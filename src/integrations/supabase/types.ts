@@ -287,6 +287,7 @@ export type Database = {
           monitor_info: string | null
           notes: string | null
           price: number | null
+          processor_info: string | null
           purchase_date: string | null
           ram_info: string | null
           requisition_number: string | null
@@ -318,6 +319,7 @@ export type Database = {
           monitor_info?: string | null
           notes?: string | null
           price?: number | null
+          processor_info?: string | null
           purchase_date?: string | null
           ram_info?: string | null
           requisition_number?: string | null
@@ -349,6 +351,7 @@ export type Database = {
           monitor_info?: string | null
           notes?: string | null
           price?: number | null
+          processor_info?: string | null
           purchase_date?: string | null
           ram_info?: string | null
           requisition_number?: string | null

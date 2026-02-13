@@ -90,6 +90,9 @@ export default function DeviceInventoryPage() {
     department: 'all',
     supportUser: 'all',
     supplier: 'all',
+    ramType: 'all',
+    storageType: 'all',
+    processorGen: 'all',
   });
 
   // Supplier management dialog
@@ -117,6 +120,7 @@ export default function DeviceInventoryPage() {
     // Device specs
     ram_info: '',
     storage_info: '',
+    processor_info: '',
     has_ups: false,
     ups_info: '',
     monitor_info: '',
@@ -205,6 +209,49 @@ export default function DeviceInventoryPage() {
       if (filters.unitLocation !== 'all' && device.unit_id !== filters.unitLocation) return false;
       if (filters.supplier !== 'all' && device.supplier_id !== filters.supplier) return false;
       
+      // RAM type filter
+      if (filters.ramType !== 'all') {
+        const ram = (device.ram_info || '').toLowerCase();
+        if (!ram.includes(filters.ramType.replace('ddr', 'ddr'))) return false;
+      }
+
+      // Storage type filter
+      if (filters.storageType !== 'all') {
+        const storage = (device.storage_info || '').toLowerCase();
+        if (filters.storageType === 'nvme' && !storage.includes('nvme')) return false;
+        if (filters.storageType === 'sata_ssd' && !(storage.includes('sata') || (storage.includes('ssd') && !storage.includes('nvme')))) return false;
+        if (filters.storageType === 'hdd' && !storage.includes('hdd')) return false;
+      }
+
+      // Processor generation filter
+      if (filters.processorGen !== 'all') {
+        const proc = ((device as any).processor_info || '').toLowerCase();
+        const ram = (device.ram_info || '').toLowerCase(); // fallback search in other fields
+        const notes = (device.notes || '').toLowerCase();
+        const customSpecs = device.custom_specs ? JSON.stringify(device.custom_specs).toLowerCase() : '';
+        const allText = `${proc} ${notes} ${customSpecs}`;
+        
+        const genMap: Record<string, string[]> = {
+          'gen8': ['8th gen', 'i3-8', 'i5-8', 'i7-8', 'i9-8', '8th generation'],
+          'gen9': ['9th gen', 'i3-9', 'i5-9', 'i7-9', 'i9-9', '9th generation'],
+          'gen10': ['10th gen', 'i3-10', 'i5-10', 'i7-10', 'i9-10', '10th generation'],
+          'gen11': ['11th gen', 'i3-11', 'i5-11', 'i7-11', 'i9-11', '11th generation'],
+          'gen12': ['12th gen', 'i3-12', 'i5-12', 'i7-12', 'i9-12', '12th generation'],
+          'gen13': ['13th gen', 'i3-13', 'i5-13', 'i7-13', 'i9-13', '13th generation'],
+          'gen14': ['14th gen', 'i3-14', 'i5-14', 'i7-14', 'i9-14', '14th generation'],
+          'ryzen3': ['ryzen 3', 'ryzen3'],
+          'ryzen5': ['ryzen 5', 'ryzen5'],
+          'ryzen7': ['ryzen 7', 'ryzen7'],
+          'ryzen9': ['ryzen 9', 'ryzen9'],
+          'apple_m1': ['m1', 'apple m1'],
+          'apple_m2': ['m2', 'apple m2'],
+          'apple_m3': ['m3', 'apple m3'],
+          'apple_m4': ['m4', 'apple m4'],
+        };
+        const keywords = genMap[filters.processorGen] || [];
+        if (!keywords.some(kw => allText.includes(kw))) return false;
+      }
+
       // Cascading user filter
       if (filters.supportUser !== 'all') {
         if (device.support_user_id !== filters.supportUser) return false;
@@ -255,6 +302,7 @@ export default function DeviceInventoryPage() {
         unit_id: device.unit_id || '',
         ram_info: device.ram_info || '',
         storage_info: device.storage_info || '',
+        processor_info: (device as any).processor_info || '',
         has_ups: device.has_ups || false,
         ups_info: device.ups_info || '',
         monitor_info: device.monitor_info || '',
@@ -283,6 +331,7 @@ export default function DeviceInventoryPage() {
         unit_id: '',
         ram_info: '',
         storage_info: '',
+        processor_info: '',
         has_ups: false,
         ups_info: '',
         monitor_info: '',
@@ -336,6 +385,7 @@ export default function DeviceInventoryPage() {
       unit_id: deviceForm.unit_id || null,
       ram_info: deviceForm.ram_info || null,
       storage_info: deviceForm.storage_info || null,
+      processor_info: deviceForm.processor_info || null,
       has_ups: deviceForm.has_ups,
       ups_info: deviceForm.ups_info || null,
       monitor_info: deviceForm.monitor_info || null,
@@ -501,12 +551,13 @@ export default function DeviceInventoryPage() {
 
   // Export to CSV
   const exportToCSV = () => {
-    const headers = ['Device Name', 'Serial Number', 'Category', 'Status', 'Purchase Date', 'Delivery Date', 'Supplier', 'Requisition No', 'BOD No', 'Warranty Date', 'Price', 'Assigned To', 'Notes'];
+    const headers = ['Device Name', 'Device Number', 'Serial Number', 'Category', 'Status', 'Purchase Date', 'Delivery Date', 'Supplier', 'Requisition No', 'BOD No', 'Warranty Date', 'Price', 'Assigned To', 'Unit', 'Department', 'RAM Info', 'Storage Info', 'Processor Info', 'UPS', 'Monitor', 'Webcam', 'Headset', 'Notes'];
     const rows = filteredDevices.map(device => {
       const category = categories.find(c => c.id === device.category_id);
       const supportUser = device.support_user_id ? supportUserMap[device.support_user_id] : null;
       return [
         device.device_name,
+        device.device_number || '',
         device.serial_number || '',
         category?.name || '',
         STATUS_OPTIONS.find(s => s.value === device.status)?.label || device.status,
@@ -518,6 +569,15 @@ export default function DeviceInventoryPage() {
         device.warranty_date || '',
         device.price?.toString() || '',
         supportUser?.name || '',
+        supportUser?.unit_name || '',
+        supportUser?.department_name || '',
+        device.ram_info || '',
+        device.storage_info || '',
+        (device as any).processor_info || '',
+        device.has_ups ? (device.ups_info || 'Yes') : 'No',
+        device.monitor_info || '',
+        device.webcam_info || '',
+        device.headset_info || '',
         device.notes || '',
       ];
     });
@@ -527,7 +587,7 @@ export default function DeviceInventoryPage() {
       ...rows.map(row => row.map(cell => `"${(cell || '').replace(/"/g, '""')}"`).join(','))
     ].join('\n');
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = `device_inventory_${format(new Date(), 'yyyy-MM-dd')}.csv`;
@@ -1054,6 +1114,7 @@ export default function DeviceInventoryPage() {
               specs={{
                 ram_info: deviceForm.ram_info,
                 storage_info: deviceForm.storage_info,
+                processor_info: deviceForm.processor_info,
                 has_ups: deviceForm.has_ups,
                 ups_info: deviceForm.ups_info,
                 monitor_info: deviceForm.monitor_info,

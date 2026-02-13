@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, Filter, Building2, Users, Truck, Tag, Activity, X } from 'lucide-react';
+import { Search, Filter, Building2, Users, Truck, Tag, Activity, X, Cpu, MemoryStick, HardDrive } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,9 @@ interface FilterState {
   department: string;
   supportUser: string;
   supplier: string;
+  ramType: string;
+  storageType: string;
+  processorGen: string;
 }
 
 interface DeviceSupplier {
@@ -97,8 +100,41 @@ export function DeviceFilters({
       department: 'all',
       supportUser: 'all',
       supplier: 'all',
+      ramType: 'all',
+      storageType: 'all',
+      processorGen: 'all',
     });
   };
+
+  const RAM_TYPES = [
+    { value: 'ddr3', label: 'DDR3' },
+    { value: 'ddr4', label: 'DDR4' },
+    { value: 'ddr5', label: 'DDR5' },
+  ];
+
+  const STORAGE_TYPES = [
+    { value: 'nvme', label: 'NVMe SSD' },
+    { value: 'sata_ssd', label: 'SATA SSD' },
+    { value: 'hdd', label: 'HDD' },
+  ];
+
+  const PROCESSOR_GENS = [
+    { value: 'gen8', label: '8th Gen' },
+    { value: 'gen9', label: '9th Gen' },
+    { value: 'gen10', label: '10th Gen' },
+    { value: 'gen11', label: '11th Gen' },
+    { value: 'gen12', label: '12th Gen' },
+    { value: 'gen13', label: '13th Gen' },
+    { value: 'gen14', label: '14th Gen' },
+    { value: 'ryzen3', label: 'Ryzen 3' },
+    { value: 'ryzen5', label: 'Ryzen 5' },
+    { value: 'ryzen7', label: 'Ryzen 7' },
+    { value: 'ryzen9', label: 'Ryzen 9' },
+    { value: 'apple_m1', label: 'Apple M1' },
+    { value: 'apple_m2', label: 'Apple M2' },
+    { value: 'apple_m3', label: 'Apple M3' },
+    { value: 'apple_m4', label: 'Apple M4' },
+  ];
 
   const FilterContent = () => (
     <motion.div 
@@ -176,6 +212,57 @@ export function DeviceFilters({
         </Select>
       </div>
 
+      {/* Hardware Specs Filters */}
+      <div className="grid grid-cols-3 gap-2 md:flex md:flex-wrap md:gap-2">
+        {/* RAM Type */}
+        <Select value={filters.ramType} onValueChange={(v) => updateFilter('ramType', v)}>
+          <SelectTrigger className="w-full md:w-[120px] h-9 text-sm group">
+            <motion.div className="flex items-center gap-1.5" whileHover={{ scale: 1.02 }}>
+              <MemoryStick className="h-3.5 w-3.5 text-primary" />
+              <SelectValue placeholder="RAM" />
+            </motion.div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{language === 'bn' ? 'সব RAM' : 'All RAM'}</SelectItem>
+            {RAM_TYPES.map(r => (
+              <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Storage Type */}
+        <Select value={filters.storageType} onValueChange={(v) => updateFilter('storageType', v)}>
+          <SelectTrigger className="w-full md:w-[130px] h-9 text-sm group">
+            <motion.div className="flex items-center gap-1.5" whileHover={{ scale: 1.02 }}>
+              <HardDrive className="h-3.5 w-3.5 text-primary" />
+              <SelectValue placeholder="Storage" />
+            </motion.div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{language === 'bn' ? 'সব স্টোরেজ' : 'All Storage'}</SelectItem>
+            {STORAGE_TYPES.map(s => (
+              <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Processor Generation */}
+        <Select value={filters.processorGen} onValueChange={(v) => updateFilter('processorGen', v)}>
+          <SelectTrigger className="w-full md:w-[140px] h-9 text-sm group">
+            <motion.div className="flex items-center gap-1.5" whileHover={{ scale: 1.02 }}>
+              <Cpu className="h-3.5 w-3.5 text-primary" />
+              <SelectValue placeholder="Processor" />
+            </motion.div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{language === 'bn' ? 'সব প্রসেসর' : 'All Processors'}</SelectItem>
+            {PROCESSOR_GENS.map(p => (
+              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* Cascading User Filter - Advanced */}
       <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
         <CollapsibleTrigger asChild>
@@ -203,7 +290,6 @@ export function DeviceFilters({
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
           >
-            {/* Department (cascades from Unit) */}
             <Select 
               value={filters.department} 
               onValueChange={(v) => updateFilter('department', v)}
@@ -220,7 +306,6 @@ export function DeviceFilters({
               </SelectContent>
             </Select>
 
-            {/* Support User (cascades from Department) */}
             <Select 
               value={filters.supportUser} 
               onValueChange={(v) => updateFilter('supportUser', v)}
