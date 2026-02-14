@@ -1,6 +1,6 @@
 # LifeOS - Personal Life Management System
 
-[![CI/CD Pipeline](https://github.com/YOUR_USERNAME/lifeos/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/YOUR_USERNAME/lifeos/actions/workflows/ci-cd.yaml)
+[![CI/CD Pipeline](https://github.com/pranto48/lifeos/actions/workflows/ci-cd.yaml/badge.svg)](https://github.com/YOUR_USERNAME/lifeos/actions/workflows/ci-cd.yaml)
 [![Docker Image](https://img.shields.io/badge/docker-ghcr.io-blue)](https://ghcr.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
