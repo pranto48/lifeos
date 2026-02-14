@@ -1,11 +1,74 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, Cpu, HardDrive, Monitor, Headphones, Video, Zap } from 'lucide-react';
+import { Plus, X, Cpu, HardDrive, Monitor, Headphones, Video, Zap, MemoryStick } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+const RAM_OPTIONS = [
+  { value: '4GB DDR3', label: '4GB DDR3' },
+  { value: '8GB DDR3', label: '8GB DDR3' },
+  { value: '4GB DDR4', label: '4GB DDR4' },
+  { value: '8GB DDR4', label: '8GB DDR4' },
+  { value: '16GB DDR4', label: '16GB DDR4' },
+  { value: '32GB DDR4', label: '32GB DDR4' },
+  { value: '8GB DDR5', label: '8GB DDR5' },
+  { value: '16GB DDR5', label: '16GB DDR5' },
+  { value: '32GB DDR5', label: '32GB DDR5' },
+  { value: '64GB DDR5', label: '64GB DDR5' },
+];
+
+const STORAGE_OPTIONS = [
+  { value: '128GB SATA SSD', label: '128GB SATA SSD' },
+  { value: '256GB SATA SSD', label: '256GB SATA SSD' },
+  { value: '512GB SATA SSD', label: '512GB SATA SSD' },
+  { value: '1TB SATA SSD', label: '1TB SATA SSD' },
+  { value: '128GB NVMe SSD', label: '128GB NVMe SSD' },
+  { value: '256GB NVMe SSD', label: '256GB NVMe SSD' },
+  { value: '512GB NVMe SSD', label: '512GB NVMe SSD' },
+  { value: '1TB NVMe SSD', label: '1TB NVMe SSD' },
+  { value: '2TB NVMe SSD', label: '2TB NVMe SSD' },
+  { value: '500GB HDD', label: '500GB HDD' },
+  { value: '1TB HDD', label: '1TB HDD' },
+  { value: '2TB HDD', label: '2TB HDD' },
+];
+
+const PROCESSOR_OPTIONS = [
+  { value: 'Intel Core i3 8th Gen', label: 'Intel i3 - 8th Gen' },
+  { value: 'Intel Core i5 8th Gen', label: 'Intel i5 - 8th Gen' },
+  { value: 'Intel Core i7 8th Gen', label: 'Intel i7 - 8th Gen' },
+  { value: 'Intel Core i3 9th Gen', label: 'Intel i3 - 9th Gen' },
+  { value: 'Intel Core i5 9th Gen', label: 'Intel i5 - 9th Gen' },
+  { value: 'Intel Core i7 9th Gen', label: 'Intel i7 - 9th Gen' },
+  { value: 'Intel Core i3 10th Gen', label: 'Intel i3 - 10th Gen' },
+  { value: 'Intel Core i5 10th Gen', label: 'Intel i5 - 10th Gen' },
+  { value: 'Intel Core i7 10th Gen', label: 'Intel i7 - 10th Gen' },
+  { value: 'Intel Core i3 11th Gen', label: 'Intel i3 - 11th Gen' },
+  { value: 'Intel Core i5 11th Gen', label: 'Intel i5 - 11th Gen' },
+  { value: 'Intel Core i7 11th Gen', label: 'Intel i7 - 11th Gen' },
+  { value: 'Intel Core i3 12th Gen', label: 'Intel i3 - 12th Gen' },
+  { value: 'Intel Core i5 12th Gen', label: 'Intel i5 - 12th Gen' },
+  { value: 'Intel Core i7 12th Gen', label: 'Intel i7 - 12th Gen' },
+  { value: 'Intel Core i9 12th Gen', label: 'Intel i9 - 12th Gen' },
+  { value: 'Intel Core i3 13th Gen', label: 'Intel i3 - 13th Gen' },
+  { value: 'Intel Core i5 13th Gen', label: 'Intel i5 - 13th Gen' },
+  { value: 'Intel Core i7 13th Gen', label: 'Intel i7 - 13th Gen' },
+  { value: 'Intel Core i9 13th Gen', label: 'Intel i9 - 13th Gen' },
+  { value: 'Intel Core i5 14th Gen', label: 'Intel i5 - 14th Gen' },
+  { value: 'Intel Core i7 14th Gen', label: 'Intel i7 - 14th Gen' },
+  { value: 'Intel Core i9 14th Gen', label: 'Intel i9 - 14th Gen' },
+  { value: 'AMD Ryzen 3', label: 'AMD Ryzen 3' },
+  { value: 'AMD Ryzen 5', label: 'AMD Ryzen 5' },
+  { value: 'AMD Ryzen 7', label: 'AMD Ryzen 7' },
+  { value: 'AMD Ryzen 9', label: 'AMD Ryzen 9' },
+  { value: 'Apple M1', label: 'Apple M1' },
+  { value: 'Apple M2', label: 'Apple M2' },
+  { value: 'Apple M3', label: 'Apple M3' },
+  { value: 'Apple M4', label: 'Apple M4' },
+];
 
 interface DeviceSpecs {
   ram_info: string;
@@ -94,15 +157,31 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
           {/* RAM */}
           <div className="space-y-2">
             <Label className="text-xs flex items-center gap-1.5">
-              <Cpu className="h-3.5 w-3.5" />
+              <MemoryStick className="h-3.5 w-3.5" />
               {language === 'bn' ? 'RAM' : 'RAM'}
             </Label>
-            <Input
-              value={specs.ram_info}
-              onChange={(e) => onChange({ ...specs, ram_info: e.target.value })}
-              placeholder={language === 'bn' ? '8GB DDR4' : '8GB DDR4'}
-              className="text-sm"
-            />
+            <Select
+              value={specs.ram_info || ''}
+              onValueChange={(v) => onChange({ ...specs, ram_info: v === 'custom' ? '' : v })}
+            >
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder={language === 'bn' ? 'RAM নির্বাচন করুন' : 'Select RAM'} />
+              </SelectTrigger>
+              <SelectContent>
+                {RAM_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+                <SelectItem value="custom">{language === 'bn' ? 'কাস্টম...' : 'Custom...'}</SelectItem>
+              </SelectContent>
+            </Select>
+            {specs.ram_info !== '' && !RAM_OPTIONS.some(o => o.value === specs.ram_info) && (
+              <Input
+                value={specs.ram_info}
+                onChange={(e) => onChange({ ...specs, ram_info: e.target.value })}
+                placeholder="e.g. 12GB DDR4"
+                className="text-sm"
+              />
+            )}
           </div>
 
           {/* Storage */}
@@ -111,12 +190,28 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
               <HardDrive className="h-3.5 w-3.5" />
               {language === 'bn' ? 'স্টোরেজ' : 'Storage'}
             </Label>
-            <Input
-              value={specs.storage_info}
-              onChange={(e) => onChange({ ...specs, storage_info: e.target.value })}
-              placeholder={language === 'bn' ? '256GB SSD + 1TB HDD' : '256GB SSD + 1TB HDD'}
-              className="text-sm"
-            />
+            <Select
+              value={specs.storage_info || ''}
+              onValueChange={(v) => onChange({ ...specs, storage_info: v === 'custom' ? '' : v })}
+            >
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder={language === 'bn' ? 'স্টোরেজ নির্বাচন করুন' : 'Select Storage'} />
+              </SelectTrigger>
+              <SelectContent>
+                {STORAGE_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+                <SelectItem value="custom">{language === 'bn' ? 'কাস্টম...' : 'Custom...'}</SelectItem>
+              </SelectContent>
+            </Select>
+            {specs.storage_info !== '' && !STORAGE_OPTIONS.some(o => o.value === specs.storage_info) && (
+              <Input
+                value={specs.storage_info}
+                onChange={(e) => onChange({ ...specs, storage_info: e.target.value })}
+                placeholder="e.g. 256GB SSD + 1TB HDD"
+                className="text-sm"
+              />
+            )}
           </div>
 
           {/* Processor */}
@@ -125,12 +220,28 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
               <Cpu className="h-3.5 w-3.5" />
               {language === 'bn' ? 'প্রসেসর' : 'Processor'}
             </Label>
-            <Input
-              value={specs.processor_info}
-              onChange={(e) => onChange({ ...specs, processor_info: e.target.value })}
-              placeholder={language === 'bn' ? 'Intel Core i5-12th Gen' : 'Intel Core i5-12th Gen'}
-              className="text-sm"
-            />
+            <Select
+              value={specs.processor_info || ''}
+              onValueChange={(v) => onChange({ ...specs, processor_info: v === 'custom' ? '' : v })}
+            >
+              <SelectTrigger className="text-sm">
+                <SelectValue placeholder={language === 'bn' ? 'প্রসেসর নির্বাচন করুন' : 'Select Processor'} />
+              </SelectTrigger>
+              <SelectContent>
+                {PROCESSOR_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                ))}
+                <SelectItem value="custom">{language === 'bn' ? 'কাস্টম...' : 'Custom...'}</SelectItem>
+              </SelectContent>
+            </Select>
+            {specs.processor_info !== '' && !PROCESSOR_OPTIONS.some(o => o.value === specs.processor_info) && (
+              <Input
+                value={specs.processor_info}
+                onChange={(e) => onChange({ ...specs, processor_info: e.target.value })}
+                placeholder="e.g. Intel Core i5-12th Gen"
+                className="text-sm"
+              />
+            )}
           </div>
 
           {/* Monitor */}
