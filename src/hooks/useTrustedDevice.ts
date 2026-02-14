@@ -89,6 +89,20 @@ export function useTrustedDevice() {
   // Check if current device is trusted for a specific user
   const checkTrustedDevice = useCallback(async (userId: string): Promise<boolean> => {
     try {
+      // Check local cache first to avoid unnecessary DB/network calls
+      try {
+        const cached = localStorage.getItem(`trusted_device_${userId}`);
+        if (cached) {
+          const { expires_at, cached_at } = JSON.parse(cached);
+          const cacheAge = Date.now() - new Date(cached_at).getTime();
+          const CACHE_TTL = 24 * 60 * 60 * 1000; // Re-validate once per day
+          if (new Date(expires_at) > new Date() && cacheAge < CACHE_TTL) {
+            setIsTrusted(true);
+            return true;
+          }
+        }
+      } catch {}
+
       const deviceFingerprint = generateDeviceFingerprint();
       const ip = await fetchCurrentIp();
       
@@ -108,12 +122,22 @@ export function useTrustedDevice() {
 
       const device = data[0] as TrustedDevice;
       
-      // Check if IP matches (if IP tracking is enabled)
-      // If IP is different, require MFA again for security
+      // Update stored IP if it changed (dynamic IPs are common)
+      // We no longer block trust due to IP changes — the device fingerprint is the primary identifier
       if (device.ip_address && ip && device.ip_address !== ip) {
-        setIsTrusted(false);
-        return false;
+        await supabase
+          .from('trusted_devices')
+          .update({ ip_address: ip })
+          .eq('id', device.id);
       }
+
+      // Cache trust locally to avoid repeated DB lookups
+      try {
+        localStorage.setItem(`trusted_device_${userId}`, JSON.stringify({
+          expires_at: device.expires_at,
+          cached_at: new Date().toISOString(),
+        }));
+      } catch {}
 
       setIsTrusted(true);
       return true;
@@ -190,6 +214,7 @@ export function useTrustedDevice() {
         return false;
       }
 
+      try { localStorage.removeItem(`trusted_device_${userId}`); } catch {}
       setIsTrusted(false);
       return true;
     } catch {
@@ -210,6 +235,7 @@ export function useTrustedDevice() {
         return false;
       }
 
+      try { localStorage.removeItem(`trusted_device_${userId}`); } catch {}
       setIsTrusted(false);
       return true;
     } catch {
