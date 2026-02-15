@@ -515,6 +515,42 @@ async function seedDefaultAdmin() {
   }
 }
 
+// --- Ensure Schema Exists ---
+async function ensureSchema() {
+  try {
+    // Check if app_settings table exists
+    if (dbType === 'postgresql') {
+      const check = await query(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'app_settings') AS exists"
+      );
+      if (!check[0].exists) {
+        console.log('Running schema initialization...');
+        const schema = PG_SCHEMA;
+        const statements = schema.split(';').filter((s) => s.trim());
+        for (const stmt of statements) {
+          if (stmt.trim()) await query(stmt + ';');
+        }
+        console.log('Schema initialized successfully');
+      }
+    } else {
+      const check = await query(
+        "SELECT COUNT(*) as cnt FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'app_settings'"
+      );
+      if (check[0].cnt === 0) {
+        console.log('Running schema initialization...');
+        const schema = MYSQL_SCHEMA;
+        const statements = schema.split(';').filter((s) => s.trim());
+        for (const stmt of statements) {
+          if (stmt.trim()) await query(stmt + ';');
+        }
+        console.log('Schema initialized successfully');
+      }
+    }
+  } catch (err) {
+    console.error('Error ensuring schema:', err.message);
+  }
+}
+
 // --- Startup ---
 async function start() {
   // Try to connect with environment variables
@@ -522,6 +558,8 @@ async function start() {
     try {
       dbClient = await connectDatabase({});
       console.log(`Connected to ${dbType} database`);
+      // Ensure all required tables exist (init-db.sql may not have app_settings)
+      await ensureSchema();
       // Seed admin user so default credentials work
       await seedDefaultAdmin();
     } catch (err) {
