@@ -235,36 +235,46 @@ BEGIN
 END;
 $$;
 
+-- App Settings
+CREATE TABLE IF NOT EXISTS public.app_settings (
+    id TEXT PRIMARY KEY DEFAULT 'default',
+    onboarding_enabled BOOLEAN DEFAULT true,
+    setup_complete BOOLEAN DEFAULT false,
+    db_type VARCHAR(20) DEFAULT 'postgresql',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Insert default app settings
+INSERT INTO public.app_settings (id, setup_complete, db_type) 
+VALUES ('default', true, 'postgresql')
+ON CONFLICT (id) DO NOTHING;
+
 -- ============================================================
 -- DEFAULT ADMIN USER SETUP
 -- ============================================================
 -- Default credentials (CHANGE IMMEDIATELY AFTER FIRST LOGIN!):
 --   Email:    admin@lifeos.local
 --   Password: LifeOS@2024!
+-- Note: The backend server will re-hash the password on startup
+--        to ensure compatibility with its auth system.
 -- ============================================================
 
--- Generate admin password hash using pgcrypto
--- Password: LifeOS@2024!
+-- Insert admin user with a placeholder hash (backend will update on startup)
 DO $$
 DECLARE
     admin_id UUID;
-    admin_password_hash TEXT;
 BEGIN
-    -- Generate bcrypt hash for default password
-    admin_password_hash := crypt('LifeOS@2024!', gen_salt('bf', 12));
-    
     -- Insert admin user if not exists
     INSERT INTO public.users (id, email, password_hash, full_name, email_verified)
     VALUES (
         uuid_generate_v4(),
         'admin@lifeos.local',
-        admin_password_hash,
+        'placeholder_will_be_updated_by_backend',
         'System Administrator',
         true
     )
-    ON CONFLICT (email) DO UPDATE SET
-        password_hash = EXCLUDED.password_hash,
-        updated_at = NOW()
+    ON CONFLICT (email) DO NOTHING
     RETURNING id INTO admin_id;
     
     -- Ensure admin role exists
@@ -300,5 +310,3 @@ BEGIN
     RAISE NOTICE '╚════════════════════════════════════════════════════════════╝';
     RAISE NOTICE '';
 END $$;
-
-COMMIT;

@@ -310,6 +310,15 @@ export default function Tasks() {
     }
   }, [user, mode]);
 
+  // Listen for task creation events (e.g. from QuickAddTask)
+  useEffect(() => {
+    const handleTasksUpdated = () => {
+      loadData(0, true);
+    };
+    window.addEventListener('tasks-updated', handleTasksUpdated);
+    return () => window.removeEventListener('tasks-updated', handleTasksUpdated);
+  }, [user, mode]);
+
   const loadAllSupportUsers = async () => {
     const { data: usersData } = await supabase
       .from('support_users')

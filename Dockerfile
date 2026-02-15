@@ -20,7 +20,8 @@ RUN rm -f .env
 # Build with placeholder Supabase vars to force self-hosted mode
 # These are valid-format but non-functional values so createClient() doesn't crash
 # The selfHostedConfig.ts detection checks for 'supabase' in URL, so localhost triggers self-hosted mode
-ENV VITE_SUPABASE_URL="http://localhost:0"
+# IMPORTANT: Use port 9999 (not port 0) to avoid ERR_UNSAFE_PORT browser errors
+ENV VITE_SUPABASE_URL="http://localhost:9999"
 ENV VITE_SUPABASE_PUBLISHABLE_KEY="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoiYW5vbiJ9.ZopqoUt20nEV9cklpv9e3yw3PVyZLmKs5qLD6nGL1SI"
 
 # Build the application
