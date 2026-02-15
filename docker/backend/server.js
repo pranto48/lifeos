@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 CREATE TABLE IF NOT EXISTS app_settings (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id TEXT PRIMARY KEY DEFAULT 'default',
   onboarding_enabled BOOLEAN DEFAULT true,
   setup_complete BOOLEAN DEFAULT false,
   db_type VARCHAR(20) DEFAULT 'postgresql',

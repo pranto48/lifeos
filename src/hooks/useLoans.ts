@@ -186,8 +186,12 @@ export function useLoans() {
     try {
       let transactionId: string | null = null;
 
+      // Find the loan to get the lender name for the transaction
+      const loan = loans.find(l => l.id === data.loan_id);
+
       // Optionally create a transaction for this payment
       if (createTransaction) {
+        const lenderName = loan?.lender_name || 'Loan';
         const { data: transaction, error: txError } = await supabase
           .from('transactions')
           .insert({
@@ -195,15 +199,18 @@ export function useLoans() {
             type: 'expense',
             amount: data.amount,
             date: data.payment_date,
-            merchant: `Loan Payment`,
-            notes: data.notes || 'Loan payment',
+            merchant: `Loan Payment - ${lenderName}`,
+            notes: data.notes || `Loan payment to ${lenderName}`,
             linked_entity_type: 'loan_payment',
             linked_entity_id: null // Will update after payment creation
           })
           .select()
           .single();
 
-        if (txError) throw txError;
+        if (txError) {
+          console.error('Transaction creation error:', txError);
+          throw txError;
+        }
         transactionId = transaction.id;
       }
 
@@ -233,7 +240,6 @@ export function useLoans() {
       }
 
       // Update remaining amount on loan
-      const loan = loans.find(l => l.id === data.loan_id);
       if (loan) {
         const newRemaining = Math.max(0, loan.remaining_amount - data.amount);
         const newStatus = newRemaining === 0 ? 'paid_off' : 'active';

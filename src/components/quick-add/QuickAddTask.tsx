@@ -81,6 +81,8 @@ export function QuickAddTask({ onClose }: QuickAddTaskProps) {
           ? (language === 'bn' ? `আপনার পুনরাবৃত্তিমূলক কাজ (${recurringPattern}) যোগ করা হয়েছে।` : `Your recurring task (${recurringPattern}) has been added.`)
           : (language === 'bn' ? 'আপনার কাজ সফলভাবে যোগ করা হয়েছে।' : 'Your task has been added successfully.'),
       });
+      // Dispatch event to notify Tasks page to refresh
+      window.dispatchEvent(new CustomEvent('tasks-updated'));
       onClose();
     } catch (error: any) {
       toast({
