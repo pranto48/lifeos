@@ -7,6 +7,7 @@ import { useBiometricAuth } from '@/hooks/useBiometricAuth';
 import { useRateLimit } from '@/hooks/useRateLimit';
 import { useTrustedDevice } from '@/hooks/useTrustedDevice';
 import { supabase } from '@/integrations/supabase/client';
+import { isSelfHosted } from '@/lib/selfHostedConfig';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -139,6 +140,15 @@ export default function Auth() {
             variant: 'destructive',
           });
         } else {
+          // In self-hosted mode, skip all Supabase MFA/trusted device checks
+          if (isSelfHosted()) {
+            setAuthGate('idle');
+            resetRateLimit();
+            toast({ title: 'Welcome back!', description: 'Successfully signed in.' });
+            navigate(returnTo);
+            return;
+          }
+
           // Get the current user for trusted device check
           const { data: { user: currentUser } } = await supabase.auth.getUser();
           
@@ -209,7 +219,6 @@ export default function Auth() {
 
           // Check if we should offer biometric setup
           if (capabilities?.canUseBiometrics && !hasBiometricSetup) {
-            // We'll handle biometric prompt after successful login
             toast({
               title: 'Welcome back!',
               description: 'Successfully signed in.',

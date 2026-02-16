@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isSelfHosted } from '@/lib/selfHostedConfig';
 
 const ONBOARDING_KEY = 'lifeos_onboarding_completed';
 
@@ -14,6 +15,16 @@ export function useOnboarding() {
 
   const checkOnboardingStatus = async () => {
     try {
+      // In self-hosted mode, skip Supabase query entirely
+      if (isSelfHosted()) {
+        const completed = localStorage.getItem(ONBOARDING_KEY);
+        if (!completed) {
+          setShowOnboarding(true);
+        }
+        setIsLoading(false);
+        return;
+      }
+
       // First check if onboarding is enabled globally
       const { data: settings } = await supabase
         .from('app_settings')
