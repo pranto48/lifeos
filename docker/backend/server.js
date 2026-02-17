@@ -475,43 +475,70 @@ const server = http.createServer(async (req, res) => {
 
 // --- Seed Default Admin ---
 async function seedDefaultAdmin() {
+  const adminEmail = 'admin@lifeos.local';
+  const adminPassword = 'LifeOS@2024!';
+  const passwordHash = hashPassword(adminPassword);
+
   try {
-    // Check if admin user already exists
-    const existing = await query("SELECT id FROM users WHERE email = 'admin@lifeos.local'");
-    if (existing.length > 0) {
-      // Update password hash to use our format so login works
-      const passwordHash = hashPassword('LifeOS@2024!');
-      await query("UPDATE users SET password_hash = $1 WHERE email = 'admin@lifeos.local'", [passwordHash]);
-      console.log('Default admin password hash updated for compatibility');
-      return;
+    // Upsert admin user - always update password hash to ensure it's valid
+    const adminId = uuid();
+    if (dbType === 'postgresql') {
+      await query(
+        `INSERT INTO users (id, email, password_hash, full_name, email_verified) 
+         VALUES ($1, $2, $3, 'System Administrator', true)
+         ON CONFLICT (email) DO UPDATE SET password_hash = $3`,
+        [adminId, adminEmail, passwordHash]
+      );
+    } else {
+      await query(
+        `INSERT INTO users (id, email, password_hash, full_name, email_verified) 
+         VALUES (?, ?, ?, 'System Administrator', true)
+         ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash)`,
+        [adminId, adminEmail, passwordHash]
+      );
     }
 
-    // Create admin user with our hashing
-    const adminId = uuid();
-    const passwordHash = hashPassword('LifeOS@2024!');
+    // Get the actual admin user id (may differ if user already existed)
+    const adminRows = await query('SELECT id FROM users WHERE email = $1', [adminEmail]);
+    const realAdminId = adminRows[0].id;
 
-    await query(
-      `INSERT INTO users (id, email, password_hash, full_name, email_verified) 
-       VALUES ($1, 'admin@lifeos.local', $2, 'System Administrator', true)`,
-      [adminId, passwordHash]
-    );
-    await query(
-      `INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, 'admin') ON CONFLICT DO NOTHING`,
-      [uuid(), adminId]
-    );
-    await query(
-      `INSERT INTO profiles (id, user_id, full_name, email) VALUES ($1, $2, 'System Administrator', 'admin@lifeos.local')
-       ON CONFLICT (user_id) DO NOTHING`,
-      [uuid(), adminId]
-    );
-    // Mark setup as complete
-    await query(
-      `INSERT INTO app_settings (id, setup_complete, db_type) VALUES ($1, true, $2) ON CONFLICT DO NOTHING`,
-      [uuid(), dbType]
-    );
-    console.log('Default admin user seeded: admin@lifeos.local / LifeOS@2024!');
+    // Ensure admin role
+    if (dbType === 'postgresql') {
+      await query(
+        `INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, 'admin') ON CONFLICT (user_id, role) DO NOTHING`,
+        [uuid(), realAdminId]
+      );
+      await query(
+        `INSERT INTO profiles (id, user_id, full_name, email) VALUES ($1, $2, 'System Administrator', $3)
+         ON CONFLICT (user_id) DO UPDATE SET full_name = 'System Administrator', email = $3`,
+        [uuid(), realAdminId, adminEmail]
+      );
+      await query(
+        `INSERT INTO app_settings (id, setup_complete, db_type) VALUES ('default', true, $1)
+         ON CONFLICT (id) DO UPDATE SET setup_complete = true`,
+        [dbType]
+      );
+    } else {
+      await query(
+        `INSERT IGNORE INTO user_roles (id, user_id, role) VALUES (?, ?, 'admin')`,
+        [uuid(), realAdminId]
+      );
+      await query(
+        `INSERT INTO profiles (id, user_id, full_name, email) VALUES (?, ?, 'System Administrator', ?)
+         ON DUPLICATE KEY UPDATE full_name = 'System Administrator', email = VALUES(email)`,
+        [uuid(), realAdminId, adminEmail]
+      );
+      await query(
+        `INSERT INTO app_settings (id, setup_complete, db_type) VALUES ('default', true, ?)
+         ON DUPLICATE KEY UPDATE setup_complete = true`,
+        [dbType]
+      );
+    }
+
+    console.log('✅ Default admin user seeded: admin@lifeos.local / LifeOS@2024!');
   } catch (err) {
-    console.error('Error seeding admin:', err.message);
+    console.error('❌ Error seeding admin:', err.message);
+    throw err; // Re-throw so retry logic can catch it
   }
 }
 
@@ -551,26 +578,47 @@ async function ensureSchema() {
   }
 }
 
-// --- Startup ---
-async function start() {
-  // Try to connect with environment variables
-  if (process.env.DB_HOST) {
+// --- Startup with Retry ---
+async function connectWithRetry(maxRetries = 10, delayMs = 3000) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       dbClient = await connectDatabase({});
-      console.log(`Connected to ${dbType} database`);
-      // Ensure all required tables exist (init-db.sql may not have app_settings)
-      await ensureSchema();
-      // Seed admin user so default credentials work
-      await seedDefaultAdmin();
+      console.log(`✅ Connected to ${dbType} database (attempt ${attempt})`);
+      return true;
     } catch (err) {
-      console.log('No database configured yet. Waiting for setup...');
+      console.log(`⏳ DB connection attempt ${attempt}/${maxRetries} failed: ${err.message}`);
+      if (attempt < maxRetries) {
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+  return false;
+}
+
+async function start() {
+  if (process.env.DB_HOST) {
+    const connected = await connectWithRetry();
+    if (connected) {
+      try {
+        await ensureSchema();
+        console.log('✅ Schema verified');
+      } catch (err) {
+        console.error('❌ Schema init failed:', err.message);
+      }
+      try {
+        await seedDefaultAdmin();
+      } catch (err) {
+        console.error('❌ Admin seeding failed after retries:', err.message);
+      }
+    } else {
+      console.error('❌ Could not connect to database after all retries');
     }
   } else {
     console.log('No database configured. Setup wizard will guide you.');
   }
 
   server.listen(PORT, () => {
-    console.log(`LifeOS API server running on port ${PORT}`);
+    console.log(`✅ LifeOS API server running on port ${PORT}`);
   });
 }
 

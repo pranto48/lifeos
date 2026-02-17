@@ -16,7 +16,7 @@ END $$;
 CREATE TABLE IF NOT EXISTS public.users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
+    password_hash TEXT NOT NULL,
     full_name VARCHAR(255),
     avatar_url TEXT,
     email_verified BOOLEAN DEFAULT false,
@@ -250,63 +250,5 @@ INSERT INTO public.app_settings (id, setup_complete, db_type)
 VALUES ('default', true, 'postgresql')
 ON CONFLICT (id) DO NOTHING;
 
--- ============================================================
--- DEFAULT ADMIN USER SETUP
--- ============================================================
--- Default credentials (CHANGE IMMEDIATELY AFTER FIRST LOGIN!):
---   Email:    admin@lifeos.local
---   Password: LifeOS@2024!
--- Note: The backend server will re-hash the password on startup
---        to ensure compatibility with its auth system.
--- ============================================================
-
--- Insert admin user with a placeholder hash (backend will update on startup)
-DO $$
-DECLARE
-    admin_id UUID;
-BEGIN
-    -- Insert admin user if not exists
-    INSERT INTO public.users (id, email, password_hash, full_name, email_verified)
-    VALUES (
-        uuid_generate_v4(),
-        'admin@lifeos.local',
-        'placeholder_will_be_updated_by_backend',
-        'System Administrator',
-        true
-    )
-    ON CONFLICT (email) DO NOTHING
-    RETURNING id INTO admin_id;
-    
-    -- Ensure admin role exists
-    IF admin_id IS NOT NULL THEN
-        INSERT INTO public.user_roles (user_id, role)
-        VALUES (admin_id, 'admin')
-        ON CONFLICT (user_id, role) DO NOTHING;
-        
-        -- Create profile for admin
-        INSERT INTO public.profiles (user_id, full_name, email)
-        VALUES (admin_id, 'System Administrator', 'admin@lifeos.local')
-        ON CONFLICT (user_id) DO UPDATE SET
-            full_name = EXCLUDED.full_name,
-            email = EXCLUDED.email;
-    END IF;
-END $$;
-
--- Display setup completion message
-DO $$
-BEGIN
-    RAISE NOTICE '';
-    RAISE NOTICE '╔════════════════════════════════════════════════════════════╗';
-    RAISE NOTICE '║           LifeOS Database Initialized Successfully         ║';
-    RAISE NOTICE '╠════════════════════════════════════════════════════════════╣';
-    RAISE NOTICE '║                                                            ║';
-    RAISE NOTICE '║  Default Admin Credentials:                                ║';
-    RAISE NOTICE '║  ──────────────────────────                                ║';
-    RAISE NOTICE '║  Email:    admin@lifeos.local                              ║';
-    RAISE NOTICE '║  Password: LifeOS@2024!                                    ║';
-    RAISE NOTICE '║                                                            ║';
-    RAISE NOTICE '║  ⚠️  IMPORTANT: Change password after first login!         ║';
-    RAISE NOTICE '║                                                            ║';
-    RAISE NOTICE '╚════════════════════════════════════════════════════════════╝';
-    RAISE NOTICE '';
-END $$;
+-- Admin user seeding is handled by the backend server on startup.
+-- See docker/backend/server.js seedDefaultAdmin() function.
