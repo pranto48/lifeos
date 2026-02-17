@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Download, FileJson, FileSpreadsheet, FileText, Upload, Loader2, Calendar, Clock, Database, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsAdmin } from '@/hooks/useUserRoles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,29 +41,11 @@ export function DataExport() {
   const [pendingRestoreData, setPendingRestoreData] = useState<any>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [isActive, setIsActive] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { hasRole: isAdmin } = useIsAdmin();
 
   useEffect(() => {
     loadBackupSchedule();
-    checkAdminStatus();
   }, [user]);
-
-  const checkAdminStatus = async () => {
-    if (!user) return;
-    try {
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-      
-      setIsAdmin(!!data);
-    } catch (error) {
-      console.error('Failed to check admin status:', error);
-      setIsAdmin(false);
-    }
-  };
 
   const loadBackupSchedule = async () => {
     if (!user) return;

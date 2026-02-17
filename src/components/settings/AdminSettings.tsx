@@ -3,6 +3,7 @@ import { Shield, Users, Key, Loader2, Crown, UserPlus, Trash2, Search, Briefcase
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsAdmin } from '@/hooks/useUserRoles';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,7 +64,7 @@ interface AdminSettingsProps {
 export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
   const { user } = useAuth();
   const { language } = useLanguage();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { hasRole: isAdmin, loading: roleLoading, recheckRoles } = useIsAdmin();
   const [loading, setLoading] = useState(true);
   const [userRoles, setUserRoles] = useState<UserRole[]>([]);
   const [oauthCredentials, setOAuthCredentials] = useState<OAuthCredential[]>([]);
@@ -106,7 +107,7 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
 
   useEffect(() => {
     checkAdminStatus();
-  }, [user]);
+  }, [user, isAdmin]);
 
   useEffect(() => {
     onAdminStatusChange?.(isAdmin);
@@ -119,23 +120,14 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
     }
 
     try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      setIsAdmin(!!data);
-      
-      if (data) {
+      if (isAdmin) {
         await loadUserRoles();
         await loadOAuthCredentials();
         await loadWorkspacePermissions();
         await loadAppSettings();
       }
     } catch (error) {
-      console.error('Failed to check admin status:', error);
+      console.error('Failed to load admin data:', error);
     } finally {
       setLoading(false);
     }

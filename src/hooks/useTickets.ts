@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
+import { useUserRoles } from '@/hooks/useUserRoles';
 
 export interface TicketCategory {
   id: string;
@@ -93,21 +94,7 @@ export function useTickets() {
   const [formFields, setFormFields] = useState<TicketFormField[]>([]);
   const [requesters, setRequesters] = useState<TicketRequester[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Check admin status
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .in('role', ['admin', 'support_manager']);
-      setIsAdmin(data && data.length > 0);
-    };
-    checkAdminStatus();
-  }, [user]);
+  const { hasRole: isAdmin } = useUserRoles(['admin', 'support_manager']);
 
   const loadData = useCallback(async () => {
     if (!user) return;
