@@ -312,7 +312,7 @@ routes['POST /api/setup/initialize'] = async (req, res) => {
         [adminId, body.adminEmail, passwordHash, body.adminName || 'Administrator']
       );
       await query(
-        `INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, 'admin') ON CONFLICT DO NOTHING`,
+        `INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, 'admin'::app_role) ON CONFLICT DO NOTHING`,
         [uuid(), adminId]
       );
       await query(
@@ -403,7 +403,7 @@ routes['POST /api/auth/register'] = async (req, res) => {
       'INSERT INTO users (id, email, password_hash, full_name, email_verified) VALUES ($1, $2, $3, $4, true)',
       [userId, email, passwordHash, full_name || '']
     );
-    await query('INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, $3)', [uuid(), userId, 'user']);
+    await query('INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, $3::app_role)', [uuid(), userId, 'user']);
     await query(
       'INSERT INTO profiles (id, user_id, full_name, email) VALUES ($1, $2, $3, $4)',
       [uuid(), userId, full_name || '', email]
@@ -505,7 +505,7 @@ async function seedDefaultAdmin() {
     // Ensure admin role
     if (dbType === 'postgresql') {
       await query(
-        `INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, 'admin') ON CONFLICT (user_id, role) DO NOTHING`,
+        `INSERT INTO user_roles (id, user_id, role) VALUES ($1, $2, 'admin'::app_role) ON CONFLICT (user_id, role) DO NOTHING`,
         [uuid(), realAdminId]
       );
       await query(
