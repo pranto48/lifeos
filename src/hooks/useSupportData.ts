@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Json } from '@/integrations/supabase/types';
+import { useUserRoles } from '@/hooks/useUserRoles';
 
 export interface SupportUnit {
   id: string;
@@ -61,21 +62,7 @@ export function useSupportData() {
   const [supportUsers, setSupportUsers] = useState<SupportUser[]>([]);
   const [activityLogs, setActivityLogs] = useState<SupportActivityLog[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Check admin or support_manager status
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .in('role', ['admin', 'support_manager']);
-      setIsAdmin(data && data.length > 0);
-    };
-    checkAdminStatus();
-  }, [user]);
+  const { hasRole: isAdmin } = useUserRoles(['admin', 'support_manager']);
 
   // Log activity to audit_logs table
   const logActivity = async (

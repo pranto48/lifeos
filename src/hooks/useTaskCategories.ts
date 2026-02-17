@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDashboardMode } from '@/contexts/DashboardModeContext';
+import { useIsAdmin } from '@/hooks/useUserRoles';
 
 export interface TaskCategory {
   id: string;
@@ -20,25 +21,13 @@ export function useTaskCategories() {
   const { mode } = useDashboardMode();
   const [categories, setCategories] = useState<TaskCategory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { hasRole: isAdmin } = useIsAdmin();
 
   useEffect(() => {
     if (user) {
       loadCategories();
-      checkAdminStatus();
     }
   }, [user, mode]);
-
-  const checkAdminStatus = async () => {
-    if (!user) return;
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-    setIsAdmin(!!data);
-  };
 
   const loadCategories = async () => {
     if (!user) return;

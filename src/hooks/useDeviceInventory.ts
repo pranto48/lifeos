@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useUserRoles } from '@/hooks/useUserRoles';
 
 export interface DeviceCategory {
   id: string;
@@ -79,21 +80,7 @@ export function useDeviceInventory() {
   const [suppliers, setSuppliers] = useState<DeviceSupplier[]>([]);
   const [devices, setDevices] = useState<DeviceInventory[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  // Check admin or inventory_manager status
-  useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user) return;
-      const { data } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', user.id)
-        .in('role', ['admin', 'inventory_manager']);
-      setIsAdmin(data && data.length > 0);
-    };
-    checkAdminStatus();
-  }, [user]);
+  const { hasRole: isAdmin } = useUserRoles(['admin', 'inventory_manager']);
 
   const loadData = useCallback(async () => {
     if (!user) return;

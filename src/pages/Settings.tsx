@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Settings as SettingsIcon, Menu } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -20,31 +19,15 @@ import { DataExport } from '@/components/settings/DataExport';
 import { CalendarIntegrationSettings } from '@/components/settings/CalendarIntegrationSettings';
 import { AdminSettings } from '@/components/settings/AdminSettings';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useIsAdmin } from '@/hooks/useUserRoles';
 
 export default function Settings() {
   const { user } = useAuth();
   const { language, t } = useLanguage();
   const isMobile = useIsMobile();
   const [activeCategory, setActiveCategory] = useState<SettingsCategory>('profile');
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { hasRole: isAdmin, recheckRoles } = useIsAdmin();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-
-  useEffect(() => {
-    checkAdminStatus();
-  }, [user]);
-
-  const checkAdminStatus = async () => {
-    if (!user) return;
-    
-    const { data } = await supabase
-      .from('user_roles')
-      .select('*')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-    
-    setIsAdmin(!!data);
-  };
 
   const handleCategoryChange = (category: SettingsCategory) => {
     setActiveCategory(category);
@@ -78,7 +61,7 @@ export default function Settings() {
       case 'backup':
         return <DataExport />;
       case 'admin':
-        return <AdminSettings onAdminStatusChange={setIsAdmin} />;
+        return <AdminSettings onAdminStatusChange={() => recheckRoles()} />;
       default:
         return <ProfileSettings />;
     }
