@@ -1,54 +1,63 @@
 
-
-## Fix: Self-Hosted Docker Admin Login (500 Error)
+## Fix: Backup and Restore Crash ("Something went wrong")
 
 ### Root Cause Analysis
 
-There are **two critical issues** causing the 500 Internal Server Error:
+The restore crashes the entire app (triggering the global ErrorBoundary) due to multiple cascading issues:
 
-**1. Schema Conflict between `init-db.sql` and backend `server.js`**
+**1. Missing Foreign Key Cleanup (Delete Phase)**
+Several dependent tables are NOT cleaned up before parent tables are deleted, causing FK constraint violations that prevent proper deletion:
+- `loan_payments.transaction_id` references `transactions` -- not cleaned before deleting transactions
+- `transactions.family_member_id` references `family_members` -- not cleaned before deleting family
+- `device_service_history.task_id` references `tasks` -- not cleaned before deleting tasks
 
-The `init-db.sql` (run by Postgres on first boot) creates the `user_roles` table with column type `app_role` (a custom ENUM). But when the backend's `seedDefaultAdmin()` tries to insert or query roles, it treats them as plain strings. More importantly, `init-db.sql` creates `password_hash` as `VARCHAR(255)` which is too short for the PBKDF2 hash format (`salt:hash` = 16-byte salt hex + `:` + 64-byte hash hex = 161 chars, fits, but is tight). The real problem: the admin user is inserted by `init-db.sql` with `password_hash = 'placeholder_will_be_updated_by_backend'`, and then `seedDefaultAdmin()` tries to UPDATE it, but if `seedDefaultAdmin()` fails for any reason, the placeholder hash remains.
+When deletes fail silently (FK violations), the old records remain. The subsequent inserts then fail with duplicate primary key errors because the backup data includes original record IDs.
 
-**2. `seedDefaultAdmin()` silently swallows errors**
+**2. No Error Boundary Around Settings Content**
+The entire app is wrapped in a single global ErrorBoundary. When the page reloads after a partial restore (line 625: `window.location.reload()`), the app renders with inconsistent data (e.g., tasks referencing deleted categories), which can crash during render and trigger the global error page.
 
-The function catches all errors and only logs them. If the database connection is slow or the `init-db.sql` hasn't fully completed, the seed function fails silently, leaving the admin with an un-usable placeholder password hash. Any subsequent login attempt then hits `verifyPassword` which works but returns false (401) -- OR if the schema mismatch causes a query error, it returns 500.
+**3. Import Function Only Imports Tasks and Goals**
+The `importJSON` function (for "JSON backup" import) only handles tasks and goals, silently ignoring all other data types. While it strips IDs correctly, it doesn't strip computed fields or handle FK references.
 
 ### Fix Plan
 
-#### Step 1: Simplify `init-db.sql` - Remove admin seeding
-Remove the admin user creation from `init-db.sql` entirely. Let the backend handle ALL admin seeding on startup. This eliminates the dual-seeding conflict. Also change `password_hash` to `TEXT` to avoid any length issues.
+#### Step 1: Add Comprehensive FK Cleanup Before Deletes
+Add cleanup for ALL dependent tables before their parent tables are deleted:
+- Delete `loan_payments` (with transaction_id references) before deleting `transactions`
+- Nullify or delete `transactions` with `family_member_id` before deleting `family_members`
+- Delete `device_service_history` entries referencing user's tasks before deleting `tasks`
 
-#### Step 2: Fix `seedDefaultAdmin()` in `server.js`
-- Add retry logic (wait for DB to be fully ready)
-- Add detailed error logging so failures are visible in `docker logs`
-- Ensure the function creates the admin user from scratch if not found
-- Use `ON CONFLICT (email) DO UPDATE` instead of `DO NOTHING` to always update the hash
+#### Step 2: Use Upsert Instead of Insert for Restore
+Change all restore inserts from `.insert()` to `.upsert()` with `onConflict: 'id'`. This handles the case where records weren't fully deleted by updating them instead of failing on duplicate keys.
 
-#### Step 3: Fix `app_settings` seeding
-The backend's `seedDefaultAdmin` inserts `app_settings` with `id = uuid()` but `init-db.sql` uses `id = 'default'`. The frontend queries `id=eq.default`. Fix the backend to use `id = 'default'` consistently.
+#### Step 3: Strip Problematic Fields from Restore Data
+Expand the `stripFields` list to include all computed/generated columns and fields that could cause FK issues:
+- `search_vector` (computed column on notes)
+- `created_at`, `updated_at` (let DB set these fresh)
 
-#### Step 4: Add startup health logging
-Add clear console output showing whether DB connection, schema init, and admin seeding all succeeded, so issues are visible in `docker logs lifeos-backend`.
+#### Step 4: Wrap Settings Content in SectionErrorBoundary
+Wrap the DataExport component (and the Settings page content area) in a `SectionErrorBoundary` so that restore errors don't crash the entire app -- only the settings section shows an error with a retry option.
+
+#### Step 5: Add Global Unhandled Rejection Handler
+Add a `window.addEventListener('unhandledrejection', ...)` handler in App.tsx to catch any stray async errors that slip through try/catch blocks, preventing them from crashing the app.
+
+#### Step 6: Remove Auto-Reload After Restore
+Remove the `window.location.reload()` after restore. Instead, just show a success toast. The user can manually refresh if needed. This prevents crashes from loading the app with inconsistent data.
 
 ### Technical Details
 
 **Files to modify:**
 
-1. **`docker/init-db.sql`**: Remove the admin user seeding DO block at the bottom. Keep only schema creation (tables, indexes, triggers). Change `password_hash VARCHAR(255)` to `password_hash TEXT`.
+1. **`src/components/settings/DataExport.tsx`**:
+   - Add `loan_payments` cleanup before `transactions` delete
+   - Add `transactions` family_member_id nullification before `family` delete
+   - Change `.insert()` to `.upsert()` with `onConflict: 'id'` in `executeSelectiveRestore`
+   - Add `created_at` and `updated_at` to `stripFields`
+   - Remove `window.location.reload()` 
+   - Wrap the entire function body in additional error safety
 
-2. **`docker/backend/server.js`**:
-   - Fix `seedDefaultAdmin()` to use `id = 'default'` for `app_settings`
-   - Add retry logic with delay for DB readiness
-   - Add explicit error messages for each step
-   - Ensure `ON CONFLICT (email) DO UPDATE SET password_hash = $2` is used
+2. **`src/pages/Settings.tsx`**:
+   - Import and wrap `renderContent()` output in `SectionErrorBoundary`
 
-3. **`nginx.conf`**: No changes needed (previous fix was correct).
-
-### After applying, run:
-```text
-docker-compose down -v
-docker-compose up --build -d
-docker logs lifeos-backend   # verify "Default admin user seeded" appears
-```
-
+3. **`src/App.tsx`**:
+   - Add `unhandledrejection` event listener in `AppContent` to catch stray async errors
