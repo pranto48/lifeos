@@ -517,9 +517,19 @@ export function DataExport() {
         habitCompletions: 'habit_completions',
       };
 
-      // Delete dependent data first if parent is selected
+      // Fields that should NOT be included in inserts (generated/computed columns)
+      const stripFields = ['search_vector'];
+
+      // Clean up ALL dependent tables before deleting parents to avoid FK violations
       if (selectedTypes.includes('tasks')) {
         await supabase.from('task_checklists').delete().eq('user_id', user.id);
+        await supabase.from('task_follow_up_notes').delete().eq('user_id', user.id);
+        // task_assignments uses assigned_by/assigned_to, not user_id directly
+        const { data: userTasks } = await supabase.from('tasks').select('id').eq('user_id', user.id);
+        if (userTasks?.length) {
+          const taskIds = userTasks.map(t => t.id);
+          await supabase.from('task_assignments').delete().in('task_id', taskIds);
+        }
       }
       if (selectedTypes.includes('habits') && !selectedTypes.includes('habitCompletions')) {
         await supabase.from('habit_completions').delete().eq('user_id', user.id);
@@ -530,11 +540,28 @@ export function DataExport() {
       if (selectedTypes.includes('projects') && !selectedTypes.includes('projectMilestones')) {
         await supabase.from('project_milestones').delete().eq('user_id', user.id);
       }
+      if (selectedTypes.includes('family')) {
+        await supabase.from('family_member_connections').delete().eq('user_id', user.id);
+        await supabase.from('family_documents').delete().eq('user_id', user.id);
+        if (!selectedTypes.includes('familyEvents')) {
+          await supabase.from('family_events').delete().eq('user_id', user.id);
+        }
+      }
+      if (selectedTypes.includes('budgetCategories')) {
+        // transactions and budgets reference budget_categories
+        if (!selectedTypes.includes('transactions')) {
+          await supabase.from('transactions').delete().eq('user_id', user.id);
+        }
+        if (!selectedTypes.includes('budgets')) {
+          await supabase.from('budgets').delete().eq('user_id', user.id);
+        }
+      }
 
       // Delete selected types in correct order (dependents first)
       const deleteOrder = [
         'habitCompletions', 'goalMilestones', 'projectMilestones',
-        'tasks', 'notes', 'transactions', 'familyEvents', 'budgets',
+        'budgets', 'transactions', 'familyEvents',
+        'tasks', 'notes',
         'goals', 'projects', 'habits', 'investments', 'salaries',
         'taskCategories', 'budgetCategories', 'family'
       ];
@@ -542,7 +569,10 @@ export function DataExport() {
       for (const type of deleteOrder) {
         if (selectedTypes.includes(type) && tableMap[type]) {
           const table = tableMap[type] as any;
-          await supabase.from(table).delete().eq('user_id', user.id);
+          const { error } = await supabase.from(table).delete().eq('user_id', user.id);
+          if (error) {
+            console.error(`Failed to delete ${type}:`, error);
+          }
         }
       }
 
@@ -557,16 +587,26 @@ export function DataExport() {
 
       for (const type of restoreOrder) {
         if (selectedTypes.includes(type) && data[type]?.length) {
-          const items = data[type].map((item: any) => ({
-            ...item,
-            user_id: user.id,
+          const items = data[type].map((item: any) => {
+            const cleaned = { ...item, user_id: user.id };
+            // Remove computed/generated fields
+            for (const field of stripFields) {
+              delete cleaned[field];
+            }
             // For notes, clear encrypted content for vault notes
-            ...(type === 'notes' && item.is_vault ? { content: null } : {}),
-          }));
+            if (type === 'notes' && item.is_vault) {
+              cleaned.content = null;
+            }
+            return cleaned;
+          });
 
           const table = tableMap[type] as any;
           const { error } = await supabase.from(table).insert(items as any);
-          if (!error) restored += items.length;
+          if (error) {
+            console.error(`Failed to restore ${type}:`, error);
+          } else {
+            restored += items.length;
+          }
         }
       }
 
@@ -586,6 +626,7 @@ export function DataExport() {
       }, 2000);
 
     } catch (error: any) {
+      console.error('Restore failed:', error);
       toast({ 
         title: 'Error', 
         description: error.message || 'Failed to restore data', 
