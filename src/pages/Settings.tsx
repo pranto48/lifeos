@@ -20,6 +20,7 @@ import { CalendarIntegrationSettings } from '@/components/settings/CalendarInteg
 import { AdminSettings } from '@/components/settings/AdminSettings';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useIsAdmin } from '@/hooks/useUserRoles';
+import { SectionErrorBoundary } from '@/components/ErrorBoundary';
 
 export default function Settings() {
   const { user } = useAuth();
@@ -138,7 +139,9 @@ export default function Settings() {
           {!isMobile && (
             <h2 className="text-xl font-semibold mb-6">{getCategoryTitle()}</h2>
           )}
-          {renderContent()}
+          <SectionErrorBoundary sectionName={getCategoryTitle()}>
+            {renderContent()}
+          </SectionErrorBoundary>
         </div>
       </main>
     </div>
