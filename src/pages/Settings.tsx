@@ -16,6 +16,7 @@ import { TwoFactorAuth } from '@/components/settings/TwoFactorAuth';
 import { BiometricManagement } from '@/components/settings/BiometricManagement';
 import { TrustedDevicesManagement } from '@/components/settings/TrustedDevicesManagement';
 import { DataExport } from '@/components/settings/DataExport';
+import { LicenseSettings } from '@/components/settings/LicenseSettings';
 import { CalendarIntegrationSettings } from '@/components/settings/CalendarIntegrationSettings';
 import { AdminSettings } from '@/components/settings/AdminSettings';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -61,6 +62,8 @@ export default function Settings() {
         return <CalendarIntegrationSettings />;
       case 'backup':
         return <DataExport />;
+      case 'license':
+        return <LicenseSettings />;
       case 'admin':
         return <AdminSettings onAdminStatusChange={() => recheckRoles()} />;
       default:
@@ -82,6 +85,7 @@ export default function Settings() {
       notifications: { en: 'Notifications', bn: 'নোটিফিকেশন' },
       calendar: { en: 'Calendar Sync', bn: 'ক্যালেন্ডার সিঙ্ক' },
       backup: { en: 'Backup & Restore', bn: 'ব্যাকআপ ও রিস্টোর' },
+      license: { en: 'License', bn: 'লাইসেন্স' },
       admin: { en: 'Admin Panel', bn: 'এডমিন প্যানেল' },
     };
     return language === 'bn' ? titles[activeCategory].bn : titles[activeCategory].en;

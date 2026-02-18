@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { 
   User, Shield, Bell, Languages, Calendar, Database, Crown, 
-  ChevronRight, Settings, Fingerprint, Smartphone, KeyRound, Lock
+  ChevronRight, Settings, Fingerprint, Smartphone, KeyRound, Lock, Key
 } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
@@ -20,6 +20,7 @@ export type SettingsCategory =
   | 'notifications' 
   | 'calendar' 
   | 'backup' 
+  | 'license'
   | 'admin'
   | 'preferences';
 
@@ -54,6 +55,7 @@ const navItems: NavItem[] = [
   { id: 'notifications', labelEn: 'Notifications', labelBn: 'নোটিফিকেশন', icon: <Bell className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'app' },
   { id: 'calendar', labelEn: 'Calendar Sync', labelBn: 'ক্যালেন্ডার সিঙ্ক', icon: <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'app' },
   { id: 'backup', labelEn: 'Backup & Restore', labelBn: 'ব্যাকআপ ও রিস্টোর', icon: <Database className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'app' },
+  { id: 'license', labelEn: 'License', labelBn: 'লাইসেন্স', icon: <Key className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'app' },
   
   // Admin Group
   { id: 'admin', labelEn: 'Admin Panel', labelBn: 'এডমিন প্যানেল', icon: <Crown className="h-3.5 w-3.5 md:h-4 md:w-4" />, group: 'admin' },
