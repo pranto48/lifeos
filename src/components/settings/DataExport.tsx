@@ -518,7 +518,7 @@ export function DataExport() {
       };
 
       // Fields that should NOT be included in inserts (generated/computed columns)
-      const stripFields = ['search_vector'];
+      const stripFields = ['search_vector', 'created_at', 'updated_at'];
 
       // Clean up ALL dependent tables before deleting parents to avoid FK violations
       if (selectedTypes.includes('tasks')) {
@@ -546,6 +546,16 @@ export function DataExport() {
         if (!selectedTypes.includes('familyEvents')) {
           await supabase.from('family_events').delete().eq('user_id', user.id);
         }
+        // Nullify family_member_id in transactions before deleting family_members
+        await supabase.from('transactions').update({ family_member_id: null }).eq('user_id', user.id).not('family_member_id', 'is', null);
+      }
+      if (selectedTypes.includes('transactions')) {
+        // Delete loan_payments that reference transactions before deleting transactions
+        await supabase.from('loan_payments').update({ transaction_id: null }).eq('user_id', user.id).not('transaction_id', 'is', null);
+      }
+      if (selectedTypes.includes('tasks')) {
+        // Nullify task_id in device_service_history before deleting tasks
+        await supabase.from('device_service_history').update({ task_id: null }).eq('user_id', user.id).not('task_id', 'is', null);
       }
       if (selectedTypes.includes('budgetCategories')) {
         // transactions and budgets reference budget_categories
@@ -601,7 +611,7 @@ export function DataExport() {
           });
 
           const table = tableMap[type] as any;
-          const { error } = await supabase.from(table).insert(items as any);
+          const { error } = await supabase.from(table).upsert(items as any, { onConflict: 'id' });
           if (error) {
             console.error(`Failed to restore ${type}:`, error);
           } else {
@@ -616,14 +626,9 @@ export function DataExport() {
       toast({ 
         title: language === 'bn' ? 'পুনরুদ্ধার সম্পন্ন' : 'Restore Complete',
         description: language === 'bn' 
-          ? `${restored} আইটেম পুনরুদ্ধার হয়েছে। পেজ রিফ্রেশ করুন।`
-          : `${restored} items restored. Please refresh the page.`
+          ? `${restored} আইটেম পুনরুদ্ধার হয়েছে।`
+          : `${restored} items restored successfully.`
       });
-
-      // Reload the page after a short delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
 
     } catch (error: any) {
       console.error('Restore failed:', error);
