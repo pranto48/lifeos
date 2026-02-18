@@ -24,8 +24,18 @@ import {
   Info,
 } from 'lucide-react';
 import { selfHostedApi, markSetupComplete } from '@/lib/selfHostedConfig';
+import {
+  verifyLicenseViaBackend,
+  verifyLicenseWithPortal,
+  saveLicenseInfo,
+  getPlanFromMaxDevices,
+  getInstallationId,
+  LICENSE_PLANS,
+  LICENSE_PORTAL_URL,
+  type LicenseInfo,
+} from '@/lib/licenseConfig';
 
-type Step = 'welcome' | 'environment' | 'database' | 'admin' | 'complete';
+type Step = 'welcome' | 'environment' | 'database' | 'admin' | 'license' | 'complete';
 type DeploymentType = 'docker' | 'xampp' | 'cpanel';
 
 const DEPLOYMENT_OPTIONS: { id: DeploymentType; label: string; icon: React.ReactNode; desc: string; dbHint: string }[] = [
@@ -67,6 +77,11 @@ export default function Setup() {
   const [dbUser, setDbUser] = useState('lifeos');
   const [dbPassword, setDbPassword] = useState('');
   const [dbPrefix, setDbPrefix] = useState('');
+  
+  // License config
+  const [licenseKey, setLicenseKey] = useState('');
+  const [licenseVerified, setLicenseVerified] = useState(false);
+  const [licenseInfo, setLicenseInfo] = useState<LicenseInfo | null>(null);
 
   // Admin config
   const [adminEmail, setAdminEmail] = useState('');
@@ -165,8 +180,8 @@ export default function Setup() {
       localStorage.setItem('lifeos_db_type', dbType);
       localStorage.setItem('lifeos_deployment_type', deploymentType);
       markSetupComplete();
-      setStep('complete');
-      toast({ title: 'Setup complete!', description: 'LifeOS is ready to use.' });
+      setStep('license');
+      toast({ title: 'Database initialized!', description: 'Now activate your license.' });
     } catch (err: any) {
       toast({
         title: 'Setup failed',
@@ -189,7 +204,55 @@ export default function Setup() {
     exit: { opacity: 0, x: -30 },
   };
 
-  const allSteps: Step[] = ['welcome', 'environment', 'database', 'admin', 'complete'];
+  const handleVerifyLicense = async () => {
+    if (!licenseKey.trim()) {
+      toast({ title: 'Please enter a license key', variant: 'destructive' });
+      return;
+    }
+    setLoading(true);
+    try {
+      const result = await verifyLicenseViaBackend(licenseKey, '/api');
+      if (result.success) {
+        const info: LicenseInfo = {
+          licenseKey,
+          status: (result.actual_status as any) || 'active',
+          maxDevices: result.max_devices || 5,
+          expiresAt: result.expires_at || null,
+          lastVerified: new Date().toISOString(),
+          installationId: getInstallationId(),
+          plan: getPlanFromMaxDevices(result.max_devices || 5),
+        };
+        saveLicenseInfo(info);
+        setLicenseInfo(info);
+        setLicenseVerified(true);
+        toast({ title: 'License Activated!', description: `${info.plan} plan activated.` });
+      } else {
+        toast({ title: 'Verification Failed', description: result.message, variant: 'destructive' });
+      }
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkipLicense = () => {
+    // Allow free usage without a license key
+    const freeInfo: LicenseInfo = {
+      licenseKey: 'FREE',
+      status: 'free',
+      maxDevices: 5,
+      expiresAt: null,
+      lastVerified: new Date().toISOString(),
+      installationId: getInstallationId(),
+      plan: 'basic',
+    };
+    saveLicenseInfo(freeInfo);
+    setLicenseInfo(freeInfo);
+    setStep('complete');
+  };
+
+  const allSteps: Step[] = ['welcome', 'environment', 'database', 'admin', 'license', 'complete'];
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -604,7 +667,106 @@ export default function Setup() {
               </motion.div>
             )}
 
-            {/* Step 5: Complete */}
+            {/* Step 5: License Activation */}
+            {step === 'license' && (
+              <motion.div key="license" variants={stepVariants} initial="initial" animate="animate" exit="exit">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Key className="w-5 h-5 text-primary" />
+                    <h2 className="text-lg font-semibold text-foreground">Activate License</h2>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Enter your LifeOS license key to unlock features. Purchase a license from{' '}
+                    <a href={LICENSE_PORTAL_URL + '/products.php'} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-0.5">
+                      portal.itsupport.com.bd <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </p>
+
+                  {/* Plan Cards */}
+                  <div className="space-y-2">
+                    {LICENSE_PLANS.map((plan) => (
+                      <div
+                        key={plan.id}
+                        className={`p-3 rounded-lg border text-left transition-all ${
+                          licenseInfo?.plan === plan.id
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border bg-muted/30'
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="font-medium text-sm text-foreground">{plan.name}</span>
+                          <span className="text-xs font-bold text-primary">{plan.price}</span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {plan.maxDevices >= 99999 ? 'Unlimited' : `Up to ${plan.maxDevices}`} users • {plan.features[0]}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="licenseKey">License Key</Label>
+                    <div className="relative">
+                      <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="licenseKey"
+                        className="pl-10 font-mono"
+                        value={licenseKey}
+                        onChange={(e) => { setLicenseKey(e.target.value); setLicenseVerified(false); }}
+                        placeholder="LIFEOS-XXXX-XXXX-XXXX"
+                      />
+                    </div>
+                  </div>
+
+                  {licenseVerified && licenseInfo && (
+                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-sm">
+                      <p className="text-foreground font-medium flex items-center gap-1.5">
+                        <CheckCircle className="w-4 h-4 text-primary" /> License Activated!
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Plan: <span className="capitalize font-medium">{licenseInfo.plan}</span> •
+                        Max Users: {licenseInfo.maxDevices >= 99999 ? 'Unlimited' : licenseInfo.maxDevices}
+                        {licenseInfo.expiresAt && ` • Expires: ${new Date(licenseInfo.expiresAt).toLocaleDateString()}`}
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={handleVerifyLicense}
+                      disabled={loading || !licenseKey.trim()}
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : licenseVerified ? (
+                        <CheckCircle className="w-4 h-4 mr-2 text-primary" />
+                      ) : (
+                        <Shield className="w-4 h-4 mr-2" />
+                      )}
+                      {licenseVerified ? 'Verified' : 'Verify License'}
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={() => setStep('complete')}
+                      disabled={!licenseVerified}
+                    >
+                      Continue <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </div>
+
+                  <button
+                    onClick={handleSkipLicense}
+                    className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors text-center py-2"
+                  >
+                    Skip — use Free plan (limited to 5 users)
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Step 6: Complete */}
             {step === 'complete' && (
               <motion.div key="complete" variants={stepVariants} initial="initial" animate="animate" exit="exit">
                 <div className="text-center space-y-4">
@@ -624,6 +786,9 @@ export default function Setup() {
                     <p><span className="text-muted-foreground">Database:</span> <span className="font-medium">{dbType === 'postgresql' ? 'PostgreSQL' : 'MySQL'}</span></p>
                     <p><span className="text-muted-foreground">Host:</span> <span className="font-medium">{dbHost}:{dbPort}</span></p>
                     <p><span className="text-muted-foreground">Admin:</span> <span className="font-medium">{adminEmail}</span></p>
+                    {licenseInfo && (
+                      <p><span className="text-muted-foreground">License:</span> <span className="font-medium capitalize">{licenseInfo.plan} Plan</span></p>
+                    )}
                   </div>
 
                   {deploymentType === 'cpanel' && (

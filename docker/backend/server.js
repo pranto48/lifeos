@@ -446,6 +446,130 @@ routes['POST /api/auth/logout'] = async (req, res) => {
   sendJson(res, 200, { success: true });
 };
 
+// --- License Verification (Proxy to portal.itsupport.com.bd) ---
+const LICENSE_VERIFY_URL = 'https://portal.itsupport.com.bd/verify_license.php';
+const LICENSE_ENCRYPTION_KEY = 'ITSupportBD_SecureKey_2024';
+
+function decryptLicenseData(encryptedBase64) {
+  try {
+    const data = Buffer.from(encryptedBase64, 'base64');
+    const ivLength = 16;
+    const iv = data.slice(0, ivLength);
+    const ciphertextBase64 = data.slice(ivLength).toString('utf8');
+    const ciphertext = Buffer.from(ciphertextBase64, 'base64');
+
+    // Derive key: PHP uses the key directly for aes-256-cbc (32 bytes, padded with null bytes)
+    const keyBuffer = Buffer.alloc(32);
+    Buffer.from(LICENSE_ENCRYPTION_KEY, 'utf8').copy(keyBuffer);
+
+    const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, iv);
+    let decrypted = decipher.update(ciphertext, undefined, 'utf8');
+    decrypted += decipher.final('utf8');
+    return JSON.parse(decrypted);
+  } catch (err) {
+    console.error('License decryption error:', err.message);
+    return null;
+  }
+}
+
+// Get installation ID from app_settings or generate one
+async function getOrCreateInstallationId() {
+  try {
+    const rows = await query("SELECT id FROM app_settings WHERE id = 'installation_id'");
+    if (rows.length > 0) return rows[0].id;
+    
+    const installId = 'LIFEOS-' + uuid();
+    if (dbType === 'postgresql') {
+      await query("INSERT INTO app_settings (id, setup_complete) VALUES ($1, false) ON CONFLICT DO NOTHING", [installId]);
+    }
+    return installId;
+  } catch {
+    return 'LIFEOS-' + uuid();
+  }
+}
+
+routes['POST /api/license/verify'] = async (req, res) => {
+  const { license_key } = await parseBody(req);
+  if (!license_key) {
+    sendJson(res, 400, { success: false, message: 'License key is required.' });
+    return;
+  }
+
+  try {
+    const installationId = await getOrCreateInstallationId();
+    const payload = getAuthUser(req);
+    const userId = payload?.sub || 'anonymous';
+
+    // Count active users for current_device_count
+    let deviceCount = 1;
+    try {
+      const countRows = await query('SELECT COUNT(*) as cnt FROM users');
+      deviceCount = parseInt(countRows[0].cnt) || 1;
+    } catch {}
+
+    // Call the portal verification endpoint
+    const https = require('https');
+    const http_mod = require('http');
+    const url = new URL(LICENSE_VERIFY_URL);
+    const requestModule = url.protocol === 'https:' ? https : http_mod;
+
+    const postData = JSON.stringify({
+      app_license_key: license_key,
+      user_id: userId,
+      current_device_count: deviceCount,
+      installation_id: installationId,
+    });
+
+    const portalResponse = await new Promise((resolve, reject) => {
+      const options = {
+        hostname: url.hostname,
+        port: url.port || (url.protocol === 'https:' ? 443 : 80),
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(postData),
+        },
+      };
+
+      const request = requestModule.request(options, (response) => {
+        let body = '';
+        response.on('data', (chunk) => (body += chunk));
+        response.on('end', () => resolve(body));
+      });
+
+      request.on('error', reject);
+      request.setTimeout(10000, () => {
+        request.destroy();
+        reject(new Error('License verification timeout'));
+      });
+      request.write(postData);
+      request.end();
+    });
+
+    // Decrypt the response
+    const decrypted = decryptLicenseData(portalResponse);
+    if (decrypted) {
+      sendJson(res, 200, decrypted);
+    } else {
+      // Try as plain JSON fallback
+      try {
+        sendJson(res, 200, JSON.parse(portalResponse));
+      } catch {
+        sendJson(res, 500, { success: false, message: 'Failed to verify license with portal.' });
+      }
+    }
+  } catch (err) {
+    console.error('License verification error:', err.message);
+    sendJson(res, 500, { success: false, message: 'License verification failed: ' + err.message });
+  }
+};
+
+// Get current license status
+routes['GET /api/license/status'] = async (req, res) => {
+  sendJson(res, 200, { message: 'Use POST /api/license/verify with license_key to verify.' });
+};
+
 // --- HTTP Server ---
 const server = http.createServer(async (req, res) => {
   // Handle CORS preflight
