@@ -4,7 +4,7 @@
 [![Docker Image](https://img.shields.io/badge/docker-ghcr.io-blue)](https://ghcr.io)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A comprehensive personal life management application built with React, TypeScript, and Supabase.
+A comprehensive personal life management application built with React, TypeScript, local db and Supabase.
 
 ## Features
 
