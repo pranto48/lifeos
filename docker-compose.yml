@@ -1,3 +1,15 @@
+# LifeOS Docker Compose
+# ─────────────────────────────────────────────────────────────
+# First-Run Setup:
+#   1. Run: docker-compose up -d
+#   2. Visit: http://localhost:3377
+#   3. The setup wizard will prompt you to:
+#      a) Create an admin account (email + password)
+#      b) Enter your license key (or skip for free plan)
+#
+# Optional: Set these env vars for headless (no-wizard) setup:
+#   ADMIN_EMAIL, ADMIN_PASSWORD, APP_LICENSE_KEY
+# ─────────────────────────────────────────────────────────────
 services:
   lifeos:
     build:
@@ -35,6 +47,12 @@ services:
       - DB_USER=lifeos
       - DB_PASSWORD=lifeos_secret_password
       - JWT_SECRET=lifeos-change-this-secret
+      - LICENSE_API_URL=https://abcytwvuntyicdknpzju.supabase.co/functions/v1/verify-license
+      # Optional: Pre-configure license key (skip license step in wizard)
+      - APP_LICENSE_KEY=${APP_LICENSE_KEY:-}
+      # Optional: Pre-configure admin account (skip admin step in wizard)
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy

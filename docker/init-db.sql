@@ -250,5 +250,16 @@ INSERT INTO public.app_settings (id, setup_complete, db_type)
 VALUES ('default', true, 'postgresql')
 ON CONFLICT (id) DO NOTHING;
 
+-- License Settings table (for license verification system)
+CREATE TABLE IF NOT EXISTS public.license_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    setting_key VARCHAR(255) UNIQUE NOT NULL,
+    setting_value TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_license_settings_key ON public.license_settings(setting_key);
+
 -- Admin user seeding is handled by the backend server on startup.
 -- See docker/backend/server.js seedDefaultAdmin() function.

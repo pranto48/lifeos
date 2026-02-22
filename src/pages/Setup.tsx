@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ import {
   ExternalLink,
   Info,
 } from 'lucide-react';
-import { selfHostedApi, markSetupComplete } from '@/lib/selfHostedConfig';
+import { selfHostedApi, markSetupComplete, getApiUrl } from '@/lib/selfHostedConfig';
 import {
   verifyLicenseViaBackend,
   verifyLicenseWithPortal,
@@ -66,8 +66,10 @@ export default function Setup() {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>('welcome');
   const [loading, setLoading] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(true);
   const [testSuccess, setTestSuccess] = useState(false);
   const [deploymentType, setDeploymentType] = useState<DeploymentType>('docker');
+  const [isDockerMode, setIsDockerMode] = useState(false);
 
   // Database config
   const [dbType, setDbType] = useState<'postgresql' | 'mysql'>('postgresql');
@@ -88,6 +90,35 @@ export default function Setup() {
   const [adminPassword, setAdminPassword] = useState('');
   const [adminConfirmPassword, setAdminConfirmPassword] = useState('');
   const [adminName, setAdminName] = useState('');
+
+  // Check setup status on mount — detect Docker mode
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const apiUrl = getApiUrl();
+        const res = await fetch(`${apiUrl}/setup/status`);
+        const data = await res.json();
+
+        if (data.isSetup && !data.needsSetup) {
+          // Already set up, redirect to login
+          navigate('/auth');
+          return;
+        }
+
+        if (data.isDocker) {
+          setIsDockerMode(true);
+          setDeploymentType('docker');
+          setDbType(data.dbType || 'postgresql');
+          // Docker skips environment + database steps
+        }
+      } catch {
+        // API not available, continue with normal setup
+      } finally {
+        setCheckingStatus(false);
+      }
+    };
+    checkStatus();
+  }, [navigate]);
 
   const applyDeploymentPresets = (type: DeploymentType) => {
     setDeploymentType(type);
@@ -149,6 +180,52 @@ export default function Setup() {
     }
   };
 
+  // Docker mode: create admin via dedicated endpoint
+  const handleCreateAdmin = async () => {
+    if (adminPassword !== adminConfirmPassword) {
+      toast({ title: 'Passwords do not match', variant: 'destructive' });
+      return;
+    }
+    if (adminPassword.length < 6) {
+      toast({ title: 'Password must be at least 6 characters', variant: 'destructive' });
+      return;
+    }
+    if (!adminEmail.includes('@')) {
+      toast({ title: 'Please enter a valid email', variant: 'destructive' });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const apiUrl = getApiUrl();
+      const res = await fetch(`${apiUrl}/setup/admin`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: adminEmail,
+          password: adminPassword,
+          name: adminName || 'Administrator',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Failed to create admin account');
+      }
+
+      toast({ title: 'Admin account created!', description: 'Now activate your license.' });
+      setStep('license');
+    } catch (err: any) {
+      toast({
+        title: 'Admin creation failed',
+        description: err.message || 'Could not create admin account.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Non-Docker: full initialize (DB + admin)
   const handleInitialize = async () => {
     if (adminPassword !== adminConfirmPassword) {
       toast({ title: 'Passwords do not match', variant: 'destructive' });
@@ -225,6 +302,21 @@ export default function Setup() {
         saveLicenseInfo(info);
         setLicenseInfo(info);
         setLicenseVerified(true);
+
+        // Also call license/setup to mark setup_complete on backend
+        try {
+          const apiUrl = getApiUrl();
+          await fetch(`${apiUrl}/license/setup`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ license_key: licenseKey }),
+          });
+        } catch {}
+
+        if (isDockerMode) {
+          markSetupComplete();
+        }
+
         toast({ title: 'License Activated!', description: `${info.plan} plan activated.` });
       } else {
         toast({ title: 'Verification Failed', description: result.message, variant: 'destructive' });
@@ -236,8 +328,7 @@ export default function Setup() {
     }
   };
 
-  const handleSkipLicense = () => {
-    // Allow free usage without a license key
+  const handleSkipLicense = async () => {
     const freeInfo: LicenseInfo = {
       licenseKey: 'FREE',
       status: 'free',
@@ -249,10 +340,36 @@ export default function Setup() {
     };
     saveLicenseInfo(freeInfo);
     setLicenseInfo(freeInfo);
+
+    // Mark setup complete on backend for Docker mode
+    if (isDockerMode) {
+      try {
+        const apiUrl = getApiUrl();
+        await fetch(`${apiUrl}/license/setup`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ license_key: 'FREE' }),
+        });
+      } catch {}
+      markSetupComplete();
+    }
+
     setStep('complete');
   };
 
-  const allSteps: Step[] = ['welcome', 'environment', 'database', 'admin', 'license', 'complete'];
+  // Docker mode: Welcome → Admin → License → Complete
+  // Normal mode: Welcome → Environment → Database → Admin → License → Complete
+  const allSteps: Step[] = isDockerMode
+    ? ['welcome', 'admin', 'license', 'complete']
+    : ['welcome', 'environment', 'database', 'admin', 'license', 'complete'];
+
+  if (checkingStatus) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -279,7 +396,9 @@ export default function Setup() {
           <h1 className="text-3xl font-bold text-foreground mb-2">
             <span className="text-primary">LifeOS</span> Setup
           </h1>
-          <p className="text-muted-foreground">Self-hosted installation wizard</p>
+          <p className="text-muted-foreground">
+            {isDockerMode ? 'Docker installation wizard' : 'Self-hosted installation wizard'}
+          </p>
         </div>
 
         {/* Progress indicators */}
@@ -303,17 +422,25 @@ export default function Setup() {
                   <Server className="w-12 h-12 text-primary mx-auto" />
                   <h2 className="text-xl font-semibold text-foreground">Welcome to LifeOS</h2>
                   <p className="text-muted-foreground text-sm">
-                    Set up your self-hosted instance. Choose your deployment environment to get started.
+                    {isDockerMode
+                      ? 'Your Docker environment is pre-configured. Create your admin account and activate your license to get started.'
+                      : 'Set up your self-hosted instance. Choose your deployment environment to get started.'}
                   </p>
-                  <Button className="w-full mt-4" onClick={() => setStep('environment')}>
+                  {isDockerMode && (
+                    <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-xs text-muted-foreground flex items-start gap-2">
+                      <Container className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                      <span>Docker detected — database is pre-configured. You only need to set up your admin account and license key.</span>
+                    </div>
+                  )}
+                  <Button className="w-full mt-4" onClick={() => setStep(isDockerMode ? 'admin' : 'environment')}>
                     Get Started <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
               </motion.div>
             )}
 
-            {/* Step 2: Environment Selection */}
-            {step === 'environment' && (
+            {/* Step 2: Environment Selection (non-Docker only) */}
+            {step === 'environment' && !isDockerMode && (
               <motion.div key="environment" variants={stepVariants} initial="initial" animate="animate" exit="exit">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -399,8 +526,8 @@ export default function Setup() {
               </motion.div>
             )}
 
-            {/* Step 3: Database Configuration */}
-            {step === 'database' && (
+            {/* Step 3: Database Configuration (non-Docker only) */}
+            {step === 'database' && !isDockerMode && (
               <motion.div key="database" variants={stepVariants} initial="initial" animate="animate" exit="exit">
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
@@ -586,6 +713,11 @@ export default function Setup() {
                     <Shield className="w-5 h-5 text-primary" />
                     <h2 className="text-lg font-semibold text-foreground">Create Admin Account</h2>
                   </div>
+                  {isDockerMode && (
+                    <p className="text-sm text-muted-foreground">
+                      Create your administrator account. You'll use these credentials to log in.
+                    </p>
+                  )}
 
                   <div className="space-y-2">
                     <Label htmlFor="adminName">Full Name</Label>
@@ -647,12 +779,12 @@ export default function Setup() {
                   </div>
 
                   <div className="flex gap-2 pt-2">
-                    <Button variant="ghost" onClick={() => setStep('database')}>
+                    <Button variant="ghost" onClick={() => setStep(isDockerMode ? 'welcome' : 'database')}>
                       <ArrowLeft className="w-4 h-4 mr-2" /> Back
                     </Button>
                     <Button
                       className="flex-1"
-                      onClick={handleInitialize}
+                      onClick={isDockerMode ? handleCreateAdmin : handleInitialize}
                       disabled={loading || !adminEmail || !adminPassword}
                     >
                       {loading ? (
@@ -660,7 +792,7 @@ export default function Setup() {
                       ) : (
                         <CheckCircle className="w-4 h-4 mr-2" />
                       )}
-                      Initialize LifeOS
+                      {isDockerMode ? 'Create Admin Account' : 'Initialize LifeOS'}
                     </Button>
                   </div>
                 </div>
@@ -782,16 +914,18 @@ export default function Setup() {
                     LifeOS has been configured successfully. You can now sign in with your admin credentials.
                   </p>
                   <div className="p-4 rounded-lg bg-muted/50 border border-border text-left text-sm space-y-1">
-                    <p><span className="text-muted-foreground">Environment:</span> <span className="font-medium capitalize">{deploymentType}</span></p>
+                    <p><span className="text-muted-foreground">Environment:</span> <span className="font-medium capitalize">{isDockerMode ? 'Docker' : deploymentType}</span></p>
                     <p><span className="text-muted-foreground">Database:</span> <span className="font-medium">{dbType === 'postgresql' ? 'PostgreSQL' : 'MySQL'}</span></p>
-                    <p><span className="text-muted-foreground">Host:</span> <span className="font-medium">{dbHost}:{dbPort}</span></p>
+                    {!isDockerMode && (
+                      <p><span className="text-muted-foreground">Host:</span> <span className="font-medium">{dbHost}:{dbPort}</span></p>
+                    )}
                     <p><span className="text-muted-foreground">Admin:</span> <span className="font-medium">{adminEmail}</span></p>
                     {licenseInfo && (
                       <p><span className="text-muted-foreground">License:</span> <span className="font-medium capitalize">{licenseInfo.plan} Plan</span></p>
                     )}
                   </div>
 
-                  {deploymentType === 'cpanel' && (
+                  {!isDockerMode && deploymentType === 'cpanel' && (
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-left text-xs space-y-1">
                       <p className="font-medium text-foreground">🚀 cPanel Next Steps</p>
                       <ul className="list-disc list-inside text-muted-foreground space-y-0.5">
@@ -812,7 +946,7 @@ export default function Setup() {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-4">
-          LifeOS Self-Hosted • {deploymentType === 'docker' ? 'Docker' : deploymentType === 'xampp' ? 'XAMPP' : 'cPanel'} Mode
+          LifeOS Self-Hosted • {isDockerMode ? 'Docker' : deploymentType === 'xampp' ? 'XAMPP' : deploymentType === 'cpanel' ? 'cPanel' : 'Docker'} Mode
         </p>
       </motion.div>
     </div>
