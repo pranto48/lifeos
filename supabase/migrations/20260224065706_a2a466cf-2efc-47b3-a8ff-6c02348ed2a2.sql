@@ -1,0 +1,2 @@
+ALTER TABLE public.transactions DROP CONSTRAINT valid_linked_entity_type;
+ALTER TABLE public.transactions ADD CONSTRAINT valid_linked_entity_type CHECK (linked_entity_type IS NULL OR linked_entity_type = ANY (ARRAY['goal'::text, 'task'::text, 'project'::text, 'note'::text, 'habit'::text, 'loan_payment'::text]));
