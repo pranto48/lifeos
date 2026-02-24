@@ -92,11 +92,15 @@ export function useSupportData() {
     if (!user) return;
     setLoading(true);
 
-    // Load ALL data - RLS policies now allow all authenticated users to view
+    // Managers get full access via direct table query; regular users get safe data via RPC
+    const supportUsersPromise = isAdmin
+      ? supabase.from('support_users').select('*').order('name')
+      : supabase.rpc('get_support_users_safe');
+
     const [unitsRes, deptsRes, usersRes, logsRes] = await Promise.all([
       supabase.from('support_units').select('*').order('name'),
       supabase.from('support_departments').select('*').order('name'),
-      supabase.from('support_users').select('*').order('name'),
+      supportUsersPromise,
       supabase.from('audit_logs')
         .select('*')
         .eq('user_id', user.id)
