@@ -106,6 +106,16 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
   const { language } = useLanguage();
   const [newCustomField, setNewCustomField] = useState('');
   const [newCustomValue, setNewCustomValue] = useState('');
+  const [customRam, setCustomRam] = useState(false);
+  const [customStorage, setCustomStorage] = useState(false);
+  const [customProcessor, setCustomProcessor] = useState(false);
+
+  // Initialize custom flags based on existing values not in predefined options
+  useEffect(() => {
+    if (specs.ram_info && !RAM_OPTIONS.some(o => o.value === specs.ram_info)) setCustomRam(true);
+    if (specs.storage_info && !STORAGE_OPTIONS.some(o => o.value === specs.storage_info)) setCustomStorage(true);
+    if (specs.processor_info && !PROCESSOR_OPTIONS.some(o => o.value === specs.processor_info)) setCustomProcessor(true);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if this category should show hardware specs
   const showHardwareSpecs = categoryName && COMPUTER_CATEGORIES.some(
@@ -161,8 +171,16 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
               {language === 'bn' ? 'RAM' : 'RAM'}
             </Label>
             <Select
-              value={specs.ram_info || ''}
-              onValueChange={(v) => onChange({ ...specs, ram_info: v === 'custom' ? '' : v })}
+              value={customRam ? 'custom' : (specs.ram_info || '')}
+              onValueChange={(v) => {
+                if (v === 'custom') {
+                  setCustomRam(true);
+                  onChange({ ...specs, ram_info: '' });
+                } else {
+                  setCustomRam(false);
+                  onChange({ ...specs, ram_info: v });
+                }
+              }}
             >
               <SelectTrigger className="text-sm">
                 <SelectValue placeholder={language === 'bn' ? 'RAM নির্বাচন করুন' : 'Select RAM'} />
@@ -174,7 +192,7 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
                 <SelectItem value="custom">{language === 'bn' ? 'কাস্টম...' : 'Custom...'}</SelectItem>
               </SelectContent>
             </Select>
-            {specs.ram_info !== '' && !RAM_OPTIONS.some(o => o.value === specs.ram_info) && (
+            {customRam && (
               <Input
                 value={specs.ram_info}
                 onChange={(e) => onChange({ ...specs, ram_info: e.target.value })}
@@ -191,8 +209,16 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
               {language === 'bn' ? 'স্টোরেজ' : 'Storage'}
             </Label>
             <Select
-              value={specs.storage_info || ''}
-              onValueChange={(v) => onChange({ ...specs, storage_info: v === 'custom' ? '' : v })}
+              value={customStorage ? 'custom' : (specs.storage_info || '')}
+              onValueChange={(v) => {
+                if (v === 'custom') {
+                  setCustomStorage(true);
+                  onChange({ ...specs, storage_info: '' });
+                } else {
+                  setCustomStorage(false);
+                  onChange({ ...specs, storage_info: v });
+                }
+              }}
             >
               <SelectTrigger className="text-sm">
                 <SelectValue placeholder={language === 'bn' ? 'স্টোরেজ নির্বাচন করুন' : 'Select Storage'} />
@@ -204,7 +230,7 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
                 <SelectItem value="custom">{language === 'bn' ? 'কাস্টম...' : 'Custom...'}</SelectItem>
               </SelectContent>
             </Select>
-            {specs.storage_info !== '' && !STORAGE_OPTIONS.some(o => o.value === specs.storage_info) && (
+            {customStorage && (
               <Input
                 value={specs.storage_info}
                 onChange={(e) => onChange({ ...specs, storage_info: e.target.value })}
@@ -221,8 +247,16 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
               {language === 'bn' ? 'প্রসেসর' : 'Processor'}
             </Label>
             <Select
-              value={specs.processor_info || ''}
-              onValueChange={(v) => onChange({ ...specs, processor_info: v === 'custom' ? '' : v })}
+              value={customProcessor ? 'custom' : (specs.processor_info || '')}
+              onValueChange={(v) => {
+                if (v === 'custom') {
+                  setCustomProcessor(true);
+                  onChange({ ...specs, processor_info: '' });
+                } else {
+                  setCustomProcessor(false);
+                  onChange({ ...specs, processor_info: v });
+                }
+              }}
             >
               <SelectTrigger className="text-sm">
                 <SelectValue placeholder={language === 'bn' ? 'প্রসেসর নির্বাচন করুন' : 'Select Processor'} />
@@ -234,7 +268,7 @@ export function DeviceSpecsForm({ categoryName, specs, onChange }: DeviceSpecsFo
                 <SelectItem value="custom">{language === 'bn' ? 'কাস্টম...' : 'Custom...'}</SelectItem>
               </SelectContent>
             </Select>
-            {specs.processor_info !== '' && !PROCESSOR_OPTIONS.some(o => o.value === specs.processor_info) && (
+            {customProcessor && (
               <Input
                 value={specs.processor_info}
                 onChange={(e) => onChange({ ...specs, processor_info: e.target.value })}
