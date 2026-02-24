@@ -2548,6 +2548,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_support_users_safe: {
+        Args: never
+        Returns: {
+          created_at: string
+          department_id: string
+          designation: string
+          device_assign_date: string
+          device_handover_date: string
+          device_info: string
+          email: string
+          extension_number: string
+          id: string
+          ip_address: string
+          is_active: boolean
+          name: string
+          nas_username: string
+          new_device_assign: string
+          notes: string
+          phone: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
