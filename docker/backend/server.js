@@ -991,7 +991,27 @@ const server = http.createServer(async (req, res) => {
     }
 
     const routeKey = `${req.method} ${urlPath}`;
-    const handler = routes[routeKey];
+    let handler = routes[routeKey];
+
+    // Parameterized route matching for /api/data/:table
+    if (!handler && urlPath.startsWith('/api/data/')) {
+      const parts = urlPath.split('/'); // ['', 'api', 'data', tableName, ...rest]
+      const tableName = parts[3];
+      const subAction = parts[4]; // 'upsert' or 'update' or undefined
+      if (tableName) {
+        if (subAction === 'upsert' && req.method === 'POST') {
+          handler = (rq, rs) => handleDataUpsert(rq, rs, tableName);
+        } else if (subAction === 'update' && req.method === 'POST') {
+          handler = (rq, rs) => handleDataUpdate(rq, rs, tableName);
+        } else if (!subAction && req.method === 'GET') {
+          handler = (rq, rs) => handleDataSelect(rq, rs, tableName);
+        } else if (!subAction && req.method === 'POST') {
+          handler = (rq, rs) => handleDataInsert(rq, rs, tableName);
+        } else if (!subAction && req.method === 'DELETE') {
+          handler = (rq, rs) => handleDataDelete(rq, rs, tableName);
+        }
+      }
+    }
 
     if (handler) {
       try {
@@ -1012,6 +1032,191 @@ const server = http.createServer(async (req, res) => {
     }
   }
 });
+
+// --- Generic CRUD Data Handlers for Backup/Restore ---
+const ALLOWED_DATA_TABLES = new Set([
+  'tasks', 'notes', 'transactions', 'goals', 'investments', 'projects',
+  'salary_entries', 'habits', 'family_members', 'family_events',
+  'budgets', 'budget_categories', 'task_categories',
+  'habit_completions', 'goal_milestones', 'project_milestones',
+  'task_checklists', 'task_follow_up_notes', 'task_assignments',
+  'family_member_connections', 'family_documents',
+  'loan_payments', 'device_service_history', 'backup_schedules',
+  'loans',
+]);
+
+function validateTable(tableName) {
+  if (!ALLOWED_DATA_TABLES.has(tableName)) {
+    return false;
+  }
+  // Extra safety: ensure no SQL injection via table name
+  return /^[a-z_]+$/.test(tableName);
+}
+
+async function handleDataSelect(req, res, tableName) {
+  if (!validateTable(tableName)) {
+    sendJson(res, 400, { message: `Invalid table: ${tableName}` });
+    return;
+  }
+  const user = getAuthUser(req);
+  if (!user) { sendJson(res, 401, { message: 'Not authenticated' }); return; }
+
+  try {
+    const rows = await query(`SELECT * FROM ${tableName} WHERE user_id = $1`, [user.sub]);
+    sendJson(res, 200, { data: rows });
+  } catch (err) {
+    sendJson(res, 500, { message: err.message });
+  }
+}
+
+async function handleDataInsert(req, res, tableName) {
+  if (!validateTable(tableName)) {
+    sendJson(res, 400, { message: `Invalid table: ${tableName}` });
+    return;
+  }
+  const user = getAuthUser(req);
+  if (!user) { sendJson(res, 401, { message: 'Not authenticated' }); return; }
+
+  try {
+    const body = await parseBody(req);
+    const rows = body.rows || [];
+    if (!rows.length) { sendJson(res, 200, { inserted: 0 }); return; }
+
+    let inserted = 0;
+    for (const row of rows) {
+      row.user_id = user.sub;
+      if (!row.id) row.id = uuid();
+      delete row.search_vector;
+      delete row.created_at;
+      delete row.updated_at;
+
+      const keys = Object.keys(row);
+      const vals = keys.map((_, i) => `$${i + 1}`);
+      await query(
+        `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${vals.join(', ')})`,
+        keys.map(k => row[k])
+      );
+      inserted++;
+    }
+    sendJson(res, 200, { inserted });
+  } catch (err) {
+    sendJson(res, 500, { message: err.message });
+  }
+}
+
+async function handleDataUpsert(req, res, tableName) {
+  if (!validateTable(tableName)) {
+    sendJson(res, 400, { message: `Invalid table: ${tableName}` });
+    return;
+  }
+  const user = getAuthUser(req);
+  if (!user) { sendJson(res, 401, { message: 'Not authenticated' }); return; }
+
+  try {
+    const body = await parseBody(req);
+    const rows = body.rows || [];
+    if (!rows.length) { sendJson(res, 200, { upserted: 0 }); return; }
+
+    let upserted = 0;
+    for (const row of rows) {
+      row.user_id = user.sub;
+      if (!row.id) row.id = uuid();
+      delete row.search_vector;
+      delete row.created_at;
+      delete row.updated_at;
+
+      const keys = Object.keys(row);
+      const vals = keys.map((_, i) => `$${i + 1}`);
+
+      if (dbType === 'postgresql') {
+        const updates = keys.filter(k => k !== 'id').map(k => `${k} = EXCLUDED.${k}`).join(', ');
+        await query(
+          `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT (id) DO UPDATE SET ${updates}`,
+          keys.map(k => row[k])
+        );
+      } else {
+        const updates = keys.filter(k => k !== 'id').map(k => `${k} = VALUES(${k})`).join(', ');
+        await query(
+          `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${vals.join(', ')}) ON DUPLICATE KEY UPDATE ${updates}`,
+          keys.map(k => row[k])
+        );
+      }
+      upserted++;
+    }
+    sendJson(res, 200, { upserted });
+  } catch (err) {
+    sendJson(res, 500, { message: err.message });
+  }
+}
+
+async function handleDataDelete(req, res, tableName) {
+  if (!validateTable(tableName)) {
+    sendJson(res, 400, { message: `Invalid table: ${tableName}` });
+    return;
+  }
+  const user = getAuthUser(req);
+  if (!user) { sendJson(res, 401, { message: 'Not authenticated' }); return; }
+
+  try {
+    await query(`DELETE FROM ${tableName} WHERE user_id = $1`, [user.sub]);
+    sendJson(res, 200, { success: true });
+  } catch (err) {
+    sendJson(res, 500, { message: err.message });
+  }
+}
+
+async function handleDataUpdate(req, res, tableName) {
+  if (!validateTable(tableName)) {
+    sendJson(res, 400, { message: `Invalid table: ${tableName}` });
+    return;
+  }
+  const user = getAuthUser(req);
+  if (!user) { sendJson(res, 401, { message: 'Not authenticated' }); return; }
+
+  try {
+    const body = await parseBody(req);
+    const { updates, filters } = body;
+    // updates: { column: value }, filters: { column: value }
+    if (!updates || !Object.keys(updates).length) {
+      sendJson(res, 400, { message: 'No updates provided' });
+      return;
+    }
+
+    const setClauses = [];
+    const params = [];
+    let idx = 1;
+    for (const [key, val] of Object.entries(updates)) {
+      if (/^[a-z_]+$/.test(key)) {
+        setClauses.push(`${key} = $${idx++}`);
+        params.push(val);
+      }
+    }
+
+    let whereClauses = [`user_id = $${idx++}`];
+    params.push(user.sub);
+
+    if (filters) {
+      for (const [key, val] of Object.entries(filters)) {
+        if (/^[a-z_]+$/.test(key)) {
+          if (val === null) {
+            whereClauses.push(`${key} IS NOT NULL`);
+          } else {
+            whereClauses.push(`${key} = $${idx++}`);
+            params.push(val);
+          }
+        }
+      }
+    }
+
+    await query(
+      `UPDATE ${tableName} SET ${setClauses.join(', ')} WHERE ${whereClauses.join(' AND ')}`,
+      params
+    );
+    sendJson(res, 200, { success: true });
+  } catch (err) {
+    sendJson(res, 500, { message: err.message });
+  }
+}
 
 // --- Seed Default Admin ---
 async function seedDefaultAdmin() {
