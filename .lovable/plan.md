@@ -1,63 +1,87 @@
 
-## Fix: Backup and Restore Crash ("Something went wrong")
 
-### Root Cause Analysis
+## Analysis: Docker 502 Bad Gateway on Login
 
-The restore crashes the entire app (triggering the global ErrorBoundary) due to multiple cascading issues:
+### Root Causes Identified
 
-**1. Missing Foreign Key Cleanup (Delete Phase)**
-Several dependent tables are NOT cleaned up before parent tables are deleted, causing FK constraint violations that prevent proper deletion:
-- `loan_payments.transaction_id` references `transactions` -- not cleaned before deleting transactions
-- `transactions.family_member_id` references `family_members` -- not cleaned before deleting family
-- `device_service_history.task_id` references `tasks` -- not cleaned before deleting tasks
+After examining the full Docker stack (nginx.conf, docker/backend/server.js, docker-compose.yml, init-db.sql, Dockerfile), I found several issues causing the persistent 502:
 
-When deletes fail silently (FK violations), the old records remain. The subsequent inserts then fail with duplicate primary key errors because the backup data includes original record IDs.
+**1. No outer error handling in HTTP request handler (server.js line 934)**
+The HTTP handler is `async` but has no top-level try/catch. If any middleware or route throws an unexpected error, the response never completes and nginx sees a dead connection, returning 502.
 
-**2. No Error Boundary Around Settings Content**
-The entire app is wrapped in a single global ErrorBoundary. When the page reloads after a partial restore (line 625: `window.location.reload()`), the app renders with inconsistent data (e.g., tasks referencing deleted categories), which can crash during render and trigger the global error page.
+**2. No backend health check endpoint or Docker healthcheck**
+The `lifeos` (nginx) service depends on `backend` with `condition: service_started`, not `service_healthy`. Nginx can start proxying requests before the backend is actually listening and connected to the database. There is no `/api/health` endpoint.
 
-**3. Import Function Only Imports Tasks and Goals**
-The `importJSON` function (for "JSON backup" import) only handles tasks and goals, silently ignoring all other data types. While it strips IDs correctly, it doesn't strip computed fields or handle FK references.
+**3. Startup timing: server.listen() waits for all initialization**
+`server.listen()` only runs AFTER `connectWithRetry()` (up to 30s), `ensureSchema()`, `seedDefaultAdmin()`, and license verification. During this entire period, the backend is unreachable. Nginx proxies to it and gets connection refused (502).
 
-### Fix Plan
+**4. init-db.sql schema vs backend schema conflict**
+`init-db.sql` creates `ip_address` as type `INET` in `user_sessions`, but the backend PG_SCHEMA defines it as plain `VARCHAR`. If `ensureSchema()` partially runs or the backend tries operations on these columns, silent errors may occur.
 
-#### Step 1: Add Comprehensive FK Cleanup Before Deletes
-Add cleanup for ALL dependent tables before their parent tables are deleted:
-- Delete `loan_payments` (with transaction_id references) before deleting `transactions`
-- Nullify or delete `transactions` with `family_member_id` before deleting `family_members`
-- Delete `device_service_history` entries referencing user's tasks before deleting `tasks`
+---
 
-#### Step 2: Use Upsert Instead of Insert for Restore
-Change all restore inserts from `.insert()` to `.upsert()` with `onConflict: 'id'`. This handles the case where records weren't fully deleted by updating them instead of failing on duplicate keys.
+### Plan
 
-#### Step 3: Strip Problematic Fields from Restore Data
-Expand the `stripFields` list to include all computed/generated columns and fields that could cause FK issues:
-- `search_vector` (computed column on notes)
-- `created_at`, `updated_at` (let DB set these fresh)
+#### A. Fix server.js - Error handling and startup order
 
-#### Step 4: Wrap Settings Content in SectionErrorBoundary
-Wrap the DataExport component (and the Settings page content area) in a `SectionErrorBoundary` so that restore errors don't crash the entire app -- only the settings section shows an error with a retry option.
+1. **Move `server.listen()` to run FIRST**, before database connection. This ensures the backend is reachable immediately when nginx starts proxying.
+2. **Add a `/api/health` endpoint** that returns the current backend state (starting, ready, error).
+3. **Add a top-level try/catch** wrapping the entire HTTP handler to prevent unhandled async exceptions from killing the response.
+4. **Add proper CORS + JSON error response** for any unhandled case.
 
-#### Step 5: Add Global Unhandled Rejection Handler
-Add a `window.addEventListener('unhandledrejection', ...)` handler in App.tsx to catch any stray async errors that slip through try/catch blocks, preventing them from crashing the app.
+#### B. Fix docker-compose.yml - Health checks
 
-#### Step 6: Remove Auto-Reload After Restore
-Remove the `window.location.reload()` after restore. Instead, just show a success toast. The user can manually refresh if needed. This prevents crashes from loading the app with inconsistent data.
+1. **Add a healthcheck** to the `backend` service using the new `/api/health` endpoint.
+2. **Change `lifeos` (nginx) dependency** on `backend` from `service_started` to `service_healthy` so nginx only starts proxying when the backend is confirmed ready.
+
+#### C. Fix init-db.sql - Schema consistency
+
+1. **Align `user_sessions.ip_address`** type with what the backend expects (use `TEXT` instead of `INET` to avoid type mismatches).
+
+#### D. Fix nginx.conf - Proxy error handling
+
+1. **Add `proxy_connect_timeout` and `proxy_read_timeout`** directives with reasonable values.
+2. **Add `proxy_next_upstream` error handling** so nginx returns a proper error instead of a raw 502 when the backend is temporarily unavailable.
+
+---
 
 ### Technical Details
 
+**server.js changes (startup reorder):**
+```text
+Before: connectWithRetry() → ensureSchema() → seedAdmin() → license → server.listen()
+After:  server.listen() → connectWithRetry() → ensureSchema() → seedAdmin() → license
+```
+The health endpoint returns `{ status: "starting" }` until initialization completes, then `{ status: "ready" }`.
+
+**server.js changes (error handling):**
+```javascript
+const server = http.createServer(async (req, res) => {
+  try {
+    // ... existing handler logic ...
+  } catch (err) {
+    console.error('Unhandled request error:', err);
+    if (!res.headersSent) {
+      sendJson(res, 500, { message: 'Internal server error' });
+    }
+  }
+});
+```
+
+**docker-compose.yml backend healthcheck:**
+```yaml
+backend:
+  healthcheck:
+    test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/health"]
+    interval: 5s
+    timeout: 5s
+    retries: 10
+    start_period: 30s
+```
+
 **Files to modify:**
+- `docker/backend/server.js` - Startup reorder, health endpoint, error handling
+- `docker-compose.yml` - Backend healthcheck, frontend dependency
+- `docker/init-db.sql` - Align ip_address column type
+- `nginx.conf` - Proxy timeout and error handling directives
 
-1. **`src/components/settings/DataExport.tsx`**:
-   - Add `loan_payments` cleanup before `transactions` delete
-   - Add `transactions` family_member_id nullification before `family` delete
-   - Change `.insert()` to `.upsert()` with `onConflict: 'id'` in `executeSelectiveRestore`
-   - Add `created_at` and `updated_at` to `stripFields`
-   - Remove `window.location.reload()` 
-   - Wrap the entire function body in additional error safety
-
-2. **`src/pages/Settings.tsx`**:
-   - Import and wrap `renderContent()` output in `SectionErrorBoundary`
-
-3. **`src/App.tsx`**:
-   - Add `unhandledrejection` event listener in `AppContent` to catch stray async errors
