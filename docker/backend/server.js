@@ -1513,7 +1513,15 @@ const ALLOWED_DATA_TABLES = new Set([
   'task_checklists', 'task_follow_up_notes', 'task_assignments',
   'family_member_connections', 'family_documents',
   'loan_payments', 'device_service_history', 'backup_schedules',
-  'loans',
+  'loans', 'profiles', 'support_users', 'support_units', 'support_departments',
+  'support_user_devices', 'device_inventory', 'device_categories',
+  'device_suppliers', 'device_disposals', 'device_transfer_history',
+  'support_tickets', 'ticket_categories', 'ticket_comments',
+  'ticket_activity_log', 'ticket_requesters', 'ticket_form_fields',
+  'attachments', 'smtp_settings', 'app_secrets',
+  'google_calendar_sync', 'synced_calendar_events',
+  'push_subscriptions', 'email_otp_codes', 'audit_logs',
+  'qr_code_settings',
 ]);
 
 function validateTable(tableName) {
