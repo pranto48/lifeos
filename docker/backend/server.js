@@ -988,22 +988,18 @@ async function seedDefaultAdmin() {
       return;
     }
 
-    // Also skip if running in Docker mode and no ADMIN_EMAIL env var (let wizard handle it)
-    if (process.env.DB_HOST && !process.env.ADMIN_EMAIL) {
-      // Check if any admin exists
-      const existingAdmins = await query("SELECT COUNT(*) as cnt FROM user_roles WHERE role = 'admin'");
-      if (parseInt(existingAdmins[0].cnt) === 0) {
-        // No admin exists, and no env vars — setup wizard will handle it
-        console.log('⏳ No admin configured. Setup wizard will prompt for admin credentials.');
-        // Don't mark setup_complete — let the wizard do it
-        await query(
-          dbType === 'postgresql'
-            ? `INSERT INTO app_settings (id, setup_complete, db_type) VALUES ('default', false, $1) ON CONFLICT (id) DO NOTHING`
-            : `INSERT INTO app_settings (id, setup_complete, db_type) VALUES ('default', false, ?) ON DUPLICATE KEY UPDATE id = id`,
-          [dbType]
-        );
-        return;
-      }
+    // Check if any admin exists already
+    const existingAdmins = await query("SELECT COUNT(*) as cnt FROM user_roles WHERE role = 'admin'");
+    if (parseInt(existingAdmins[0].cnt) > 0) {
+      console.log('✅ Admin user already exists — skipping default seed.');
+      // Ensure setup_complete is true
+      await query(
+        dbType === 'postgresql'
+          ? `INSERT INTO app_settings (id, setup_complete, db_type) VALUES ('default', true, $1) ON CONFLICT (id) DO UPDATE SET setup_complete = true`
+          : `INSERT INTO app_settings (id, setup_complete, db_type) VALUES ('default', true, ?) ON DUPLICATE KEY UPDATE setup_complete = true`,
+        [dbType]
+      );
+      return;
     }
 
     // Use env vars for headless setup if provided
