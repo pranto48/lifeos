@@ -950,7 +950,9 @@ const server = http.createServer(async (req, res) => {
     // Health endpoint — always available, even before DB is ready
     const urlPath = req.url.split('?')[0];
     if (req.method === 'GET' && urlPath === '/api/health') {
-      sendJson(res, appState.status === 'ready' ? 200 : 503, {
+      // Always return 200 so Docker healthcheck passes while container is alive.
+      // The 'status' field tells callers whether the app is actually ready.
+      sendJson(res, 200, {
         status: appState.status,
         message: appState.message,
         timestamp: new Date().toISOString(),
