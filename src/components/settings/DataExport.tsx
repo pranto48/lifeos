@@ -740,9 +740,14 @@ export function DataExport() {
       toast({ 
         title: language === 'bn' ? 'পুনরুদ্ধার সম্পন্ন' : 'Restore Complete',
         description: language === 'bn' 
-          ? `${restored} আইটেম পুনরুদ্ধার হয়েছে।`
-          : `${restored} items restored successfully.`
+          ? `${restored} আইটেম পুনরুদ্ধার হয়েছে। পেজ রিলোড হচ্ছে...`
+          : `${restored} items restored successfully. Reloading page...`
       });
+
+      // Reload the page after a short delay to refresh all cached data
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
 
     } catch (error: any) {
       console.error('Restore failed:', error);
