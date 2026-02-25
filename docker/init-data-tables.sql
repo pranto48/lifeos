@@ -359,27 +359,236 @@ CREATE TABLE IF NOT EXISTS public.backup_schedules (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Loans (if not already created by init-db.sql)
-CREATE TABLE IF NOT EXISTS public.loans (
+-- Device Disposals
+CREATE TABLE IF NOT EXISTS public.device_disposals (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL,
-    lender_name TEXT NOT NULL,
-    loan_type TEXT DEFAULT 'personal',
-    principal_amount NUMERIC NOT NULL,
-    total_amount NUMERIC NOT NULL,
-    remaining_amount NUMERIC NOT NULL,
-    interest_rate NUMERIC,
-    monthly_payment NUMERIC,
-    payment_frequency TEXT DEFAULT 'monthly',
-    start_date DATE NOT NULL,
-    end_date DATE,
-    next_payment_date DATE,
-    status TEXT DEFAULT 'active',
-    reminder_days INTEGER,
+    device_id UUID NOT NULL,
+    disposal_method TEXT NOT NULL DEFAULT 'recycled',
+    disposal_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    disposal_reason TEXT,
+    disposal_value NUMERIC,
+    buyer_info TEXT,
+    certificate_number TEXT,
+    approved_by TEXT,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Support User Devices
+CREATE TABLE IF NOT EXISTS public.support_user_devices (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    support_user_id UUID NOT NULL,
+    device_name TEXT NOT NULL,
+    device_handover_date DATE,
+    notes TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ticket Categories
+CREATE TABLE IF NOT EXISTS public.ticket_categories (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT,
+    is_active BOOLEAN DEFAULT true,
+    sort_order INTEGER DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ticket Requesters
+CREATE TABLE IF NOT EXISTS public.ticket_requesters (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    department TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Support Tickets
+CREATE TABLE IF NOT EXISTS public.support_tickets (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_number TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    status TEXT DEFAULT 'open',
+    priority TEXT DEFAULT 'medium',
+    category_id UUID,
+    requester_id UUID,
+    assigned_to UUID,
+    device_id UUID,
+    custom_fields JSONB,
+    resolved_at TIMESTAMPTZ,
+    closed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ticket Comments
+CREATE TABLE IF NOT EXISTS public.ticket_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    content TEXT NOT NULL,
+    is_internal BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ticket Activity Log
+CREATE TABLE IF NOT EXISTS public.ticket_activity_log (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    ticket_id UUID NOT NULL,
+    user_id UUID NOT NULL,
+    action TEXT NOT NULL,
+    old_value TEXT,
+    new_value TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Ticket Form Fields
+CREATE TABLE IF NOT EXISTS public.ticket_form_fields (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    category_id UUID,
+    field_name TEXT NOT NULL,
+    field_type TEXT NOT NULL DEFAULT 'text',
+    field_label TEXT NOT NULL,
+    is_required BOOLEAN DEFAULT false,
+    field_options JSONB,
+    sort_order INTEGER DEFAULT 0,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Attachments
+CREATE TABLE IF NOT EXISTS public.attachments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id UUID NOT NULL,
+    file_name TEXT NOT NULL,
+    file_url TEXT NOT NULL,
+    file_type TEXT,
+    file_size INTEGER,
+    is_vault BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- SMTP Settings
+CREATE TABLE IF NOT EXISTS public.smtp_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    smtp_host TEXT NOT NULL,
+    smtp_port INTEGER DEFAULT 587,
+    smtp_username TEXT NOT NULL,
+    smtp_password TEXT NOT NULL,
+    from_email TEXT NOT NULL,
+    from_name TEXT DEFAULT 'LifeOS',
+    use_tls BOOLEAN DEFAULT true,
+    is_active BOOLEAN DEFAULT true,
+    updated_by UUID NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- App Secrets
+CREATE TABLE IF NOT EXISTS public.app_secrets (
+    id TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Google Calendar Sync
+CREATE TABLE IF NOT EXISTS public.google_calendar_sync (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    access_token TEXT NOT NULL,
+    refresh_token TEXT NOT NULL,
+    token_expires_at TIMESTAMPTZ NOT NULL,
+    calendar_id TEXT,
+    sync_enabled BOOLEAN DEFAULT true,
+    sync_token TEXT,
+    last_sync_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Synced Calendar Events
+CREATE TABLE IF NOT EXISTS public.synced_calendar_events (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    google_event_id TEXT NOT NULL,
+    local_event_id UUID NOT NULL,
+    local_event_type TEXT NOT NULL,
+    last_synced_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Push Subscriptions
+CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    endpoint TEXT NOT NULL,
+    p256dh TEXT NOT NULL,
+    auth TEXT NOT NULL,
+    device_info TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Email OTP Codes
+CREATE TABLE IF NOT EXISTS public.email_otp_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    code TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used BOOLEAN DEFAULT false,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Audit Logs
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    old_data JSONB,
+    new_data JSONB,
+    ip_address TEXT,
+    user_agent TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- QR Code Settings
+CREATE TABLE IF NOT EXISTS public.qr_code_settings (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    fields JSONB DEFAULT '[]',
+    logo_url TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Add supplier_id column to device_inventory if missing
+DO $$ BEGIN
+    ALTER TABLE public.device_inventory ADD COLUMN IF NOT EXISTS supplier_id UUID;
+EXCEPTION WHEN others THEN NULL;
+END $$;
+
+DO $$ BEGIN
+    ALTER TABLE public.device_inventory ADD COLUMN IF NOT EXISTS processor_info VARCHAR(255);
+EXCEPTION WHEN others THEN NULL;
+END $$;
 
 -- Indexes for data tables
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON public.tasks(user_id);
@@ -395,3 +604,7 @@ CREATE INDEX IF NOT EXISTS idx_budgets_user_id ON public.budgets(user_id);
 CREATE INDEX IF NOT EXISTS idx_task_categories_user_id ON public.task_categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_habit_completions_user_id ON public.habit_completions(user_id);
 CREATE INDEX IF NOT EXISTS idx_backup_schedules_user_id ON public.backup_schedules(user_id);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON public.support_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_ticket_comments_ticket_id ON public.ticket_comments(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_attachments_entity ON public.attachments(entity_type, entity_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON public.audit_logs(user_id);
