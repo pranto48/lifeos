@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Download, FileJson, FileSpreadsheet, FileText, Upload, Loader2, Calendar, Clock, Database, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { isSelfHosted, selfHostedApi } from '@/lib/selfHostedConfig';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAdmin } from '@/hooks/useUserRoles';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -51,18 +52,26 @@ export function DataExport() {
     if (!user) return;
     setLoadingSchedule(true);
     try {
-      const { data, error } = await supabase
-        .from('backup_schedules')
-        .select('*')
-        .eq('user_id', user.id)
-        .maybeSingle();
+      let scheduleData: any = null;
 
-      if (data) {
-        setSchedule(data);
-        setFrequency(data.frequency);
-        setDayOfWeek(data.day_of_week ?? 0);
-        setDayOfMonth(data.day_of_month ?? 1);
-        setIsActive(data.is_active);
+      if (isSelfHosted()) {
+        const rows = await selfHostedApi.selectAll('backup_schedules');
+        scheduleData = rows.length > 0 ? rows[0] : null;
+      } else {
+        const { data } = await supabase
+          .from('backup_schedules')
+          .select('*')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        scheduleData = data;
+      }
+
+      if (scheduleData) {
+        setSchedule(scheduleData);
+        setFrequency(scheduleData.frequency);
+        setDayOfWeek(scheduleData.day_of_week ?? 0);
+        setDayOfMonth(scheduleData.day_of_month ?? 1);
+        setIsActive(scheduleData.is_active);
       }
     } catch (error) {
       console.error('Failed to load backup schedule:', error);
@@ -103,19 +112,25 @@ export function DataExport() {
         is_active: isActive,
       };
 
-      if (schedule?.id) {
-        const { error } = await supabase
-          .from('backup_schedules')
-          .update(scheduleData)
-          .eq('id', schedule.id);
-        
-        if (error) throw error;
+      if (isSelfHosted()) {
+        if (schedule?.id) {
+          await selfHostedApi.upsertBatch('backup_schedules', [{ ...scheduleData, id: schedule.id }]);
+        } else {
+          await selfHostedApi.insertBatch('backup_schedules', [scheduleData]);
+        }
       } else {
-        const { error } = await supabase
-          .from('backup_schedules')
-          .insert(scheduleData);
-        
-        if (error) throw error;
+        if (schedule?.id) {
+          const { error } = await supabase
+            .from('backup_schedules')
+            .update(scheduleData)
+            .eq('id', schedule.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from('backup_schedules')
+            .insert(scheduleData);
+          if (error) throw error;
+        }
       }
 
       await loadBackupSchedule();
@@ -147,13 +162,22 @@ export function DataExport() {
       // Update last backup timestamp if schedule exists
       if (schedule?.id) {
         const nextBackup = calculateNextBackup(frequency, dayOfWeek, dayOfMonth);
-        await supabase
-          .from('backup_schedules')
-          .update({ 
+        if (isSelfHosted()) {
+          await selfHostedApi.upsertBatch('backup_schedules', [{
+            id: schedule.id,
+            user_id: user?.id,
             last_backup_at: new Date().toISOString(),
             next_backup_at: nextBackup.toISOString()
-          })
-          .eq('id', schedule.id);
+          }]);
+        } else {
+          await supabase
+            .from('backup_schedules')
+            .update({ 
+              last_backup_at: new Date().toISOString(),
+              next_backup_at: nextBackup.toISOString()
+            })
+            .eq('id', schedule.id);
+        }
         await loadBackupSchedule();
       }
 
@@ -169,6 +193,42 @@ export function DataExport() {
   };
 
   const fetchAllData = async () => {
+    if (isSelfHosted()) {
+      const [
+        tasks, notes, transactions, goals, investments, projects,
+        salaries, habits, family, familyEvents, budgets, budgetCategories,
+        taskCategories, habitCompletions, goalMilestones, projectMilestones
+      ] = await Promise.all([
+        selfHostedApi.selectAll('tasks'),
+        selfHostedApi.selectAll('notes'),
+        selfHostedApi.selectAll('transactions'),
+        selfHostedApi.selectAll('goals'),
+        selfHostedApi.selectAll('investments'),
+        selfHostedApi.selectAll('projects'),
+        selfHostedApi.selectAll('salary_entries'),
+        selfHostedApi.selectAll('habits'),
+        selfHostedApi.selectAll('family_members'),
+        selfHostedApi.selectAll('family_events'),
+        selfHostedApi.selectAll('budgets'),
+        selfHostedApi.selectAll('budget_categories'),
+        selfHostedApi.selectAll('task_categories'),
+        selfHostedApi.selectAll('habit_completions'),
+        selfHostedApi.selectAll('goal_milestones'),
+        selfHostedApi.selectAll('project_milestones'),
+      ]);
+
+      return {
+        tasks, 
+        notes: notes.map((n: any) => ({ ...n, content: n.is_vault ? '[ENCRYPTED]' : n.content })),
+        transactions, goals, investments, projects,
+        salaries, habits, family, familyEvents,
+        budgets, budgetCategories, taskCategories,
+        habitCompletions, goalMilestones, projectMilestones,
+        exportedAt: new Date().toISOString(),
+        version: '2.0',
+      };
+    }
+
     const [
       tasks, notes, transactions, goals, investments, projects, 
       salaries, habits, family, familyEvents, budgets, budgetCategories,
@@ -416,32 +476,42 @@ export function DataExport() {
       // Import data (note: this is additive, not replacing)
       let imported = 0;
 
-      // Import tasks
-      if (data.tasks?.length) {
-        const { error } = await supabase.from('tasks').insert(
-          data.tasks.map((t: any) => ({
-            ...t,
-            id: undefined, // Generate new ID
-            user_id: user?.id,
-            created_at: undefined,
-            updated_at: undefined
-          }))
-        );
-        if (!error) imported += data.tasks.length;
-      }
-
-      // Import goals
-      if (data.goals?.length) {
-        const { error } = await supabase.from('goals').insert(
-          data.goals.map((g: any) => ({
-            ...g,
-            id: undefined,
-            user_id: user?.id,
-            created_at: undefined,
-            updated_at: undefined
-          }))
-        );
-        if (!error) imported += data.goals.length;
+      if (isSelfHosted()) {
+        // Self-hosted: use API client
+        if (data.tasks?.length) {
+          const rows = data.tasks.map((t: any) => ({ ...t, id: undefined, user_id: user?.id, created_at: undefined, updated_at: undefined, search_vector: undefined }));
+          imported += await selfHostedApi.insertBatch('tasks', rows);
+        }
+        if (data.goals?.length) {
+          const rows = data.goals.map((g: any) => ({ ...g, id: undefined, user_id: user?.id, created_at: undefined, updated_at: undefined }));
+          imported += await selfHostedApi.insertBatch('goals', rows);
+        }
+      } else {
+        // Cloud: use Supabase
+        if (data.tasks?.length) {
+          const { error } = await supabase.from('tasks').insert(
+            data.tasks.map((t: any) => ({
+              ...t,
+              id: undefined,
+              user_id: user?.id,
+              created_at: undefined,
+              updated_at: undefined
+            }))
+          );
+          if (!error) imported += data.tasks.length;
+        }
+        if (data.goals?.length) {
+          const { error } = await supabase.from('goals').insert(
+            data.goals.map((g: any) => ({
+              ...g,
+              id: undefined,
+              user_id: user?.id,
+              created_at: undefined,
+              updated_at: undefined
+            }))
+          );
+          if (!error) imported += data.goals.length;
+        }
       }
 
       toast({ 
@@ -521,49 +591,66 @@ export function DataExport() {
       const stripFields = ['search_vector', 'created_at', 'updated_at'];
 
       // Clean up ALL dependent tables before deleting parents to avoid FK violations
+      const selfHosted = isSelfHosted();
+
+      const deleteFromTable = async (table: string) => {
+        if (selfHosted) {
+          await selfHostedApi.deleteAll(table);
+        } else {
+          await supabase.from(table as any).delete().eq('user_id', user.id);
+        }
+      };
+
+      const updateTable = async (table: string, updates: Record<string, any>, filterNotNull?: string) => {
+        if (selfHosted) {
+          await selfHostedApi.updateWhere(table, updates, filterNotNull ? { [filterNotNull]: null } : undefined);
+        } else {
+          let q = supabase.from(table as any).update(updates).eq('user_id', user.id);
+          if (filterNotNull) q = q.not(filterNotNull, 'is', null);
+          await q;
+        }
+      };
+
       if (selectedTypes.includes('tasks')) {
-        await supabase.from('task_checklists').delete().eq('user_id', user.id);
-        await supabase.from('task_follow_up_notes').delete().eq('user_id', user.id);
-        // task_assignments uses assigned_by/assigned_to, not user_id directly
-        const { data: userTasks } = await supabase.from('tasks').select('id').eq('user_id', user.id);
-        if (userTasks?.length) {
-          const taskIds = userTasks.map(t => t.id);
-          await supabase.from('task_assignments').delete().in('task_id', taskIds);
+        await deleteFromTable('task_checklists');
+        await deleteFromTable('task_follow_up_notes');
+        if (!selfHosted) {
+          const { data: userTasks } = await supabase.from('tasks').select('id').eq('user_id', user.id);
+          if (userTasks?.length) {
+            const taskIds = userTasks.map(t => t.id);
+            await supabase.from('task_assignments').delete().in('task_id', taskIds);
+          }
         }
       }
       if (selectedTypes.includes('habits') && !selectedTypes.includes('habitCompletions')) {
-        await supabase.from('habit_completions').delete().eq('user_id', user.id);
+        await deleteFromTable('habit_completions');
       }
       if (selectedTypes.includes('goals') && !selectedTypes.includes('goalMilestones')) {
-        await supabase.from('goal_milestones').delete().eq('user_id', user.id);
+        await deleteFromTable('goal_milestones');
       }
       if (selectedTypes.includes('projects') && !selectedTypes.includes('projectMilestones')) {
-        await supabase.from('project_milestones').delete().eq('user_id', user.id);
+        await deleteFromTable('project_milestones');
       }
       if (selectedTypes.includes('family')) {
-        await supabase.from('family_member_connections').delete().eq('user_id', user.id);
-        await supabase.from('family_documents').delete().eq('user_id', user.id);
+        await deleteFromTable('family_member_connections');
+        await deleteFromTable('family_documents');
         if (!selectedTypes.includes('familyEvents')) {
-          await supabase.from('family_events').delete().eq('user_id', user.id);
+          await deleteFromTable('family_events');
         }
-        // Nullify family_member_id in transactions before deleting family_members
-        await supabase.from('transactions').update({ family_member_id: null }).eq('user_id', user.id).not('family_member_id', 'is', null);
+        await updateTable('transactions', { family_member_id: null }, 'family_member_id');
       }
       if (selectedTypes.includes('transactions')) {
-        // Delete loan_payments that reference transactions before deleting transactions
-        await supabase.from('loan_payments').update({ transaction_id: null }).eq('user_id', user.id).not('transaction_id', 'is', null);
+        await updateTable('loan_payments', { transaction_id: null }, 'transaction_id');
       }
       if (selectedTypes.includes('tasks')) {
-        // Nullify task_id in device_service_history before deleting tasks
-        await supabase.from('device_service_history').update({ task_id: null }).eq('user_id', user.id).not('task_id', 'is', null);
+        await updateTable('device_service_history', { task_id: null }, 'task_id');
       }
       if (selectedTypes.includes('budgetCategories')) {
-        // transactions and budgets reference budget_categories
         if (!selectedTypes.includes('transactions')) {
-          await supabase.from('transactions').delete().eq('user_id', user.id);
+          await deleteFromTable('transactions');
         }
         if (!selectedTypes.includes('budgets')) {
-          await supabase.from('budgets').delete().eq('user_id', user.id);
+          await deleteFromTable('budgets');
         }
       }
 
@@ -578,10 +665,12 @@ export function DataExport() {
 
       for (const type of deleteOrder) {
         if (selectedTypes.includes(type) && tableMap[type]) {
-          const table = tableMap[type] as any;
-          const { error } = await supabase.from(table).delete().eq('user_id', user.id);
-          if (error) {
-            console.error(`Failed to delete ${type}:`, error);
+          const table = tableMap[type];
+          if (selfHosted) {
+            try { await selfHostedApi.deleteAll(table); } catch (err) { console.error(`Failed to delete ${type}:`, err); }
+          } else {
+            const { error } = await supabase.from(table as any).delete().eq('user_id', user.id);
+            if (error) console.error(`Failed to delete ${type}:`, error);
           }
         }
       }
@@ -599,23 +688,29 @@ export function DataExport() {
         if (selectedTypes.includes(type) && data[type]?.length) {
           const items = data[type].map((item: any) => {
             const cleaned = { ...item, user_id: user.id };
-            // Remove computed/generated fields
             for (const field of stripFields) {
               delete cleaned[field];
             }
-            // For notes, clear encrypted content for vault notes
             if (type === 'notes' && item.is_vault) {
               cleaned.content = null;
             }
             return cleaned;
           });
 
-          const table = tableMap[type] as any;
-          const { error } = await supabase.from(table).upsert(items as any, { onConflict: 'id' });
-          if (error) {
-            console.error(`Failed to restore ${type}:`, error);
+          const table = tableMap[type];
+          if (selfHosted) {
+            try {
+              restored += await selfHostedApi.upsertBatch(table, items);
+            } catch (err) {
+              console.error(`Failed to restore ${type}:`, err);
+            }
           } else {
-            restored += items.length;
+            const { error } = await supabase.from(table as any).upsert(items as any, { onConflict: 'id' });
+            if (error) {
+              console.error(`Failed to restore ${type}:`, error);
+            } else {
+              restored += items.length;
+            }
           }
         }
       }

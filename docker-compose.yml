@@ -75,7 +75,8 @@ services:
       POSTGRES_DB: lifeos
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./docker/init-data-tables.sql:/docker-entrypoint-initdb.d/02-data-tables.sql:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U lifeos -d lifeos"]

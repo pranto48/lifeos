@@ -152,6 +152,50 @@ export class SelfHostedApi {
       localStorage.removeItem('lifeos_token');
     }
   }
+
+  // --- Data CRUD methods for backup/restore ---
+
+  async selectAll(table: string): Promise<any[]> {
+    const result = await this.request<{ data: any[] }>(`/data/${table}`);
+    return result.data || [];
+  }
+
+  async insertBatch(table: string, rows: any[], batchSize = 500): Promise<number> {
+    let total = 0;
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const result = await this.request<{ inserted: number }>(`/data/${table}`, {
+        method: 'POST',
+        body: JSON.stringify({ rows: batch }),
+      });
+      total += result.inserted || 0;
+    }
+    return total;
+  }
+
+  async upsertBatch(table: string, rows: any[], batchSize = 500): Promise<number> {
+    let total = 0;
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const result = await this.request<{ upserted: number }>(`/data/${table}/upsert`, {
+        method: 'POST',
+        body: JSON.stringify({ rows: batch }),
+      });
+      total += result.upserted || 0;
+    }
+    return total;
+  }
+
+  async deleteAll(table: string): Promise<void> {
+    await this.request(`/data/${table}`, { method: 'DELETE' });
+  }
+
+  async updateWhere(table: string, updates: Record<string, any>, filters?: Record<string, any>): Promise<void> {
+    await this.request(`/data/${table}/update`, {
+      method: 'POST',
+      body: JSON.stringify({ updates, filters }),
+    });
+  }
 }
 
 export const selfHostedApi = new SelfHostedApi();
