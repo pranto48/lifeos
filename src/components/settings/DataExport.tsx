@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Download, FileJson, FileSpreadsheet, FileText, Upload, Loader2, Calendar, Clock, Database, CheckCircle2, RotateCcw, AlertTriangle } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { isSelfHosted, selfHostedApi } from '@/lib/selfHostedConfig';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +43,7 @@ export function DataExport() {
   const [pendingRestoreData, setPendingRestoreData] = useState<any>(null);
   const restoreInputRef = useRef<HTMLInputElement>(null);
   const [isActive, setIsActive] = useState(false);
+  const [restoreProgress, setRestoreProgress] = useState<{ current: number; total: number; currentTable: string } | null>(null);
   const { hasRole: isAdmin } = useIsAdmin();
 
   useEffect(() => {
@@ -456,9 +458,12 @@ export function DataExport() {
       const text = await file.text();
       const data = JSON.parse(text);
 
-      // Validate structure
-      if (!data.exportedAt) {
+      // Validate structure - be lenient about exportedAt
+      if (!data || typeof data !== 'object') {
         throw new Error('Invalid backup file format');
+      }
+      if (!data.exportedAt && !data.version && !data.tasks && !data.notes && !data.goals) {
+        throw new Error('Invalid backup file format - no recognizable data found');
       }
 
       // Show confirmation
@@ -539,9 +544,12 @@ export function DataExport() {
       const text = await file.text();
       const data = JSON.parse(text);
 
-      // Validate structure
-      if (!data.exportedAt) {
+      // Validate structure - check for exportedAt or version or at least some known data keys
+      if (!data || typeof data !== 'object') {
         throw new Error('Invalid backup file format');
+      }
+      if (!data.exportedAt && !data.version && !data.tasks && !data.notes && !data.goals) {
+        throw new Error('Invalid backup file format - no recognizable data found');
       }
 
       setPendingRestoreData(data);
@@ -562,6 +570,7 @@ export function DataExport() {
     if (!pendingRestoreData || !user || selectedTypes.length === 0) return;
 
     setRestoring(true);
+    setRestoreProgress(null);
     
     try {
       const data = pendingRestoreData;
@@ -684,8 +693,15 @@ export function DataExport() {
         'goalMilestones', 'projectMilestones', 'habitCompletions'
       ];
 
+      // Count total items to restore for progress
+      const typesToRestore = restoreOrder.filter(type => selectedTypes.includes(type) && data[type]?.length);
+      const totalItems = typesToRestore.reduce((sum, type) => sum + (data[type]?.length || 0), 0);
+      let processedItems = 0;
+
       for (const type of restoreOrder) {
         if (selectedTypes.includes(type) && data[type]?.length) {
+          setRestoreProgress({ current: processedItems, total: totalItems, currentTable: type });
+
           const items = data[type].map((item: any) => {
             const cleaned = { ...item, user_id: user.id };
             for (const field of stripFields) {
@@ -712,8 +728,11 @@ export function DataExport() {
               restored += items.length;
             }
           }
+          processedItems += items.length;
         }
       }
+
+      setRestoreProgress(null);
 
       setRestoreDialogOpen(false);
       setPendingRestoreData(null);
@@ -734,6 +753,7 @@ export function DataExport() {
       });
     } finally {
       setRestoring(false);
+      setRestoreProgress(null);
     }
   };
 
@@ -1012,6 +1032,23 @@ export function DataExport() {
                   />
                   {restoring && <Loader2 className="h-4 w-4 animate-spin" />}
                 </div>
+                {restoreProgress && (
+                  <div className="mt-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        {language === 'bn' 
+                          ? `পুনরুদ্ধার হচ্ছে: ${restoreProgress.currentTable}` 
+                          : `Restoring: ${restoreProgress.currentTable}`
+                        }
+                      </span>
+                      <span>{Math.round((restoreProgress.current / restoreProgress.total) * 100)}%</span>
+                    </div>
+                    <Progress value={(restoreProgress.current / restoreProgress.total) * 100} className="h-2" />
+                    <p className="text-xs text-muted-foreground">
+                      {restoreProgress.current} / {restoreProgress.total} {language === 'bn' ? 'আইটেম' : 'items'}
+                    </p>
+                  </div>
+                )}
                 <p className="text-xs text-destructive/80 mt-1 flex items-start gap-1">
                   <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
                   {language === 'bn' 

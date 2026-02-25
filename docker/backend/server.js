@@ -1053,6 +1053,45 @@ function validateTable(tableName) {
   return /^[a-z_]+$/.test(tableName);
 }
 
+// Cache of valid columns per table to avoid repeated schema queries
+const tableColumnsCache = {};
+
+async function getTableColumns(tableName) {
+  if (tableColumnsCache[tableName]) return tableColumnsCache[tableName];
+  try {
+    let rows;
+    if (dbType === 'postgresql') {
+      rows = await query(
+        "SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1",
+        [tableName]
+      );
+    } else {
+      rows = await query(
+        "SELECT COLUMN_NAME as column_name FROM information_schema.columns WHERE table_name = ?",
+        [tableName]
+      );
+    }
+    const cols = new Set(rows.map(r => r.column_name));
+    tableColumnsCache[tableName] = cols;
+    return cols;
+  } catch (err) {
+    console.error(`Failed to get columns for ${tableName}:`, err.message);
+    return null; // Return null to skip filtering
+  }
+}
+
+// Strip keys from a row that don't exist as columns in the target table
+function filterRowColumns(row, validColumns) {
+  if (!validColumns) return row; // If we couldn't fetch columns, pass through
+  const filtered = {};
+  for (const key of Object.keys(row)) {
+    if (validColumns.has(key)) {
+      filtered[key] = row[key];
+    }
+  }
+  return filtered;
+}
+
 async function handleDataSelect(req, res, tableName) {
   if (!validateTable(tableName)) {
     sendJson(res, 400, { message: `Invalid table: ${tableName}` });
@@ -1082,6 +1121,7 @@ async function handleDataInsert(req, res, tableName) {
     const rows = body.rows || [];
     if (!rows.length) { sendJson(res, 200, { inserted: 0 }); return; }
 
+    const validColumns = await getTableColumns(tableName);
     let inserted = 0;
     for (const row of rows) {
       row.user_id = user.sub;
@@ -1090,11 +1130,13 @@ async function handleDataInsert(req, res, tableName) {
       delete row.created_at;
       delete row.updated_at;
 
-      const keys = Object.keys(row);
+      const cleaned = filterRowColumns(row, validColumns);
+      const keys = Object.keys(cleaned);
+      if (!keys.length) continue;
       const vals = keys.map((_, i) => `$${i + 1}`);
       await query(
         `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${vals.join(', ')})`,
-        keys.map(k => row[k])
+        keys.map(k => cleaned[k])
       );
       inserted++;
     }
@@ -1117,6 +1159,7 @@ async function handleDataUpsert(req, res, tableName) {
     const rows = body.rows || [];
     if (!rows.length) { sendJson(res, 200, { upserted: 0 }); return; }
 
+    const validColumns = await getTableColumns(tableName);
     let upserted = 0;
     for (const row of rows) {
       row.user_id = user.sub;
@@ -1125,20 +1168,22 @@ async function handleDataUpsert(req, res, tableName) {
       delete row.created_at;
       delete row.updated_at;
 
-      const keys = Object.keys(row);
+      const cleaned = filterRowColumns(row, validColumns);
+      const keys = Object.keys(cleaned);
+      if (!keys.length) continue;
       const vals = keys.map((_, i) => `$${i + 1}`);
 
       if (dbType === 'postgresql') {
         const updates = keys.filter(k => k !== 'id').map(k => `${k} = EXCLUDED.${k}`).join(', ');
         await query(
           `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT (id) DO UPDATE SET ${updates}`,
-          keys.map(k => row[k])
+          keys.map(k => cleaned[k])
         );
       } else {
         const updates = keys.filter(k => k !== 'id').map(k => `${k} = VALUES(${k})`).join(', ');
         await query(
           `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${vals.join(', ')}) ON DUPLICATE KEY UPDATE ${updates}`,
-          keys.map(k => row[k])
+          keys.map(k => cleaned[k])
         );
       }
       upserted++;
