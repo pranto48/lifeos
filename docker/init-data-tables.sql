@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     recurring_pattern TEXT,
     tags TEXT[],
     task_type TEXT DEFAULT 'office',
+    sort_order INTEGER DEFAULT 0,
+    estimated_time INTEGER,
+    support_user_id UUID,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -199,8 +202,10 @@ CREATE TABLE IF NOT EXISTS public.task_categories (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL,
     name TEXT NOT NULL,
-    color TEXT,
+    color TEXT DEFAULT '#3b82f6',
     icon TEXT,
+    category_type TEXT DEFAULT 'office',
+    is_admin_category BOOLEAN DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -350,6 +355,28 @@ CREATE TABLE IF NOT EXISTS public.backup_schedules (
     last_backup_at TIMESTAMPTZ,
     next_backup_at TIMESTAMPTZ NOT NULL,
     is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Loans (if not already created by init-db.sql)
+CREATE TABLE IF NOT EXISTS public.loans (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL,
+    lender_name TEXT NOT NULL,
+    loan_type TEXT DEFAULT 'personal',
+    principal_amount NUMERIC NOT NULL,
+    total_amount NUMERIC NOT NULL,
+    remaining_amount NUMERIC NOT NULL,
+    interest_rate NUMERIC,
+    monthly_payment NUMERIC,
+    payment_frequency TEXT DEFAULT 'monthly',
+    start_date DATE NOT NULL,
+    end_date DATE,
+    next_payment_date DATE,
+    status TEXT DEFAULT 'active',
+    reminder_days INTEGER,
+    notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
