@@ -933,6 +933,423 @@ async function checkSetupMiddleware(req) {
 // --- App State (for health endpoint) ---
 let appState = { status: 'starting', message: 'Initializing...' };
 
+// --- PostgREST-Compatible Proxy Layer ---
+// Translates Supabase REST API calls into direct PostgreSQL queries
+// so all supabase.from() calls work in Docker mode without changes.
+
+const POSTGREST_TABLES = new Set([
+  'tasks', 'notes', 'transactions', 'goals', 'investments', 'projects',
+  'salary_entries', 'habits', 'family_members', 'family_events',
+  'budgets', 'budget_categories', 'task_categories',
+  'habit_completions', 'goal_milestones', 'project_milestones',
+  'task_checklists', 'task_follow_up_notes', 'task_assignments',
+  'family_member_connections', 'family_documents',
+  'loan_payments', 'device_service_history', 'backup_schedules',
+  'loans', 'profiles', 'app_settings', 'user_roles',
+  'support_users', 'support_units', 'support_departments',
+  'support_user_devices', 'device_inventory', 'device_categories',
+  'device_suppliers', 'device_disposals', 'device_transfer_history',
+  'support_tickets', 'ticket_categories', 'ticket_comments',
+  'ticket_activity_log', 'ticket_requesters', 'ticket_form_fields',
+  'attachments', 'smtp_settings', 'app_secrets',
+  'google_calendar_sync', 'synced_calendar_events',
+  'push_subscriptions', 'user_sessions', 'user_mfa_settings',
+  'email_otp_codes', 'audit_logs', 'user_workspace_permissions',
+  'qr_code_settings',
+]);
+
+// Tables that should NOT be auto-scoped by user_id
+const NO_USER_SCOPE_TABLES = new Set([
+  'app_settings', 'ticket_categories', 'ticket_form_fields',
+  'support_units', 'support_departments', 'device_suppliers',
+  'ticket_requesters',
+]);
+
+function getRestAuthUser(req) {
+  // Try Authorization: Bearer token first
+  const auth = req.headers.authorization;
+  if (auth && auth.startsWith('Bearer ')) {
+    const payload = verifyToken(auth.slice(7));
+    if (payload) return payload;
+  }
+  // Try apikey header (Supabase anon key — skip validation, just allow)
+  return null;
+}
+
+function parsePostgrestFilters(queryParams, tableName) {
+  const where = [];
+  const values = [];
+  let orderBy = '';
+  let limitClause = '';
+  let offsetClause = '';
+  let selectCols = '*';
+  let idx = 1;
+
+  for (const [key, val] of Object.entries(queryParams)) {
+    if (key === 'select') {
+      if (val && val !== '*') {
+        // Handle select with embedded renames and nested selects (just use *)
+        if (val.includes('(') || val.includes(':')) {
+          selectCols = '*';
+        } else {
+          const cols = val.split(',').filter(c => /^[a-z_]+$/.test(c.trim()));
+          if (cols.length > 0) selectCols = cols.join(', ');
+        }
+      }
+      continue;
+    }
+    if (key === 'order') {
+      const parts = val.split(',').map(p => {
+        const [col, dir] = p.split('.');
+        if (!/^[a-z_]+$/.test(col)) return null;
+        return `${col} ${dir === 'desc' ? 'DESC' : 'ASC'}`;
+      }).filter(Boolean);
+      if (parts.length) orderBy = ' ORDER BY ' + parts.join(', ');
+      continue;
+    }
+    if (key === 'limit') {
+      const n = parseInt(val);
+      if (!isNaN(n)) limitClause = ` LIMIT ${n}`;
+      continue;
+    }
+    if (key === 'offset') {
+      const n = parseInt(val);
+      if (!isNaN(n)) offsetClause = ` OFFSET ${n}`;
+      continue;
+    }
+
+    // Filter columns
+    if (!/^[a-z_]+$/.test(key)) continue;
+
+    if (typeof val === 'string') {
+      if (val.startsWith('eq.')) {
+        where.push(`${key} = $${idx++}`);
+        values.push(val.slice(3));
+      } else if (val.startsWith('neq.')) {
+        where.push(`${key} != $${idx++}`);
+        values.push(val.slice(4));
+      } else if (val.startsWith('gt.')) {
+        where.push(`${key} > $${idx++}`);
+        values.push(val.slice(3));
+      } else if (val.startsWith('gte.')) {
+        where.push(`${key} >= $${idx++}`);
+        values.push(val.slice(4));
+      } else if (val.startsWith('lt.')) {
+        where.push(`${key} < $${idx++}`);
+        values.push(val.slice(3));
+      } else if (val.startsWith('lte.')) {
+        where.push(`${key} <= $${idx++}`);
+        values.push(val.slice(4));
+      } else if (val.startsWith('like.')) {
+        where.push(`${key} LIKE $${idx++}`);
+        values.push(val.slice(5));
+      } else if (val.startsWith('ilike.')) {
+        where.push(`${key} ILIKE $${idx++}`);
+        values.push(val.slice(6));
+      } else if (val.startsWith('is.')) {
+        const v = val.slice(3);
+        if (v === 'null') where.push(`${key} IS NULL`);
+        else if (v === 'true') where.push(`${key} IS TRUE`);
+        else if (v === 'false') where.push(`${key} IS FALSE`);
+      } else if (val.startsWith('not.is.')) {
+        const v = val.slice(7);
+        if (v === 'null') where.push(`${key} IS NOT NULL`);
+      } else if (val.startsWith('in.')) {
+        // in.(val1,val2,val3)
+        const inner = val.slice(3).replace(/^\(/, '').replace(/\)$/, '');
+        const items = inner.split(',').map(s => s.trim().replace(/^"/, '').replace(/"$/, ''));
+        if (items.length > 0) {
+          const placeholders = items.map(() => `$${idx++}`);
+          where.push(`${key} IN (${placeholders.join(',')})`);
+          values.push(...items);
+        }
+      } else if (val.startsWith('not.in.')) {
+        const inner = val.slice(7).replace(/^\(/, '').replace(/\)$/, '');
+        const items = inner.split(',').map(s => s.trim().replace(/^"/, '').replace(/"$/, ''));
+        if (items.length > 0) {
+          const placeholders = items.map(() => `$${idx++}`);
+          where.push(`${key} NOT IN (${placeholders.join(',')})`);
+          values.push(...items);
+        }
+      }
+    }
+  }
+
+  // Handle 'or' parameter: or=(col1.eq.val1,col2.eq.val2)
+  if (queryParams.or) {
+    const orStr = queryParams.or.replace(/^\(/, '').replace(/\)$/, '');
+    const orParts = [];
+    // Simple parser for or conditions
+    const orItems = orStr.split(',');
+    for (const item of orItems) {
+      const dotIdx = item.indexOf('.');
+      if (dotIdx === -1) continue;
+      const col = item.slice(0, dotIdx);
+      const rest = item.slice(dotIdx + 1);
+      if (!/^[a-z_]+$/.test(col)) continue;
+      if (rest.startsWith('eq.')) {
+        orParts.push(`${col} = $${idx++}`);
+        values.push(rest.slice(3));
+      } else if (rest.startsWith('neq.')) {
+        orParts.push(`${col} != $${idx++}`);
+        values.push(rest.slice(4));
+      } else if (rest.startsWith('is.null')) {
+        orParts.push(`${col} IS NULL`);
+      } else if (rest.startsWith('is.true')) {
+        orParts.push(`${col} IS TRUE`);
+      } else if (rest.startsWith('is.false')) {
+        orParts.push(`${col} IS FALSE`);
+      }
+    }
+    if (orParts.length > 0) {
+      where.push(`(${orParts.join(' OR ')})`);
+    }
+  }
+
+  return { selectCols, where, values, orderBy, limitClause, offsetClause, nextIdx: idx };
+}
+
+function parseQueryString(url) {
+  const qIdx = url.indexOf('?');
+  if (qIdx === -1) return {};
+  const qs = url.slice(qIdx + 1);
+  const params = {};
+  for (const pair of qs.split('&')) {
+    const eqIdx = pair.indexOf('=');
+    if (eqIdx === -1) continue;
+    const key = decodeURIComponent(pair.slice(0, eqIdx));
+    const val = decodeURIComponent(pair.slice(eqIdx + 1));
+    params[key] = val;
+  }
+  return params;
+}
+
+function sendRestJson(res, statusCode, data, headers = {}) {
+  const allHeaders = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, Prefer, X-Client-Info',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD',
+    'Access-Control-Expose-Headers': 'Content-Range, X-Total-Count',
+    ...headers,
+  };
+  res.writeHead(statusCode, allHeaders);
+  res.end(JSON.stringify(data));
+}
+
+async function handlePostgrestRequest(req, res, tableName) {
+  if (!POSTGREST_TABLES.has(tableName)) {
+    sendRestJson(res, 404, { message: `Table ${tableName} not found`, code: 'PGRST116' });
+    return;
+  }
+  if (!/^[a-z_]+$/.test(tableName)) {
+    sendRestJson(res, 400, { message: 'Invalid table name' });
+    return;
+  }
+
+  const user = getRestAuthUser(req);
+  const queryParams = parseQueryString(req.url);
+  const prefer = req.headers['prefer'] || '';
+
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    try {
+      const { selectCols, where, values, orderBy, limitClause, offsetClause, nextIdx } =
+        parsePostgrestFilters(queryParams, tableName);
+
+      // Auto-scope by user_id if table has user_id and user is authenticated
+      if (user && !NO_USER_SCOPE_TABLES.has(tableName)) {
+        // Check if user_id filter is already present
+        const hasUserFilter = where.some(w => w.startsWith('user_id '));
+        if (!hasUserFilter) {
+          where.push(`user_id = $${nextIdx}`);
+          values.push(user.sub);
+        }
+      }
+
+      const whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : '';
+      const sql = `SELECT ${selectCols} FROM ${tableName}${whereClause}${orderBy}${limitClause || ' LIMIT 1000'}${offsetClause}`;
+
+      const rows = await query(sql, values);
+
+      if (req.method === 'HEAD') {
+        // Return count in header
+        const countSql = `SELECT COUNT(*) as cnt FROM ${tableName}${whereClause}`;
+        const countRows = await query(countSql, values);
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Content-Range': `0-${rows.length}/${countRows[0].cnt}`,
+          'X-Total-Count': String(countRows[0].cnt),
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Expose-Headers': 'Content-Range, X-Total-Count',
+        });
+        res.end();
+        return;
+      }
+
+      // Check Prefer header for count
+      if (prefer.includes('count=exact')) {
+        const countSql = `SELECT COUNT(*) as cnt FROM ${tableName}${whereClause}`;
+        const countRows = await query(countSql, values);
+        sendRestJson(res, 200, rows, {
+          'Content-Range': `0-${rows.length}/${countRows[0].cnt}`,
+        });
+      } else {
+        sendRestJson(res, 200, rows);
+      }
+    } catch (err) {
+      console.error(`PostgREST GET ${tableName} error:`, err.message);
+      sendRestJson(res, 500, { message: err.message });
+    }
+    return;
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const body = await parseBody(req);
+      const rows = Array.isArray(body) ? body : [body];
+      if (!rows.length) { sendRestJson(res, 201, []); return; }
+
+      const validColumns = await getTableColumns(tableName);
+      const results = [];
+
+      for (const row of rows) {
+        if (user && !NO_USER_SCOPE_TABLES.has(tableName) && !row.user_id) {
+          row.user_id = user.sub;
+        }
+        if (!row.id) row.id = uuid();
+        delete row.search_vector;
+
+        const cleaned = filterRowColumns(row, validColumns);
+        const keys = Object.keys(cleaned);
+        if (!keys.length) continue;
+        const vals = keys.map((_, i) => `$${i + 1}`);
+
+        // Check for upsert via Prefer header
+        if (prefer.includes('resolution=merge-duplicates')) {
+          const updates = keys.filter(k => k !== 'id').map(k => `${k} = EXCLUDED.${k}`).join(', ');
+          const inserted = await query(
+            `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${vals.join(', ')}) ON CONFLICT (id) DO UPDATE SET ${updates} RETURNING *`,
+            keys.map(k => cleaned[k])
+          );
+          if (inserted.length) results.push(inserted[0]);
+        } else {
+          const inserted = await query(
+            `INSERT INTO ${tableName} (${keys.join(', ')}) VALUES (${vals.join(', ')}) RETURNING *`,
+            keys.map(k => cleaned[k])
+          );
+          if (inserted.length) results.push(inserted[0]);
+        }
+      }
+
+      const returnMinimal = prefer.includes('return=minimal');
+      if (returnMinimal) {
+        sendRestJson(res, 201, null);
+      } else {
+        sendRestJson(res, 201, results.length === 1 && !Array.isArray(body) ? results[0] : results);
+      }
+    } catch (err) {
+      console.error(`PostgREST POST ${tableName} error:`, err.message);
+      sendRestJson(res, 500, { message: err.message, details: err.detail || '' });
+    }
+    return;
+  }
+
+  if (req.method === 'PATCH') {
+    try {
+      const body = await parseBody(req);
+      const { where, values, nextIdx } = parsePostgrestFilters(queryParams, tableName);
+
+      // Auto-scope by user_id
+      if (user && !NO_USER_SCOPE_TABLES.has(tableName)) {
+        const hasUserFilter = where.some(w => w.startsWith('user_id '));
+        if (!hasUserFilter) {
+          where.push(`user_id = $${nextIdx}`);
+          values.push(user.sub);
+        }
+      }
+
+      const setClauses = [];
+      const setValues = [];
+      let setIdx = values.length + 1;
+      const validColumns = await getTableColumns(tableName);
+
+      for (const [key, val] of Object.entries(body)) {
+        if (key === 'id' || key === 'search_vector') continue;
+        if (!/^[a-z_]+$/.test(key)) continue;
+        if (validColumns && !validColumns.has(key)) continue;
+        setClauses.push(`${key} = $${setIdx++}`);
+        setValues.push(val);
+      }
+
+      if (!setClauses.length) {
+        sendRestJson(res, 200, []);
+        return;
+      }
+
+      const whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : '';
+      const allValues = [...values, ...setValues];
+      const result = await query(
+        `UPDATE ${tableName} SET ${setClauses.join(', ')}${whereClause} RETURNING *`,
+        allValues
+      );
+
+      sendRestJson(res, 200, result);
+    } catch (err) {
+      console.error(`PostgREST PATCH ${tableName} error:`, err.message);
+      sendRestJson(res, 500, { message: err.message });
+    }
+    return;
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      const { where, values, nextIdx } = parsePostgrestFilters(queryParams, tableName);
+
+      // Auto-scope by user_id
+      if (user && !NO_USER_SCOPE_TABLES.has(tableName)) {
+        const hasUserFilter = where.some(w => w.startsWith('user_id '));
+        if (!hasUserFilter) {
+          where.push(`user_id = $${nextIdx}`);
+          values.push(user.sub);
+        }
+      }
+
+      const whereClause = where.length > 0 ? ' WHERE ' + where.join(' AND ') : '';
+      const result = await query(
+        `DELETE FROM ${tableName}${whereClause} RETURNING *`,
+        values
+      );
+
+      sendRestJson(res, 200, result);
+    } catch (err) {
+      console.error(`PostgREST DELETE ${tableName} error:`, err.message);
+      sendRestJson(res, 500, { message: err.message });
+    }
+    return;
+  }
+
+  sendRestJson(res, 405, { message: 'Method not allowed' });
+}
+
+async function handleRpcCall(req, res, funcName) {
+  if (funcName === 'get_support_users_safe') {
+    try {
+      const rows = await query(
+        `SELECT id, user_id, department_id, name, email, phone, designation, device_info,
+                ip_address, notes, is_active, created_at, updated_at, extension_number,
+                nas_username, device_handover_date, device_assign_date, new_device_assign
+         FROM support_users ORDER BY name`
+      );
+      sendRestJson(res, 200, rows);
+    } catch (err) {
+      sendRestJson(res, 500, { message: err.message });
+    }
+    return;
+  }
+  // Unknown RPC — return empty result
+  sendRestJson(res, 200, []);
+}
+
 // --- HTTP Server ---
 const server = http.createServer(async (req, res) => {
   try {
@@ -940,8 +1357,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') {
       res.writeHead(204, {
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, Prefer, X-Client-Info',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD',
+        'Access-Control-Expose-Headers': 'Content-Range, X-Total-Count',
       });
       res.end();
       return;
@@ -950,13 +1368,66 @@ const server = http.createServer(async (req, res) => {
     // Health endpoint — always available, even before DB is ready
     const urlPath = req.url.split('?')[0];
     if (req.method === 'GET' && urlPath === '/api/health') {
-      // Always return 200 so Docker healthcheck passes while container is alive.
-      // The 'status' field tells callers whether the app is actually ready.
       sendJson(res, 200, {
         status: appState.status,
         message: appState.message,
         timestamp: new Date().toISOString(),
       });
+      return;
+    }
+
+    // --- PostgREST proxy routes ---
+    if (urlPath.startsWith('/rest/v1/rpc/')) {
+      const funcName = urlPath.slice('/rest/v1/rpc/'.length);
+      if (appState.status === 'starting') {
+        sendRestJson(res, 503, { message: 'Backend starting' });
+        return;
+      }
+      await handleRpcCall(req, res, funcName);
+      return;
+    }
+
+    if (urlPath.startsWith('/rest/v1/')) {
+      const tableName = urlPath.slice('/rest/v1/'.length).split('?')[0];
+      if (appState.status === 'starting') {
+        sendRestJson(res, 503, { message: 'Backend starting' });
+        return;
+      }
+      if (!dbClient) {
+        sendRestJson(res, 503, { message: 'Database not connected' });
+        return;
+      }
+      await handlePostgrestRequest(req, res, tableName);
+      return;
+    }
+
+    // --- Auth proxy routes (Supabase client auth calls) ---
+    if (urlPath.startsWith('/auth/v1/')) {
+      // The Supabase client may call /auth/v1/token, /auth/v1/user, etc.
+      // In Docker mode, auth is handled by our custom system, so return appropriate responses
+      if (urlPath === '/auth/v1/token' && req.method === 'POST') {
+        // Supabase client login — return a "not supported" so the app falls back to self-hosted auth
+        sendRestJson(res, 400, { error: 'self_hosted_mode', error_description: 'Use /api/auth/login for self-hosted authentication' });
+        return;
+      }
+      if (urlPath === '/auth/v1/user' && req.method === 'GET') {
+        const user = getRestAuthUser(req);
+        if (user) {
+          sendRestJson(res, 200, { id: user.sub, email: user.email, role: 'authenticated' });
+        } else {
+          sendRestJson(res, 401, { message: 'Not authenticated' });
+        }
+        return;
+      }
+      // Default: return empty success for other auth endpoints
+      sendRestJson(res, 200, {});
+      return;
+    }
+
+    // --- Edge functions stub ---
+    if (urlPath.startsWith('/functions/v1/')) {
+      // In Docker mode, edge functions don't exist. Return graceful no-op responses.
+      sendRestJson(res, 200, { success: true, message: 'Edge functions not available in self-hosted mode' });
       return;
     }
 
