@@ -1084,6 +1084,7 @@ export function DataExport() {
         backupData={pendingRestoreData}
         onRestore={executeSelectiveRestore}
         restoring={restoring}
+        restoreProgress={restoreProgress}
       />
     </div>
   );
