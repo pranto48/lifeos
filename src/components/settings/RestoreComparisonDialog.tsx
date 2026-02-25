@@ -11,12 +11,19 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
+interface RestoreProgress {
+  current: number;
+  total: number;
+  currentTable: string;
+}
+
 interface RestoreComparisonDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   backupData: any;
   onRestore: (selectedTypes: string[]) => void;
   restoring: boolean;
+  restoreProgress?: RestoreProgress | null;
 }
 
 interface DataComparison {
@@ -52,7 +59,8 @@ export function RestoreComparisonDialog({
   onOpenChange, 
   backupData, 
   onRestore,
-  restoring 
+  restoring,
+  restoreProgress,
 }: RestoreComparisonDialogProps) {
   const { user } = useAuth();
   const { language } = useLanguage();
@@ -211,7 +219,7 @@ export function RestoreComparisonDialog({
             <div className="bg-muted/50 p-3 rounded-lg space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span>{language === 'bn' ? 'ব্যাকআপ তারিখ' : 'Backup Date'}:</span>
-                <span className="font-medium">{new Date(backupData.exportedAt).toLocaleString()}</span>
+                <span className="font-medium">{backupData?.exportedAt ? new Date(backupData.exportedAt).toLocaleString() : (language === 'bn' ? 'অজানা' : 'Unknown')}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span>{language === 'bn' ? 'নির্বাচিত ধরন' : 'Selected Types'}:</span>
@@ -289,6 +297,29 @@ export function RestoreComparisonDialog({
                 }
               </p>
             </div>
+
+            {/* Restore Progress Indicator */}
+            {restoring && restoreProgress && (
+              <div className="space-y-2 p-3 bg-muted/50 rounded-lg border border-border">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {language === 'bn' ? 'পুনরুদ্ধার হচ্ছে:' : 'Restoring:'}{' '}
+                    <span className="font-medium text-foreground capitalize">
+                      {restoreProgress.currentTable.replace(/_/g, ' ')}
+                    </span>
+                  </span>
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {restoreProgress.current} / {restoreProgress.total}
+                  </span>
+                </div>
+                <Progress value={restoreProgress.total > 0 ? (restoreProgress.current / restoreProgress.total) * 100 : 0} className="h-2" />
+                <p className="text-xs text-muted-foreground text-center">
+                  {Math.round(restoreProgress.total > 0 ? (restoreProgress.current / restoreProgress.total) * 100 : 0)}%{' '}
+                  {language === 'bn' ? 'সম্পন্ন' : 'complete'}
+                </p>
+              </div>
+            )}
           </div>
         )}
 
