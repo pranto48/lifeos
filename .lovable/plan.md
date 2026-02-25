@@ -1,69 +1,93 @@
 
 
-## Analysis: Docker Backup & Restore Failure
+## Analysis: Why Restored Data Does Not Appear in Docker
 
-### Root Cause
+### Root Cause (Critical Discovery)
 
-The `DataExport.tsx` component calls `supabase.from('tasks').select(...)`, `supabase.from('tasks').insert(...)`, `supabase.from('goals').upsert(...)`, etc. for ALL backup, import, and restore operations. In Docker self-hosted mode, there is no Supabase instance — the backend is a plain Node.js API server. The backend currently has **zero data CRUD routes** (only auth, setup, license, and health endpoints). Every Supabase call silently fails or errors out.
+The restore operation **works correctly** — data IS successfully written to the PostgreSQL database via the backend API (`/api/data/:table/upsert`). The `user_id` is properly remapped on line 706 of DataExport.tsx and again on line 1165 of server.js.
 
-### Plan
+**The real problem**: Every page in the application (Tasks, Notes, Goals, Dashboard, etc.) fetches data using `supabase.from('tasks').select(...)` directly. In Docker mode, the Supabase client points to `http://localhost:9999` — a dummy URL that doesn't exist. This means:
 
-#### A. Add generic CRUD API endpoints to the backend (`docker/backend/server.js`)
+- Restore writes data to PostgreSQL via `/api/data/:table` — **works**
+- Pages read data via `supabase.from().select()` hitting `localhost:9999` — **fails silently**
+- Result: "restore complete" but nothing shows anywhere
 
-Add three new routes that the frontend can use for data operations:
+The error logs confirm this: every single `localhost:9999/rest/v1/...` request fails with `ERR_CONNECTION_REFUSED`.
 
-1. **`GET /api/data/:table`** — Select all rows for the authenticated user from a given table
-2. **`POST /api/data/:table`** — Insert rows (bulk) into a table for the authenticated user  
-3. **`POST /api/data/:table/upsert`** — Upsert rows (bulk) by ID for the authenticated user
-4. **`DELETE /api/data/:table`** — Delete all rows for the authenticated user from a table
-5. **`POST /api/data/:table/update`** — Update specific rows (for nullifying FK references during restore cleanup)
+### Scope of the Problem
 
-These routes will:
-- Require authentication (JWT token)
-- Whitelist only known data tables (tasks, notes, goals, transactions, etc.) to prevent SQL injection
-- Automatically scope all queries to the authenticated user's `user_id`
+There are **167 `supabase.from()` calls across 9 page files** plus additional calls in hooks and components. Making every single page dual-mode is a massive undertaking that would touch virtually every file in the application.
 
-#### B. Add a self-hosted data API client (`src/lib/selfHostedConfig.ts`)
+### Proposed Solution: Proxy Supabase REST Calls Through the Backend
 
-Extend the `SelfHostedApi` class with methods:
-- `selectAll(table)` — GET from `/api/data/:table`
-- `insertBatch(table, rows)` — POST to `/api/data/:table` with batching (500 rows per batch)
-- `upsertBatch(table, rows)` — POST to `/api/data/:table/upsert` with batching
-- `deleteAll(table)` — DELETE `/api/data/:table`
-- `updateWhere(table, updates, filters)` — POST `/api/data/:table/update`
+Instead of rewriting every page, we intercept at the infrastructure level:
 
-#### C. Make `DataExport.tsx` dual-mode
+**1. Add a PostgREST-compatible proxy layer to the Docker backend (`docker/backend/server.js`)**
 
-Update all data operations in `DataExport.tsx` to check `isSelfHosted()`:
-- **Backup/Export**: If self-hosted, use `selfHostedApi.selectAll()` instead of `supabase.from().select()`
-- **Import**: If self-hosted, use `selfHostedApi.insertBatch()` instead of `supabase.from().insert()`
-- **Restore**: If self-hosted, use `selfHostedApi.deleteAll()` + `selfHostedApi.upsertBatch()` instead of Supabase equivalents
-- **Cleanup steps** (nullify FKs, delete dependents): Use `selfHostedApi.updateWhere()` and `selfHostedApi.deleteAll()`
+Add a route handler for `/rest/v1/:table` that translates Supabase-style REST API calls into direct PostgreSQL queries. This way, when the Supabase client in Docker mode calls `localhost:9999/rest/v1/tasks?select=*&user_id=eq.xxx`, the nginx proxy routes it to the backend which executes the equivalent SQL query.
 
-Batch processing (500 rows per request) will be built into the API client to prevent timeouts with large datasets.
+The proxy will handle:
+- `GET /rest/v1/:table` — Parse PostgREST query params (`select`, `eq`, `order`, `limit`, `offset`, `in`, `not.is`, `gte`, `lte`, `like`, `neq`, `or`)
+- `POST /rest/v1/:table` — Insert rows (handle both single and array bodies)
+- `PATCH /rest/v1/:table` — Update rows with filter params
+- `DELETE /rest/v1/:table` — Delete rows with filter params
+- `HEAD /rest/v1/:table` — Return count headers (used by some operations)
 
-#### D. Exempt data routes from license check during restore
+Auth will be extracted from the `apikey`/`Authorization` header that the Supabase client sends.
 
-Add the data API routes to `LICENSE_EXEMPT_ROUTES` — or rather, they should require auth but pass through license middleware normally. Actually, they should go through license check. No change needed here since authenticated data routes should be subject to license enforcement as normal.
+**2. Update the Supabase client URL in Docker builds (`Dockerfile`)**
+
+Change `VITE_SUPABASE_URL` from `http://localhost:9999` to an empty string or a relative URL, and configure nginx to proxy `/rest/v1/` requests to the backend.
+
+**3. Update nginx proxy config (`nginx.conf`)**
+
+Add a proxy rule so `/rest/v1/` requests are forwarded to the backend server alongside the existing `/api/` proxy.
+
+**4. Handle the `functions/v1/` calls**
+
+Add a catch-all for `/functions/v1/` that returns graceful no-op responses in Docker mode (these are edge functions that don't exist in self-hosted).
 
 ### Technical Details
 
-**Whitelisted tables for the CRUD API:**
+**PostgREST query param parser** — the key translations needed:
+
 ```text
-tasks, notes, transactions, goals, investments, projects,
-salary_entries, habits, family_members, family_events,
-budgets, budget_categories, task_categories,
-habit_completions, goal_milestones, project_milestones,
-task_checklists, task_follow_up_notes, task_assignments,
-family_member_connections, family_documents,
-loan_payments, device_service_history, backup_schedules
+?select=*                          → SELECT *
+?select=id,title,status            → SELECT id, title, status
+&user_id=eq.{uuid}                 → WHERE user_id = '{uuid}'
+&status=neq.pending                → WHERE status != 'pending'
+&date=gte.2026-02-01               → WHERE date >= '2026-02-01'
+&order=created_at.desc             → ORDER BY created_at DESC
+&limit=20&offset=0                 → LIMIT 20 OFFSET 0
+&or=(col1.eq.val1,col2.eq.val2)    → WHERE (col1 = 'val1' OR col2 = 'val2')
+&col=in.(val1,val2)                → WHERE col IN ('val1', 'val2')
+&col=not.is.null                   → WHERE col IS NOT NULL
 ```
 
-**Backend route matching change:**
-The current router uses exact string matching (`routes[routeKey]`). Since we need parameterized routes (`/api/data/:table`), we'll add prefix-based matching for `/api/data/` paths before the exact-match lookup.
+**Auth handling** — The Supabase client sends the anon key as `apikey` header plus the user's JWT in `Authorization: Bearer`. In Docker mode, the JWT is the self-hosted token. We need to:
+- Accept both the dummy anon key and the self-hosted JWT
+- Extract user identity from the self-hosted JWT via `verifyToken()`
+- Scope queries by user_id automatically for data tables
 
-**Files to modify:**
-- `docker/backend/server.js` — Add CRUD routes + parameterized routing
-- `src/lib/selfHostedConfig.ts` — Add data API methods to SelfHostedApi
-- `src/components/settings/DataExport.tsx` — Add self-hosted branching for all data operations
+**RPC calls** — Handle `POST /rest/v1/rpc/:function_name` for database functions like `get_support_users_safe`.
+
+### Files to modify
+
+- `docker/backend/server.js` — Add PostgREST-compatible proxy routes (~200 lines)
+- `nginx.conf` — Add `/rest/v1/` and `/functions/v1/` proxy rules
+- `Dockerfile` — Change `VITE_SUPABASE_URL` to point to the app itself (e.g., `http://localhost:80` or use relative URL)
+
+### Why this approach
+
+- **Zero changes to any page or component** — all 167+ `supabase.from()` calls work as-is
+- **Backup, restore, AND normal page rendering** all work
+- **Future-proof** — any new pages automatically work in Docker mode
+- **Single point of maintenance** — the proxy layer in server.js
+
+### Risk mitigation
+
+- The PostgREST query parser doesn't need to be 100% complete — just the subset actually used by the app
+- Unknown query params are safely ignored
+- Tables are still whitelisted for security
+- User scoping is enforced server-side
 
