@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS public.user_sessions (
     user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
     session_token VARCHAR(255) UNIQUE NOT NULL,
     device_info TEXT,
-    ip_address INET,
+    ip_address TEXT,
     is_revoked BOOLEAN DEFAULT false,
     last_active TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,

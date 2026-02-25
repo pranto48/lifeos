@@ -930,51 +930,84 @@ async function checkSetupMiddleware(req) {
   return false;
 }
 
+// --- App State (for health endpoint) ---
+let appState = { status: 'starting', message: 'Initializing...' };
+
 // --- HTTP Server ---
 const server = http.createServer(async (req, res) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    });
-    res.end();
-    return;
-  }
-
-  // Setup enforcement — block everything until setup is complete
-  const setupOk = await checkSetupMiddleware(req);
-  if (!setupOk) {
-    sendJson(res, 403, {
-      message: 'Setup not complete. Please complete the setup wizard first.',
-      needs_setup: true,
-    });
-    return;
-  }
-
-  // License enforcement
-  const licenseOk = await checkLicenseMiddleware(req);
-  if (!licenseOk) {
-    sendJson(res, 403, {
-      message: 'License is not active. Please configure a valid license.',
-      license_status: licenseCache.status,
-      license_message: licenseCache.message,
-    });
-    return;
-  }
-
-  const routeKey = `${req.method} ${req.url.split('?')[0]}`;
-  const handler = routes[routeKey];
-
-  if (handler) {
-    try {
-      await handler(req, res);
-    } catch (err) {
-      sendJson(res, 500, { message: err.message });
+  try {
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      });
+      res.end();
+      return;
     }
-  } else {
-    sendJson(res, 404, { message: 'Not found' });
+
+    // Health endpoint — always available, even before DB is ready
+    const urlPath = req.url.split('?')[0];
+    if (req.method === 'GET' && urlPath === '/api/health') {
+      sendJson(res, appState.status === 'ready' ? 200 : 503, {
+        status: appState.status,
+        message: appState.message,
+        timestamp: new Date().toISOString(),
+      });
+      return;
+    }
+
+    // If backend is still starting, reject non-health requests
+    if (appState.status === 'starting') {
+      sendJson(res, 503, {
+        message: 'Backend is still starting up. Please wait...',
+        status: 'starting',
+      });
+      return;
+    }
+
+    // Setup enforcement — block everything until setup is complete
+    const setupOk = await checkSetupMiddleware(req);
+    if (!setupOk) {
+      sendJson(res, 403, {
+        message: 'Setup not complete. Please complete the setup wizard first.',
+        needs_setup: true,
+      });
+      return;
+    }
+
+    // License enforcement
+    const licenseOk = await checkLicenseMiddleware(req);
+    if (!licenseOk) {
+      sendJson(res, 403, {
+        message: 'License is not active. Please configure a valid license.',
+        license_status: licenseCache.status,
+        license_message: licenseCache.message,
+      });
+      return;
+    }
+
+    const routeKey = `${req.method} ${urlPath}`;
+    const handler = routes[routeKey];
+
+    if (handler) {
+      try {
+        await handler(req, res);
+      } catch (err) {
+        console.error(`Route error [${routeKey}]:`, err);
+        if (!res.headersSent) {
+          sendJson(res, 500, { message: err.message });
+        }
+      }
+    } else {
+      sendJson(res, 404, { message: 'Not found' });
+    }
+  } catch (err) {
+    console.error('Unhandled request error:', err);
+    if (!res.headersSent) {
+      sendJson(res, 500, { message: 'Internal server error' });
+    }
   }
 });
 
@@ -1122,8 +1155,14 @@ async function connectWithRetry(maxRetries = 10, delayMs = 3000) {
   return false;
 }
 
-async function start() {
-  if (process.env.DB_HOST) {
+async function initializeDatabase() {
+  if (!process.env.DB_HOST) {
+    console.log('No database configured. Setup wizard will guide you.');
+    appState = { status: 'ready', message: 'Waiting for setup wizard' };
+    return;
+  }
+
+  try {
     const connected = await connectWithRetry();
     if (connected) {
       try {
@@ -1146,7 +1185,6 @@ async function start() {
         const licenseKey = envKey || storedKey;
 
         if (licenseKey) {
-          // Save env key to DB if provided
           if (envKey && envKey !== storedKey) {
             await setLicenseSetting('app_license_key', envKey);
           }
@@ -1154,13 +1192,12 @@ async function start() {
           const result = await verifyLicenseWithPortal(licenseKey, true);
           console.log(`🔑 License status: ${result.status} - ${result.message}`);
 
-          // Schedule periodic re-verification every 30 days
-          const RECHECK_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+          const RECHECK_INTERVAL_MS = 30 * 24 * 60 * 60 * 1000;
           setInterval(async () => {
             try {
               const currentKey = await getLicenseSetting('app_license_key');
               if (currentKey) {
-                console.log('🔄 Periodic license re-verification (30-day interval)...');
+                console.log('🔄 Periodic license re-verification...');
                 const recheckResult = await verifyLicenseWithPortal(currentKey, true);
                 console.log(`🔄 License recheck: ${recheckResult.status} - ${recheckResult.message}`);
               }
@@ -1170,21 +1207,26 @@ async function start() {
           }, RECHECK_INTERVAL_MS);
           console.log('⏰ Periodic license re-check scheduled (every 30 days)');
         } else {
-          console.log('⚠️ No license key configured. Set APP_LICENSE_KEY in docker-compose.yml or use /api/license/setup');
+          console.log('⚠️ No license key configured.');
         }
       } catch (err) {
         console.error('⚠️ License check on startup failed:', err.message);
       }
+
+      appState = { status: 'ready', message: 'Backend is ready' };
+      console.log('✅ Backend initialization complete — ready to serve requests');
     } else {
       console.error('❌ Could not connect to database after all retries');
+      appState = { status: 'error', message: 'Database connection failed' };
     }
-  } else {
-    console.log('No database configured. Setup wizard will guide you.');
+  } catch (err) {
+    console.error('❌ Initialization error:', err.message);
+    appState = { status: 'error', message: err.message };
   }
-
-  server.listen(PORT, () => {
-    console.log(`✅ LifeOS API server running on port ${PORT}`);
-  });
 }
 
-start();
+// --- Start: listen FIRST, then initialize DB in background ---
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`✅ LifeOS API server listening on port ${PORT}`);
+  initializeDatabase();
+});
