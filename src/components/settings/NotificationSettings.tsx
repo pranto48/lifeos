@@ -20,14 +20,23 @@ export function NotificationSettings() {
       
       toast({ 
         title: language === 'bn' ? 'রিমাইন্ডার পাঠানো হয়েছে' : 'Reminders Sent', 
-        description: data.message || (language === 'bn' ? 'কাজের রিমাইন্ডার প্রসেস করা হয়েছে।' : 'Task reminders have been processed.')
+        description: data?.message || (language === 'bn' ? 'কাজের রিমাইন্ডার প্রসেস করা হয়েছে।' : 'Task reminders have been processed.')
       });
     } catch (error: any) {
-      toast({ 
-        title: 'Error', 
-        description: error.message || 'Failed to send reminders', 
-        variant: 'destructive' 
-      });
+      // Graceful fallback for Docker/self-hosted mode
+      const msg = error?.message || '';
+      if (msg.includes('self-hosted') || msg.includes('local mode') || msg.includes('Failed to fetch')) {
+        toast({ 
+          title: language === 'bn' ? 'স্থানীয় মোড' : 'Local Mode', 
+          description: language === 'bn' ? 'ইমেইল রিমাইন্ডার স্থানীয় মোডে উপলব্ধ নয়।' : 'Email reminders are not available in local/Docker mode.',
+        });
+      } else {
+        toast({ 
+          title: 'Error', 
+          description: msg || 'Failed to send reminders', 
+          variant: 'destructive' 
+        });
+      }
     } finally {
       setSendingReminders(false);
     }
