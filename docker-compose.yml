@@ -20,6 +20,9 @@ services:
       - "3377:80"
     environment:
       - NODE_ENV=production
+      # URL used for Supabase client proxy. Default: http://localhost:3377
+      # Change if accessing from another host (e.g., http://192.168.1.100:3377)
+      - LIFEOS_URL=${LIFEOS_URL:-http://localhost:3377}
     depends_on:
       backend:
         condition: service_healthy

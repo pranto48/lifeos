@@ -14,7 +14,11 @@ export function detectMode(): SelfHostedConfig {
   const selfHostedApi = import.meta.env.VITE_SELFHOSTED_API_URL;
 
   // If Supabase env vars are set, non-empty, and valid, use cloud mode
-  if (supabaseUrl.length > 0 && supabaseKey.length > 0 && supabaseUrl.includes('supabase')) {
+  // Docker self-hosted uses a placeholder or localhost URL (no 'supabase' in it)
+  const isCloudUrl = supabaseUrl.length > 0 && supabaseKey.length > 0 
+    && supabaseUrl.includes('supabase') 
+    && !supabaseUrl.includes('__LIFEOS_URL_PLACEHOLDER__');
+  if (isCloudUrl) {
     return {
       mode: 'cloud',
       apiUrl: supabaseUrl,
