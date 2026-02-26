@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
+import { ThemeSettings } from './ThemeSettings';
 
 const timezones = [
   'Asia/Dhaka',
@@ -67,6 +68,7 @@ export function PreferencesSettings() {
 
   return (
     <div className="space-y-6">
+      <ThemeSettings />
       <Card className="bg-card border-border">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">

@@ -1424,10 +1424,29 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    // --- Edge functions stub ---
+    // --- Edge functions stub (graceful fallback) ---
     if (urlPath.startsWith('/functions/v1/')) {
-      // In Docker mode, edge functions don't exist. Return graceful no-op responses.
-      sendRestJson(res, 200, { success: true, message: 'Edge functions not available in self-hosted mode' });
+      const funcName = urlPath.replace('/functions/v1/', '').split('/')[0].split('?')[0];
+      
+      // Function-specific responses for known edge functions
+      const functionResponses = {
+        'send-task-reminders': { success: true, message: 'Task reminders processed (local mode)', sent: 0 },
+        'send-habit-reminders': { success: true, message: 'Habit reminders processed (local mode)', sent: 0 },
+        'send-family-event-reminders': { success: true, message: 'Event reminders processed (local mode)', sent: 0 },
+        'send-loan-reminders': { success: true, message: 'Loan reminders processed (local mode)', sent: 0 },
+        'send-push-notification': { success: true, message: 'Push notification skipped (local mode)' },
+        'send-email-notification': { success: true, message: 'Email notification skipped (local mode)' },
+        'send-email-otp': { success: true, message: 'Email OTP skipped (local mode)' },
+        'send-smtp-email': { success: true, message: 'SMTP email skipped (local mode)' },
+        'send-task-assignment-notification': { success: true, message: 'Assignment notification skipped (local mode)' },
+        'google-calendar-sync': { success: true, message: 'Google Calendar sync not available in local mode', events: [] },
+        'microsoft-calendar-sync': { success: true, message: 'Microsoft Calendar sync not available in local mode', events: [] },
+        'save-calendar-credentials': { success: true, message: 'Calendar credentials not supported in local mode' },
+        'manage-resend-key': { success: true, message: 'Resend API not available in local mode' },
+      };
+
+      const response = functionResponses[funcName] || { success: true, message: `Edge function '${funcName}' not available in self-hosted mode` };
+      sendRestJson(res, 200, response);
       return;
     }
 
