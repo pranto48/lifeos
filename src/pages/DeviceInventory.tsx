@@ -32,6 +32,7 @@ import { DeviceFilters } from '@/components/device/DeviceFilters';
 import { SupplierManager } from '@/components/device/SupplierManager';
 import { DeviceDisposalDialog } from '@/components/device/DeviceDisposalDialog';
 import { AnimatedIcon, LoadingSpinner, PulsingDot } from '@/components/ui/animated-icon';
+import { DataExportImportButton } from '@/components/shared/DataExportImportButton';
 
 const STATUS_OPTIONS = [
   { value: 'available', label: 'Available', labelBn: 'উপলব্ধ', color: 'bg-green-500/20 text-green-600' },
@@ -653,10 +654,11 @@ export default function DeviceInventoryPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <DataExportImportButton preset="devices" />
           <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             <Button variant="outline" size="sm" onClick={exportToCSV} className="hover-lift">
               <Download className="h-4 w-4 mr-1 icon-hover-bounce" />
-              <span className="hidden sm:inline">{language === 'bn' ? 'রপ্তানি' : 'Export'}</span>
+              <span className="hidden sm:inline">{language === 'bn' ? 'রপ্তানি' : 'CSV'}</span>
             </Button>
           </motion.div>
           {isAdmin && (

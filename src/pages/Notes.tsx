@@ -18,6 +18,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { toast } from '@/hooks/use-toast';
 import { encryptContent, decryptContent, validatePassphrase } from '@/lib/encryption';
 import { format } from 'date-fns';
+import { DataExportImportButton } from '@/components/shared/DataExportImportButton';
 
 export default function Notes() {
   const { user } = useAuth();
@@ -200,6 +201,7 @@ export default function Notes() {
               className="pl-9 bg-muted/50" 
             />
           </div>
+          <DataExportImportButton preset="notes" />
           <Button onClick={() => setIsCreateDialogOpen(true)}>
             <Plus className="h-4 w-4 mr-2" /> {t('notes.newNote')}
           </Button>

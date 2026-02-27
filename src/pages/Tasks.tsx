@@ -28,6 +28,7 @@ import { PendingTaskAssignments } from '@/components/tasks/PendingTaskAssignment
 import { OutgoingTaskAssignments } from '@/components/tasks/OutgoingTaskAssignments';
 import { TaskAssignmentHistory } from '@/components/tasks/TaskAssignmentHistory';
 import { TaskFollowUp } from '@/components/tasks/TaskFollowUp';
+import { DataExportImportButton } from '@/components/shared/DataExportImportButton';
 import {
   DndContext,
   closestCenter,
@@ -600,6 +601,7 @@ export default function Tasks() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-foreground">{t('tasks.title')}</h1>
         <div className="flex flex-wrap gap-2">
+          <DataExportImportButton preset="tasks" />
           <Button
             variant={selectionMode ? 'secondary' : 'ghost'}
             size="sm"
