@@ -41,14 +41,15 @@ export const EXPORT_PRESETS: Record<string, ExportConfig> = {
   },
 };
 
-// Tables that don't filter by user_id (shared data)
-const SHARED_TABLES = new Set(['support_units', 'support_departments', 'support_users', 'device_categories', 'device_suppliers', 'device_inventory', 'device_service_history']);
+const SHARED_TABLES = new Set([
+  'support_units', 'support_departments', 'support_users',
+  'device_categories', 'device_suppliers', 'device_inventory', 'device_service_history',
+]);
 
 export async function fetchEntityData(entity: ExportableEntity, userId: string): Promise<any[]> {
   if (isSelfHosted()) {
     return selfHostedApi.selectAll(entity);
   }
-
   const isShared = SHARED_TABLES.has(entity);
   let query = supabase.from(entity).select('*');
   if (!isShared) {
@@ -62,18 +63,23 @@ export async function fetchEntityData(entity: ExportableEntity, userId: string):
 export async function exportData(
   preset: string,
   userId: string,
-  format: ExportFormat
+  format: ExportFormat,
+  selectedEntities?: ExportableEntity[],
+  onProgress?: (entity: string, pct: number) => void,
 ): Promise<{ blob: Blob; filename: string }> {
   const config = EXPORT_PRESETS[preset];
   if (!config) throw new Error(`Unknown preset: ${preset}`);
 
+  const entities = selectedEntities && selectedEntities.length > 0 ? selectedEntities : config.entities;
   const result: Record<string, any[]> = {};
-  
-  await Promise.all(
-    config.entities.map(async (entity) => {
-      result[entity] = await fetchEntityData(entity, userId);
-    })
-  );
+  const total = entities.length;
+
+  for (let i = 0; i < total; i++) {
+    const entity = entities[i];
+    onProgress?.(entity, ((i) / total) * 100);
+    result[entity] = await fetchEntityData(entity, userId);
+    onProgress?.(entity, ((i + 1) / total) * 100);
+  }
 
   const exportPayload = {
     exportType: preset,
@@ -83,7 +89,7 @@ export async function exportData(
   };
 
   const dateStr = new Date().toISOString().split('T')[0];
-  
+
   if (format === 'json') {
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
     return { blob, filename: `lifeos-${preset}-${dateStr}.json` };
@@ -98,6 +104,8 @@ export async function importData(
   file: File,
   userId: string,
   onProgress?: (msg: string) => void,
+  onPct?: (pct: number) => void,
+  conflictResolution: 'overwrite' | 'skip' = 'overwrite',
 ): Promise<{ imported: number; errors: string[] }> {
   const text = await file.text();
   let payload: any;
@@ -120,16 +128,37 @@ export async function importData(
   let imported = 0;
   const errors: string[] = [];
   const isShared = (entity: string) => SHARED_TABLES.has(entity as ExportableEntity);
+  const total = preset.entities.length;
 
-  // Import in order (parents first)
-  for (const entity of preset.entities) {
+  for (let idx = 0; idx < total; idx++) {
+    const entity = preset.entities[idx];
     const rows = payload.data[entity];
-    if (!Array.isArray(rows) || rows.length === 0) continue;
+    if (!Array.isArray(rows) || rows.length === 0) {
+      onPct?.(((idx + 1) / total) * 100);
+      continue;
+    }
 
-    onProgress?.(`Importing ${entity} (${rows.length} items)...`);
+    onProgress?.(`Importing ${entity.replace(/_/g, ' ')} (${rows.length} items)...`);
+    onPct?.((idx / total) * 100);
 
-    // Strip generated columns and inject user_id for user-scoped tables
-    const cleaned = rows.map((row: any) => {
+    // If skip mode, filter out existing IDs
+    let filteredRows = rows;
+    if (conflictResolution === 'skip') {
+      try {
+        const existingData = await fetchEntityData(entity as ExportableEntity, userId);
+        const existingIds = new Set(existingData.map((r: any) => r.id));
+        filteredRows = rows.filter((row: any) => !existingIds.has(row.id));
+      } catch {
+        // If fetch fails, proceed with all rows
+      }
+    }
+
+    if (filteredRows.length === 0) {
+      onPct?.(((idx + 1) / total) * 100);
+      continue;
+    }
+
+    const cleaned = filteredRows.map((row: any) => {
       const { search_vector, ...rest } = row;
       if (!isShared(entity)) {
         rest.user_id = userId;
@@ -141,19 +170,23 @@ export async function importData(
       if (isSelfHosted()) {
         await selfHostedApi.upsertBatch(entity, cleaned);
       } else {
-        // Upsert in batches of 100
         for (let i = 0; i < cleaned.length; i += 100) {
           const batch = cleaned.slice(i, i + 100);
           const { error } = await supabase.from(entity as any).upsert(batch as any, { onConflict: 'id' });
           if (error) {
             errors.push(`${entity}: ${error.message}`);
           }
+          // Sub-progress within entity
+          const subPct = (idx / total + ((i + batch.length) / cleaned.length) / total) * 100;
+          onPct?.(subPct);
         }
       }
       imported += cleaned.length;
     } catch (err: any) {
       errors.push(`${entity}: ${err.message}`);
     }
+
+    onPct?.(((idx + 1) / total) * 100);
   }
 
   return { imported, errors };
@@ -219,18 +252,21 @@ function xmlToJson(xmlStr: string): any {
   return xmlNodeToJson(root);
 }
 
+// Public wrapper for conflict detection in the component
+export function xmlToJsonPublic(xmlStr: string): any {
+  return xmlToJson(xmlStr);
+}
+
 function xmlNodeToJson(node: Element): any {
   const result: any = {};
 
   for (const child of Array.from(node.children)) {
     const tag = child.tagName;
 
-    // Check if this is an array (has <item> children)
     if (child.children.length > 0 && child.children[0]?.tagName === 'item') {
       result[tag] = Array.from(child.children)
         .filter(c => c.tagName === 'item')
         .map(item => {
-          // If item has a single <value> child, return primitive
           if (item.children.length === 1 && item.children[0].tagName === 'value') {
             return parsePrimitive(item.children[0].textContent || '');
           }
