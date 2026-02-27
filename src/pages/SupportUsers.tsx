@@ -22,6 +22,7 @@ import { DeviceManagement, DeviceEntry } from '@/components/support/DeviceManage
 import { UserDeviceAssignment } from '@/components/support/UserDeviceAssignment';
 import { useDeviceInventory } from '@/hooks/useDeviceInventory';
 import { useAuth } from '@/contexts/AuthContext';
+import { DataExportImportButton } from '@/components/shared/DataExportImportButton';
 
 interface SupportUserTask {
   id: string;
@@ -828,6 +829,7 @@ export default function SupportUsers() {
         <h1 className="text-2xl font-bold text-foreground">
           {language === 'bn' ? 'সাপোর্ট ইউজার ম্যানেজমেন্ট' : 'Support User Management'}
         </h1>
+        <DataExportImportButton preset="support_users" />
       </div>
 
       <Tabs defaultValue="users" className="space-y-4">

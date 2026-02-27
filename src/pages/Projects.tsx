@@ -17,6 +17,7 @@ import { Progress } from '@/components/ui/progress';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { DataExportImportButton } from '@/components/shared/DataExportImportButton';
 
 interface Milestone {
   id: string;
@@ -360,7 +361,8 @@ export default function Projects() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-foreground">{t('projects.projectIdeas')}</h1>
-        
+        <div className="flex items-center gap-2">
+        <DataExportImportButton preset="projects" />
         <Dialog open={dialogOpen} onOpenChange={(open) => {
           setDialogOpen(open);
           if (!open) resetForm();
@@ -455,6 +457,7 @@ export default function Projects() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
