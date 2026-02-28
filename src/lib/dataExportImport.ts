@@ -203,12 +203,16 @@ export async function importData(
 
     const cleaned = filteredRows.map((row: any) => {
       const { search_vector, ...rest } = row;
-      // Remap user_id to current user for user-scoped tables
-      if (!isShared(entity)) {
+      // Remap user_id to current user for ALL tables during import
+      // This ensures cross-platform compatibility (web <-> Docker)
+      if (rest.user_id) {
         rest.user_id = userId;
       }
       return rest;
     });
+
+    // Determine the correct onConflict key for upsert
+    const onConflictKey = getOnConflictKey(entity);
 
     try {
       if (isSelfHosted()) {
@@ -217,7 +221,7 @@ export async function importData(
       } else {
         for (let i = 0; i < cleaned.length; i += 100) {
           const batch = cleaned.slice(i, i + 100);
-          const { error } = await supabase.from(entity as any).upsert(batch as any, { onConflict: 'id' });
+          const { error } = await supabase.from(entity as any).upsert(batch as any, { onConflict: onConflictKey });
           if (error) {
             errors.push(`${entity}: ${error.message}`);
           }
@@ -254,6 +258,18 @@ async function upsertViaPostgrest(table: string, rows: any[]): Promise<void> {
       const err = await response.json().catch(() => ({ message: response.statusText }));
       throw new Error(err.message || `Import failed for ${table}`);
     }
+  }
+}
+
+// Get the correct onConflict key for each entity during upsert
+function getOnConflictKey(entity: string): string {
+  switch (entity) {
+    case 'profiles':
+      return 'user_id';  // profiles has unique constraint on user_id
+    case 'user_roles':
+      return 'user_id,role';  // user_roles has unique(user_id, role)
+    default:
+      return 'id';
   }
 }
 
