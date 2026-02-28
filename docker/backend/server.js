@@ -962,6 +962,8 @@ const POSTGREST_TABLES = new Set([
 const NO_USER_SCOPE_TABLES = new Set([
   'app_settings', 'ticket_categories', 'ticket_form_fields',
   'support_units', 'support_departments', 'device_suppliers',
+  'device_inventory', 'device_categories', 'device_service_history',
+  'support_users', 'user_roles',
   'ticket_requesters',
 ]);
 
@@ -1540,7 +1542,7 @@ const ALLOWED_DATA_TABLES = new Set([
   'attachments', 'smtp_settings', 'app_secrets',
   'google_calendar_sync', 'synced_calendar_events',
   'push_subscriptions', 'email_otp_codes', 'audit_logs',
-  'qr_code_settings',
+  'qr_code_settings', 'user_roles',
 ]);
 
 function validateTable(tableName) {
@@ -1590,6 +1592,14 @@ function filterRowColumns(row, validColumns) {
   return filtered;
 }
 
+// Tables that should NOT be scoped by user_id in data API
+const DATA_NO_USER_SCOPE = new Set([
+  'support_units', 'support_departments', 'support_users',
+  'device_categories', 'device_suppliers', 'device_inventory', 'device_service_history',
+  'user_roles', 'app_settings', 'ticket_categories', 'ticket_form_fields',
+  'ticket_requesters',
+]);
+
 async function handleDataSelect(req, res, tableName) {
   if (!validateTable(tableName)) {
     sendJson(res, 400, { message: `Invalid table: ${tableName}` });
@@ -1599,7 +1609,12 @@ async function handleDataSelect(req, res, tableName) {
   if (!user) { sendJson(res, 401, { message: 'Not authenticated' }); return; }
 
   try {
-    const rows = await query(`SELECT * FROM ${tableName} WHERE user_id = $1`, [user.sub]);
+    let rows;
+    if (DATA_NO_USER_SCOPE.has(tableName)) {
+      rows = await query(`SELECT * FROM ${tableName}`);
+    } else {
+      rows = await query(`SELECT * FROM ${tableName} WHERE user_id = $1`, [user.sub]);
+    }
     sendJson(res, 200, { data: rows });
   } catch (err) {
     sendJson(res, 500, { message: err.message });
@@ -1620,13 +1635,14 @@ async function handleDataInsert(req, res, tableName) {
     if (!rows.length) { sendJson(res, 200, { inserted: 0 }); return; }
 
     const validColumns = await getTableColumns(tableName);
+    const isSharedTable = DATA_NO_USER_SCOPE.has(tableName);
     let inserted = 0;
     for (const row of rows) {
-      row.user_id = user.sub;
+      if (!isSharedTable) {
+        row.user_id = user.sub;
+      }
       if (!row.id) row.id = uuid();
       delete row.search_vector;
-      delete row.created_at;
-      delete row.updated_at;
 
       const cleaned = filterRowColumns(row, validColumns);
       const keys = Object.keys(cleaned);
@@ -1658,13 +1674,16 @@ async function handleDataUpsert(req, res, tableName) {
     if (!rows.length) { sendJson(res, 200, { upserted: 0 }); return; }
 
     const validColumns = await getTableColumns(tableName);
+    const isSharedTable = DATA_NO_USER_SCOPE.has(tableName);
     let upserted = 0;
     for (const row of rows) {
-      row.user_id = user.sub;
+      // Only set user_id for user-scoped tables
+      if (!isSharedTable) {
+        row.user_id = user.sub;
+      }
       if (!row.id) row.id = uuid();
       delete row.search_vector;
-      delete row.created_at;
-      delete row.updated_at;
+      // Preserve created_at/updated_at from import data (don't strip them)
 
       const cleaned = filterRowColumns(row, validColumns);
       const keys = Object.keys(cleaned);
