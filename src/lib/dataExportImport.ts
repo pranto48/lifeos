@@ -5,7 +5,8 @@ export type ExportableEntity =
   | 'tasks' | 'task_categories' | 'task_checklists' | 'task_follow_up_notes'
   | 'notes' | 'support_users' | 'support_departments' | 'support_units'
   | 'device_inventory' | 'device_categories' | 'device_suppliers' | 'device_service_history'
-  | 'projects' | 'project_milestones';
+  | 'projects' | 'project_milestones'
+  | 'profiles' | 'user_roles';
 
 export type ExportFormat = 'json' | 'xml';
 
@@ -39,16 +40,38 @@ export const EXPORT_PRESETS: Record<string, ExportConfig> = {
     label: 'Projects',
     entities: ['projects', 'project_milestones'],
   },
+  users_roles: {
+    label: 'Users & Roles',
+    entities: ['profiles', 'user_roles'],
+  },
 };
 
+// Tables that are NOT user-scoped (shared/global data)
 const SHARED_TABLES = new Set([
   'support_units', 'support_departments', 'support_users',
   'device_categories', 'device_suppliers', 'device_inventory', 'device_service_history',
+  'user_roles',
 ]);
 
 export async function fetchEntityData(entity: ExportableEntity, userId: string): Promise<any[]> {
   if (isSelfHosted()) {
-    return selfHostedApi.selectAll(entity);
+    // For self-hosted, use the PostgREST proxy which handles scoping properly
+    const isShared = SHARED_TABLES.has(entity);
+    try {
+      if (isShared) {
+        // Fetch all rows for shared tables via PostgREST proxy
+        const response = await fetch(`${getApiBaseUrl()}/rest/v1/${entity}?select=*`, {
+          headers: getRestHeaders(),
+        });
+        if (!response.ok) throw new Error(`Failed to fetch ${entity}`);
+        return await response.json();
+      } else {
+        return selfHostedApi.selectAll(entity);
+      }
+    } catch {
+      // Fallback to data API
+      return selfHostedApi.selectAll(entity);
+    }
   }
   const isShared = SHARED_TABLES.has(entity);
   let query = supabase.from(entity).select('*');
@@ -58,6 +81,26 @@ export async function fetchEntityData(entity: ExportableEntity, userId: string):
   const { data, error } = await query;
   if (error) throw error;
   return data || [];
+}
+
+function getApiBaseUrl(): string {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  if (supabaseUrl && !supabaseUrl.includes('__LIFEOS_URL_PLACEHOLDER__')) {
+    return supabaseUrl;
+  }
+  return window.location.origin;
+}
+
+function getRestHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'anon',
+  };
+  const token = localStorage.getItem('lifeos_token');
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  return headers;
 }
 
 export async function exportData(
@@ -160,6 +203,7 @@ export async function importData(
 
     const cleaned = filteredRows.map((row: any) => {
       const { search_vector, ...rest } = row;
+      // Remap user_id to current user for user-scoped tables
       if (!isShared(entity)) {
         rest.user_id = userId;
       }
@@ -168,7 +212,8 @@ export async function importData(
 
     try {
       if (isSelfHosted()) {
-        await selfHostedApi.upsertBatch(entity, cleaned);
+        // Use PostgREST proxy for Docker imports (supports upsert via Prefer header)
+        await upsertViaPostgrest(entity, cleaned);
       } else {
         for (let i = 0; i < cleaned.length; i += 100) {
           const batch = cleaned.slice(i, i + 100);
@@ -190,6 +235,26 @@ export async function importData(
   }
 
   return { imported, errors };
+}
+
+// Use PostgREST proxy for Docker upserts - this preserves created_at/updated_at
+async function upsertViaPostgrest(table: string, rows: any[]): Promise<void> {
+  const batchSize = 50;
+  for (let i = 0; i < rows.length; i += batchSize) {
+    const batch = rows.slice(i, i + batchSize);
+    const response = await fetch(`${getApiBaseUrl()}/rest/v1/${table}`, {
+      method: 'POST',
+      headers: {
+        ...getRestHeaders(),
+        'Prefer': 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify(batch),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ message: response.statusText }));
+      throw new Error(err.message || `Import failed for ${table}`);
+    }
+  }
 }
 
 // ---- XML helpers ----

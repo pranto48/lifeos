@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DataExportImportButton } from '@/components/shared/DataExportImportButton';
 import { Shield, Users, Key, Loader2, Crown, UserPlus, Trash2, Search, Briefcase, Home, Settings, Calendar, AlertTriangle, Mail, Sparkles } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
@@ -694,6 +695,12 @@ export function AdminSettings({ onAdminStatusChange }: AdminSettingsProps) {
 
             {/* Users & Role Management */}
             <TabsContent value="users" className="space-y-4 mt-4">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-foreground text-sm md:text-base">
+                  {language === 'bn' ? 'ইউজার ও রোল ম্যানেজমেন্ট' : 'Users & Role Management'}
+                </h4>
+                <DataExportImportButton preset="users_roles" label="Users & Roles" />
+              </div>
               {/* Add Role Section */}
               <div className="p-3 md:p-4 rounded-lg border border-border bg-muted/30">
                 <h4 className="font-medium text-foreground mb-3 flex items-center gap-2 text-sm md:text-base">
