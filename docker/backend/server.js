@@ -551,6 +551,66 @@ routes['POST /api/auth/logout'] = async (req, res) => {
   sendJson(res, 200, { success: true });
 };
 
+// Auth: Change Password
+routes['POST /api/auth/change-password'] = async (req, res) => {
+  const payload = getAuthUser(req);
+  if (!payload) {
+    sendJson(res, 401, { message: 'Not authenticated' });
+    return;
+  }
+  const { current_password, new_password } = await parseBody(req);
+  if (!new_password || new_password.length < 8) {
+    sendJson(res, 400, { success: false, message: 'New password must be at least 8 characters.' });
+    return;
+  }
+  try {
+    const users = await query('SELECT id, password_hash FROM users WHERE id = $1', [payload.sub]);
+    if (users.length === 0) {
+      sendJson(res, 404, { success: false, message: 'User not found.' });
+      return;
+    }
+    // Verify current password
+    if (current_password) {
+      const hash = crypto.createHash('sha256').update(current_password).digest('hex');
+      if (hash !== users[0].password_hash) {
+        sendJson(res, 403, { success: false, message: 'Current password is incorrect.' });
+        return;
+      }
+    }
+    const newHash = crypto.createHash('sha256').update(new_password).digest('hex');
+    await query('UPDATE users SET password_hash = $1 WHERE id = $2', [newHash, payload.sub]);
+    sendJson(res, 200, { success: true, message: 'Password updated successfully.' });
+  } catch (err) {
+    sendJson(res, 500, { success: false, message: err.message });
+  }
+};
+
+// Auth: Update Email
+routes['POST /api/auth/update-email'] = async (req, res) => {
+  const payload = getAuthUser(req);
+  if (!payload) {
+    sendJson(res, 401, { message: 'Not authenticated' });
+    return;
+  }
+  const { email } = await parseBody(req);
+  if (!email || !email.includes('@')) {
+    sendJson(res, 400, { success: false, message: 'Invalid email address.' });
+    return;
+  }
+  try {
+    // Check if email already in use
+    const existing = await query('SELECT id FROM users WHERE email = $1 AND id != $2', [email, payload.sub]);
+    if (existing.length > 0) {
+      sendJson(res, 409, { success: false, message: 'Email already in use by another account.' });
+      return;
+    }
+    await query('UPDATE users SET email = $1 WHERE id = $2', [email, payload.sub]);
+    sendJson(res, 200, { success: true, message: 'Email updated successfully.' });
+  } catch (err) {
+    sendJson(res, 500, { success: false, message: err.message });
+  }
+};
+
 // --- License Verification via Supabase Edge Function ---
 const LICENSE_VERIFY_URL = process.env.LICENSE_API_URL || 'https://abcytwvuntyicdknpzju.supabase.co/functions/v1/verify-license';
 const LICENSE_ENCRYPTION_KEY = 'ITSupportBD_SecureKey_2024';
@@ -896,6 +956,8 @@ const LICENSE_EXEMPT_ROUTES = [
   'POST /api/auth/login',
   'POST /api/auth/logout',
   'POST /api/auth/register',
+  'POST /api/auth/change-password',
+  'POST /api/auth/update-email',
 ];
 
 async function checkLicenseMiddleware(req) {
@@ -919,6 +981,7 @@ async function checkSetupMiddleware(req) {
     'GET /api/setup/status', 'POST /api/setup/admin', 'POST /api/setup/initialize', 'POST /api/setup/test-connection',
     'POST /api/license/verify', 'POST /api/license/setup', 'GET /api/license/status',
     'POST /api/auth/login', 'POST /api/auth/logout', 'POST /api/auth/register', 'GET /api/auth/session',
+    'POST /api/auth/change-password', 'POST /api/auth/update-email',
   ];
   if (setupExempt.includes(routeKey)) return true;
 

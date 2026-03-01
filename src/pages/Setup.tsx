@@ -888,12 +888,12 @@ export default function Setup() {
                     </Button>
                   </div>
 
-                  <button
-                    onClick={handleSkipLicense}
-                    className="w-full text-xs text-muted-foreground hover:text-foreground transition-colors text-center py-2"
-                  >
-                    Skip — use Free plan (limited to 5 users)
-                  </button>
+                  <p className="text-xs text-muted-foreground text-center py-2">
+                    A valid license key is required to use LifeOS.{' '}
+                    <a href={LICENSE_PORTAL_URL + '/products.php'} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      Purchase a license
+                    </a>
+                  </p>
                 </div>
               </motion.div>
             )}
