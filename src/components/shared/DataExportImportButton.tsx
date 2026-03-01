@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Download, Upload, FileJson, FileCode, Loader2, Check, AlertTriangle, RefreshCw, SkipForward, Replace } from 'lucide-react';
+import { Download, Upload, FileJson, FileCode, Loader2, Check, AlertTriangle, RefreshCw, SkipForward, Replace, FileDown, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from '@/components/ui/dropdown-menu';
@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -32,6 +33,134 @@ interface ConflictItem {
 }
 
 type ConflictResolution = 'overwrite' | 'skip';
+
+// Generate example import file content for a given preset
+function generateExampleFile(preset: string): object {
+  const config = EXPORT_PRESETS[preset];
+  if (!config) return {};
+
+  const exampleData: Record<string, any[]> = {};
+
+  for (const entity of config.entities) {
+    switch (entity) {
+      case 'tasks':
+        exampleData.tasks = [{
+          id: 'example-task-id-1',
+          title: 'Example Task',
+          description: 'This is an example task for import reference',
+          status: 'pending',
+          priority: 'medium',
+          task_type: 'office',
+          due_date: '2026-03-15',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'task_categories':
+        exampleData.task_categories = [{
+          id: 'example-cat-id-1',
+          name: 'Example Category',
+          color: '#3b82f6',
+          icon: 'Briefcase',
+          category_type: 'office',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'notes':
+        exampleData.notes = [{
+          id: 'example-note-id-1',
+          title: 'Example Note',
+          content: 'This is an example note content for import reference.',
+          note_type: 'office',
+          is_pinned: false,
+          is_favorite: false,
+          tags: ['example'],
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'support_units':
+        exampleData.support_units = [{
+          id: 'example-unit-id-1',
+          name: 'Example Unit',
+          description: 'Example organizational unit',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'support_departments':
+        exampleData.support_departments = [{
+          id: 'example-dept-id-1',
+          name: 'Example Department',
+          unit_id: 'example-unit-id-1',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'support_users':
+        exampleData.support_users = [{
+          id: 'example-suser-id-1',
+          name: 'John Doe',
+          email: 'john@example.com',
+          department_id: 'example-dept-id-1',
+          designation: 'Engineer',
+          is_active: true,
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'device_categories':
+        exampleData.device_categories = [{
+          id: 'example-dcat-id-1',
+          name: 'Laptop',
+          description: 'Portable computers',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'device_inventory':
+        exampleData.device_inventory = [{
+          id: 'example-device-id-1',
+          device_name: 'Dell Latitude 5540',
+          serial_number: 'SN-EXAMPLE-001',
+          status: 'available',
+          category_id: 'example-dcat-id-1',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'projects':
+        exampleData.projects = [{
+          id: 'example-project-id-1',
+          title: 'Example Project',
+          description: 'An example project for import reference',
+          status: 'active',
+          priority: 'medium',
+          project_type: 'office',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'profiles':
+        exampleData.profiles = [{
+          id: 'example-profile-id-1',
+          full_name: 'Example User',
+          email: 'user@example.com',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      case 'user_roles':
+        exampleData.user_roles = [{
+          id: 'example-role-id-1',
+          role: 'admin',
+          user_id: 'YOUR_USER_ID',
+        }];
+        break;
+      default:
+        exampleData[entity] = [];
+    }
+  }
+
+  return {
+    exportType: preset,
+    exportedAt: new Date().toISOString(),
+    version: '1.0',
+    _note: 'Replace YOUR_USER_ID with your actual user ID. All IDs should be valid UUIDs.',
+    data: exampleData,
+  };
+}
 
 export function DataExportImportButton({ preset, label }: DataExportImportButtonProps) {
   const { user } = useAuth();
@@ -59,6 +188,14 @@ export function DataExportImportButton({ preset, label }: DataExportImportButton
 
   const config = EXPORT_PRESETS[preset];
   const displayLabel = label || config?.label || preset;
+
+  // ---- Download example file ----
+  const handleDownloadExample = () => {
+    const example = generateExampleFile(preset);
+    const blob = new Blob([JSON.stringify(example, null, 2)], { type: 'application/json' });
+    downloadBlob(blob, `lifeos-${preset}-example.json`);
+    toast.success('Example file downloaded! Edit it with your data and import.');
+  };
 
   // ---- Export with category picker ----
 
@@ -125,7 +262,6 @@ export function DataExportImportButton({ preset, label }: DataExportImportButton
       const text = await file.text();
       let payload: any;
       if (file.name.endsWith('.xml')) {
-        // We'll parse inside importData, but we need to peek here
         const { xmlToJsonPublic } = await import('@/lib/dataExportImport');
         payload = xmlToJsonPublic(text);
       } else {
@@ -167,7 +303,6 @@ export function DataExportImportButton({ preset, label }: DataExportImportButton
         setImportProgress(0);
         setImportEntity('');
       } else {
-        // No conflicts – import directly
         await executeImport(file, 'overwrite');
       }
     } catch (err: any) {
@@ -223,35 +358,45 @@ export function DataExportImportButton({ preset, label }: DataExportImportButton
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" disabled={exporting || importing}>
-            {exporting || importing ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Download className="h-4 w-4 mr-2" />
-            )}
-            {importing ? 'Importing...' : exporting ? 'Exporting...' : 'Export / Import'}
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Export {displayLabel}</DropdownMenuLabel>
-          <DropdownMenuItem onClick={() => openCategoryPicker('json')}>
-            <FileJson className="h-4 w-4 mr-2" />
-            Export as JSON
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => openCategoryPicker('xml')}>
-            <FileCode className="h-4 w-4 mr-2" />
-            Export as XML
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuLabel>Import {displayLabel}</DropdownMenuLabel>
-          <DropdownMenuItem onClick={handleImportClick}>
+      {/* Main action buttons - clearly visible */}
+      <div className="flex flex-wrap items-center gap-2">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="default" size="sm" disabled={exporting}>
+              {exporting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4 mr-2" />
+              )}
+              {exporting ? 'Exporting...' : `Export ${displayLabel}`}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => openCategoryPicker('json')}>
+              <FileJson className="h-4 w-4 mr-2" />
+              Export as JSON
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => openCategoryPicker('xml')}>
+              <FileCode className="h-4 w-4 mr-2" />
+              Export as XML
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <Button variant="outline" size="sm" onClick={handleImportClick} disabled={importing}>
+          {importing ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
             <Upload className="h-4 w-4 mr-2" />
-            Import from JSON / XML
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+          )}
+          {importing ? 'Importing...' : `Import ${displayLabel}`}
+        </Button>
+
+        <Button variant="ghost" size="sm" onClick={handleDownloadExample} title="Download example import file">
+          <FileDown className="h-4 w-4 mr-2" />
+          Example File
+        </Button>
+      </div>
 
       <input ref={fileInputRef} type="file" accept=".json,.xml" className="hidden" onChange={handleFileChange} />
 
@@ -327,7 +472,7 @@ export function DataExportImportButton({ preset, label }: DataExportImportButton
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-yellow-500" />
+              <AlertTriangle className="h-5 w-5 text-warning" />
               Duplicate Items Found
             </DialogTitle>
             <DialogDescription>
@@ -391,7 +536,7 @@ export function DataExportImportButton({ preset, label }: DataExportImportButton
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               {importResult?.errors.length ? (
-                <AlertTriangle className="h-5 w-5 text-yellow-500" />
+                <AlertTriangle className="h-5 w-5 text-warning" />
               ) : (
                 <Check className="h-5 w-5 text-green-500" />
               )}
