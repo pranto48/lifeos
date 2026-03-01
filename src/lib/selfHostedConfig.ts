@@ -57,21 +57,66 @@ export function getApiUrl(): string {
 export function installSelfHostedFetchInterceptor() {
   if (!isSelfHosted()) return;
 
-  const originalFetch = window.fetch;
-  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+  const FLAG = '__lifeos_selfhosted_fetch_interceptor_installed__';
+  if ((window as any)[FLAG]) return;
+  (window as any)[FLAG] = true;
 
-    // Only intercept requests to the local PostgREST / auth / functions proxy
-    if (url.includes('/rest/v1/') || url.includes('/auth/v1/') || url.includes('/functions/v1/')) {
-      const token = localStorage.getItem('lifeos_token');
-      if (token) {
-        const headers = new Headers(init?.headers || {});
-        headers.set('Authorization', `Bearer ${token}`);
-        init = { ...init, headers };
-      }
+  const originalFetch = window.fetch.bind(window);
+
+  const isProxyPath = (pathname: string) =>
+    pathname.startsWith('/rest/v1/') || pathname.startsWith('/auth/v1/') || pathname.startsWith('/functions/v1/');
+
+  const isLoopbackHost = (hostname: string) =>
+    hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '[::1]';
+
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const originalUrl =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : (input as Request).url;
+
+    let parsed: URL | null = null;
+    try {
+      parsed = new URL(originalUrl, window.location.origin);
+    } catch {
+      parsed = null;
     }
 
-    return originalFetch(input, init);
+    const isProxyRequest = parsed ? isProxyPath(parsed.pathname) : false;
+
+    // If the build injected localhost (default Docker config) but the app is opened
+    // from another host/IP, force requests back to the current app origin.
+    const rewrittenUrl =
+      parsed &&
+      isProxyRequest &&
+      parsed.origin !== window.location.origin &&
+      isLoopbackHost(parsed.hostname)
+        ? `${window.location.origin}${parsed.pathname}${parsed.search}`
+        : originalUrl;
+
+    if (!isProxyRequest) {
+      return originalFetch(input, init);
+    }
+
+    const headers = new Headers(input instanceof Request ? input.headers : undefined);
+    if (init?.headers) {
+      const initHeaders = new Headers(init.headers);
+      initHeaders.forEach((value, key) => headers.set(key, value));
+    }
+
+    const token = localStorage.getItem('lifeos_token');
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+
+    if (input instanceof Request) {
+      const request = new Request(rewrittenUrl, input);
+      return originalFetch(request, { ...init, headers });
+    }
+
+    return originalFetch(rewrittenUrl, { ...init, headers });
   };
 }
 
@@ -169,6 +214,9 @@ export class SelfHostedApi {
     try {
       return await this.request<{ user: any }>('/auth/session');
     } catch {
+      // Token is missing/expired/invalid - clear local auth state.
+      this.token = null;
+      localStorage.removeItem('lifeos_token');
       return null;
     }
   }
