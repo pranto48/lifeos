@@ -50,6 +50,31 @@ export function getApiUrl(): string {
   return detectMode().apiUrl;
 }
 
+// Install a global fetch interceptor that injects the self-hosted JWT token
+// into all Supabase client requests (/rest/v1/, /auth/v1/, /functions/v1/).
+// Without this, the Supabase client sends only the anon key, and the backend
+// cannot identify the user — causing all CRUD operations to fail.
+export function installSelfHostedFetchInterceptor() {
+  if (!isSelfHosted()) return;
+
+  const originalFetch = window.fetch;
+  window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : (input as Request).url;
+
+    // Only intercept requests to the local PostgREST / auth / functions proxy
+    if (url.includes('/rest/v1/') || url.includes('/auth/v1/') || url.includes('/functions/v1/')) {
+      const token = localStorage.getItem('lifeos_token');
+      if (token) {
+        const headers = new Headers(init?.headers || {});
+        headers.set('Authorization', `Bearer ${token}`);
+        init = { ...init, headers };
+      }
+    }
+
+    return originalFetch(input, init);
+  };
+}
+
 // Self-hosted API client for local database operations
 export class SelfHostedApi {
   private baseUrl: string;

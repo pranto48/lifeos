@@ -1211,6 +1211,12 @@ async function handlePostgrestRequest(req, res, tableName) {
       const rows = Array.isArray(body) ? body : [body];
       if (!rows.length) { sendRestJson(res, 201, []); return; }
 
+      // Require authentication for inserts on user-scoped tables
+      if (!user && !NO_USER_SCOPE_TABLES.has(tableName)) {
+        sendRestJson(res, 401, { message: 'Authentication required. Please log in again.', code: 'AUTH_REQUIRED' });
+        return;
+      }
+
       const validColumns = await getTableColumns(tableName);
       const results = [];
 
